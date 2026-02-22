@@ -577,6 +577,94 @@ class ErrorResponse(BaseModel):
     error_type: Optional[str] = None
 
 
+# ============================================================================
+# Stream Metrics Models
+# ============================================================================
+
+class StreamMetricPoint(BaseModel):
+    """Single time-series data point for a stream."""
+    stream_name: str
+    collected_at: str
+    messages: int
+    bytes: int
+    consumer_count: int
+    msg_rate: float = 0.0
+    byte_rate: float = 0.0
+
+
+class StreamMetricsResponse(BaseModel):
+    """Rate data for a single stream."""
+    stream_name: str
+    points: List[StreamMetricPoint]
+    window_minutes: int
+
+
+class StreamMetricsSummaryResponse(BaseModel):
+    """Rate data for all streams on a connection."""
+    connection_id: str
+    streams: List[StreamMetricsResponse]
+    window_minutes: int
+
+
+# ============================================================================
+# Connection Health Models
+# ============================================================================
+
+class HealthCheckEntry(BaseModel):
+    """Single health check record."""
+    status: str
+    jetstream_ok: bool = True
+    error: Optional[str] = None
+    checked_at: str
+
+
+class HealthHistoryResponse(BaseModel):
+    """Health check history for a connection."""
+    connection_id: str
+    checks: List[HealthCheckEntry]
+    window_hours: int
+
+
+class UptimeSummaryResponse(BaseModel):
+    """Uptime statistics for a connection."""
+    connection_id: str
+    total_checks: int
+    up_checks: int
+    down_checks: int
+    uptime_pct: float
+    last_status: Optional[str] = None
+    last_error: Optional[str] = None
+    last_checked_at: Optional[str] = None
+
+
+# ============================================================================
+# Audit Log Models
+# ============================================================================
+
+class AuditLogEntry(BaseModel):
+    """Single audit log entry."""
+    id: int
+    user_id: Optional[int] = None
+    user_email: Optional[str] = None
+    action: str
+    resource_type: str
+    resource_name: Optional[str] = None
+    connection_id: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    ip_address: Optional[str] = None
+    created_at: str
+
+
+class AuditLogResponse(BaseModel):
+    """Paginated audit log response."""
+    entries: List[AuditLogEntry]
+    total: int
+
+
+# ============================================================================
+# System Models
+# ============================================================================
+
 class SystemMetricPoint(BaseModel):
     """Simple named metric for UI charts/widgets."""
     name: str

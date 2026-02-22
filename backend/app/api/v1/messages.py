@@ -1,9 +1,9 @@
 """API endpoints for NATS JetStream messages."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from nats.js.errors import NotFoundError
 
-from app.api.deps import get_connection, require_admin
+from app.api.deps import get_connection, require_admin, audit_action
 from app.models.schemas import (
     MessageData,
     MessageBatchPublishRequest,
@@ -27,6 +27,7 @@ router = APIRouter(tags=["messages"])
 async def publish_message(
     connection_id: str,
     request: MessagePublishRequest,
+    http_request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -43,6 +44,10 @@ async def publish_message(
 
     try:
         result = await MessageService.publish_message(conn_info, request)
+        audit_action(
+            http_request, "publish_message", "message", request.subject,
+            connection_id, details={"seq": result.seq, "stream": result.stream},
+        )
         return result
 
     except Exception as e:
@@ -59,6 +64,7 @@ async def publish_message(
 async def publish_batch(
     connection_id: str,
     request: MessageBatchPublishRequest,
+    http_request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -75,6 +81,10 @@ async def publish_batch(
 
     try:
         result = await MessageService.publish_batch(conn_info, request)
+        audit_action(
+            http_request, "publish_batch", "message", request.subject,
+            connection_id, details={"count": result.published},
+        )
         return result
 
     except Exception as e:
@@ -189,12 +199,13 @@ async def replay_message(
     stream_name: str,
     seq: int,
     request: MessageReplayRequest,
+    http_request: Request,
     _: None = Depends(require_admin),
 ):
     """Replay a message to a target subject (DLQ retry workflow)."""
     conn_info = await get_connection(connection_id)
     try:
-        return await MessageService.replay_message(
+        result = await MessageService.replay_message(
             conn_info,
             stream_name=stream_name,
             seq=seq,
@@ -202,6 +213,11 @@ async def replay_message(
             copy_headers=request.copy_headers,
             extra_headers=request.extra_headers,
         )
+        audit_action(
+            http_request, "replay_message", "message", stream_name,
+            connection_id, details={"seq": seq, "target": request.target_subject},
+        )
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

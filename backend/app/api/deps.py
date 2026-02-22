@@ -1,9 +1,12 @@
 """Dependency injection for API endpoints."""
 
+from typing import Any
+
 from fastapi import Depends, HTTPException, Request, status
 from app.core.connection_manager import connection_manager, ConnectionInfo
 from app.core.config import settings
 from app.services.auth_service import AuthService
+from app.services.audit_service import AuditService
 
 
 async def get_connection(connection_id: str) -> ConnectionInfo:
@@ -102,3 +105,33 @@ async def get_current_user(request: Request):
             detail="Invalid or expired session",
         )
     return user
+
+
+def audit_action(
+    request: Request,
+    action: str,
+    resource_type: str,
+    resource_name: str | None = None,
+    connection_id: str | None = None,
+    details: dict[str, Any] | None = None,
+) -> None:
+    """Log an audit entry, extracting user info from the request token."""
+    user_id = None
+    user_email = None
+    token = _extract_bearer_token(request)
+    if token:
+        user = AuthService.get_user_by_session_token(token)
+        if user:
+            user_id = user.id
+            user_email = user.email
+    ip_address = request.client.host if request.client else None
+    AuditService.log(
+        action=action,
+        resource_type=resource_type,
+        resource_name=resource_name,
+        user_id=user_id,
+        user_email=user_email,
+        connection_id=connection_id,
+        details=details,
+        ip_address=ip_address,
+    )

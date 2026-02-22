@@ -1,9 +1,9 @@
 """API endpoints for NATS JetStream streams."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from nats.js.errors import BadRequestError, NotFoundError
 
-from app.api.deps import get_connection, require_admin
+from app.api.deps import get_connection, require_admin, audit_action
 from app.core.connection_manager import ConnectionInfo
 from app.models.schemas import (
     StreamCreateRequest,
@@ -45,6 +45,7 @@ async def list_streams(connection_id: str):
 async def create_stream(
     connection_id: str,
     stream_config: StreamCreateRequest,
+    request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -61,6 +62,7 @@ async def create_stream(
 
     try:
         stream_info = await StreamService.create_stream(conn_info, stream_config)
+        audit_action(request, "create_stream", "stream", stream_config.name, connection_id)
         return stream_info
 
     except BadRequestError as e:
@@ -109,6 +111,7 @@ async def update_stream(
     connection_id: str,
     stream_name: str,
     update_config: StreamUpdateRequest,
+    request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -126,6 +129,7 @@ async def update_stream(
 
     try:
         stream_info = await StreamService.update_stream(conn_info, stream_name, update_config)
+        audit_action(request, "update_stream", "stream", stream_name, connection_id)
         return stream_info
 
     except NotFoundError:
@@ -150,6 +154,7 @@ async def update_stream(
 async def delete_stream(
     connection_id: str,
     stream_name: str,
+    request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -166,6 +171,7 @@ async def delete_stream(
 
     try:
         success = await StreamService.delete_stream(conn_info, stream_name)
+        audit_action(request, "delete_stream", "stream", stream_name, connection_id)
         return StreamDeleteResponse(success=success, deleted_stream=stream_name)
 
     except NotFoundError:
@@ -185,6 +191,7 @@ async def delete_stream(
 async def purge_stream(
     connection_id: str,
     stream_name: str,
+    request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -201,6 +208,7 @@ async def purge_stream(
 
     try:
         success = await StreamService.purge_stream(conn_info, stream_name)
+        audit_action(request, "purge_stream", "stream", stream_name, connection_id)
         return StreamPurgeResponse(success=success, purged=True)
 
     except NotFoundError:

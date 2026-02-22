@@ -1,8 +1,8 @@
 """API endpoints for NATS connections."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.core.connection_manager import connection_manager
-from app.api.deps import require_admin
+from app.api.deps import require_admin, audit_action
 from app.models.schemas import (
     ConnectionListResponse,
     ConnectionRequest,
@@ -44,6 +44,7 @@ async def test_connection(request: ConnectionRequest):
 @router.post("/connect", response_model=ConnectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_connection(
     request: ConnectionRequest,
+    http_request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -63,6 +64,10 @@ async def create_connection(
             token=request.token
         )
 
+        audit_action(
+            http_request, "connect", "connection", request.url,
+            connection_id,
+        )
         return ConnectionResponse(
             connection_id=connection_id,
             status="connected",
@@ -99,6 +104,7 @@ async def get_connection_status(connection_id: str):
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def disconnect(
     connection_id: str,
+    request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -108,6 +114,8 @@ async def disconnect(
         connection_id: Connection ID
     """
     removed = await connection_manager.remove_connection(connection_id)
+    if removed:
+        audit_action(request, "disconnect", "connection", connection_id, connection_id)
     if not removed:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
