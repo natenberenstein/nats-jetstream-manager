@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  # nats:
+  #   image: nats:latest
+  #   command: "-js -m 8222"
+  #   ports:
+  #     - "4222:4222"
+  #     - "8222:8222"
+  #   networks:
+  #     - nats-network
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend:/app
+    networks:
+      - nats-network
+    # depends_on:
+    #   - nats
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - nats-network
+    depends_on:
+      - backend
+
+networks:
+  nats-network:
+    driver: bridge
