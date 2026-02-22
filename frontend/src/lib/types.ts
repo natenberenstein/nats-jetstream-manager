@@ -329,6 +329,73 @@ export interface SystemObservability {
   generated_at: string;
 }
 
+// Stream Metrics types
+export interface StreamMetricPoint {
+  stream_name: string;
+  collected_at: string;
+  messages: number;
+  bytes: number;
+  consumer_count: number;
+  msg_rate: number;
+  byte_rate: number;
+}
+
+export interface StreamMetricsResponse {
+  stream_name: string;
+  points: StreamMetricPoint[];
+  window_minutes: number;
+}
+
+export interface StreamMetricsSummaryResponse {
+  connection_id: string;
+  streams: StreamMetricsResponse[];
+  window_minutes: number;
+}
+
+// Connection Health types
+export interface HealthCheckEntry {
+  status: 'up' | 'down';
+  jetstream_ok: boolean;
+  error?: string | null;
+  checked_at: string;
+}
+
+export interface HealthHistoryResponse {
+  connection_id: string;
+  checks: HealthCheckEntry[];
+  window_hours: number;
+}
+
+export interface UptimeSummary {
+  connection_id: string;
+  total_checks: number;
+  up_checks: number;
+  down_checks: number;
+  uptime_pct: number;
+  last_status?: string | null;
+  last_error?: string | null;
+  last_checked_at?: string | null;
+}
+
+// Audit Log types
+export interface AuditLogEntry {
+  id: number;
+  user_id?: number | null;
+  user_email?: string | null;
+  action: string;
+  resource_type: string;
+  resource_name?: string | null;
+  connection_id?: string | null;
+  details?: Record<string, unknown> | null;
+  ip_address?: string | null;
+  created_at: string;
+}
+
+export interface AuditLogResponse {
+  entries: AuditLogEntry[];
+  total: number;
+}
+
 // API response types
 export interface ApiResponse<T> {
   data?: T;

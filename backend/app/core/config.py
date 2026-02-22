@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 24 * 7
     invite_ttl_hours: int = 72
 
+    # Metrics & Health
+    metrics_collection_interval: int = 30  # seconds
+    metrics_retention_hours: int = 24
+    health_check_interval: int = 30  # seconds
+    health_retention_days: int = 7
+
     # Email invitations
     smtp_host: str = ""
     smtp_port: int = 587

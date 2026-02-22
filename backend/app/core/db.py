@@ -87,6 +87,49 @@ def init_db() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_jobs_connection_id ON jobs(connection_id);
             CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+
+            CREATE TABLE IF NOT EXISTS stream_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                connection_id TEXT NOT NULL,
+                stream_name TEXT NOT NULL,
+                messages INTEGER NOT NULL DEFAULT 0,
+                bytes INTEGER NOT NULL DEFAULT 0,
+                consumer_count INTEGER NOT NULL DEFAULT 0,
+                collected_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_stream_metrics_conn_stream
+                ON stream_metrics(connection_id, stream_name, collected_at);
+
+            CREATE TABLE IF NOT EXISTS connection_health (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                connection_id TEXT NOT NULL,
+                url TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('up', 'down')),
+                jetstream_ok INTEGER NOT NULL DEFAULT 1,
+                error TEXT,
+                checked_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_connection_health_conn
+                ON connection_health(connection_id, checked_at);
+
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                user_email TEXT,
+                action TEXT NOT NULL,
+                resource_type TEXT NOT NULL,
+                resource_name TEXT,
+                connection_id TEXT,
+                details_json TEXT,
+                ip_address TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+            CREATE INDEX IF NOT EXISTS idx_audit_log_resource_type ON audit_log(resource_type);
             """
         )
         conn.commit()

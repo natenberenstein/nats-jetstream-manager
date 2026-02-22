@@ -1,5 +1,6 @@
 """FastAPI application with lifespan management."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -10,6 +11,8 @@ from app.core.connection_manager import connection_manager
 from app.api.v1.router import api_router
 from app.models.schemas import HealthResponse
 from app.core.db import init_db
+from app.services.metrics_service import MetricsService
+from app.services.health_service import HealthService
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +23,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def _metrics_collection_loop():
+    """Background task: collect stream metrics and health checks, prune old data."""
+    interval = settings.metrics_collection_interval
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            await MetricsService.collect_all_snapshots()
+            await HealthService.check_all_connections()
+            MetricsService.prune_old_metrics()
+            HealthService.prune_old_records()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in metrics collection loop: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -27,6 +46,7 @@ async def lifespan(app: FastAPI):
 
     Handles:
     - Starting the connection manager
+    - Starting the metrics collection background task
     - Cleaning up all connections on shutdown
     """
     # Startup
@@ -36,10 +56,19 @@ async def lifespan(app: FastAPI):
     await connection_manager.start()
     logger.info("Connection manager started")
 
+    metrics_task = asyncio.create_task(_metrics_collection_loop())
+    logger.info("Metrics collection loop started")
+
     yield
 
     # Shutdown
     logger.info("Shutting down NATS JetStream Manager application")
+    metrics_task.cancel()
+    try:
+        await metrics_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Metrics collection loop stopped")
     await connection_manager.stop()
     logger.info("Connection manager stopped")
 

@@ -14,6 +14,11 @@ import {
   ClusterOverview,
   StreamConfig,
   StreamInfo,
+  StreamMetricsResponse,
+  StreamMetricsSummaryResponse,
+  HealthHistoryResponse,
+  UptimeSummary,
+  AuditLogResponse,
   ConsumerConfig,
   ConsumerInfo,
   ConsumerAnalytics,
@@ -337,6 +342,49 @@ export const messageApi = {
         body: JSON.stringify({ schema, payload }),
       }
     ),
+};
+
+export const metricsApi = {
+  getStreamMetrics: (connectionId: string, streamName: string, window = 15) =>
+    fetchApi<StreamMetricsResponse>(
+      `/connections/${connectionId}/metrics/streams/${encodeURIComponent(streamName)}?window=${window}`
+    ),
+
+  getAllStreamMetrics: (connectionId: string, window = 15) =>
+    fetchApi<StreamMetricsSummaryResponse>(
+      `/connections/${connectionId}/metrics/streams?window=${window}`
+    ),
+};
+
+export const connectionHealthApi = {
+  getHistory: (connectionId: string, window = 24) =>
+    fetchApi<HealthHistoryResponse>(
+      `/connections/${connectionId}/health/history?window=${window}`
+    ),
+
+  getUptime: (connectionId: string, window = 24) =>
+    fetchApi<UptimeSummary>(
+      `/connections/${connectionId}/health/uptime?window=${window}`
+    ),
+};
+
+export const auditApi = {
+  list: (params: {
+    limit?: number;
+    offset?: number;
+    action?: string;
+    resource_type?: string;
+    user_id?: number;
+  } = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+    if (params.offset) searchParams.append('offset', params.offset.toString());
+    if (params.action) searchParams.append('action', params.action);
+    if (params.resource_type) searchParams.append('resource_type', params.resource_type);
+    if (params.user_id) searchParams.append('user_id', params.user_id.toString());
+    const qs = searchParams.toString();
+    return fetchApi<AuditLogResponse>(`/audit${qs ? `?${qs}` : ''}`);
+  },
 };
 
 export const systemApi = {

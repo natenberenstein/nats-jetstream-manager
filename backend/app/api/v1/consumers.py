@@ -1,9 +1,9 @@
 """API endpoints for NATS JetStream consumers."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from nats.js.errors import BadRequestError, NotFoundError
 
-from app.api.deps import get_connection, require_admin
+from app.api.deps import get_connection, require_admin, audit_action
 from app.models.schemas import (
     ConsumerAnalyticsResponse,
     ConsumerCreateRequest,
@@ -67,6 +67,7 @@ async def create_consumer(
     connection_id: str,
     stream_name: str,
     consumer_config: ConsumerCreateRequest,
+    request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -85,6 +86,12 @@ async def create_consumer(
     try:
         consumer_info = await ConsumerService.create_consumer(
             conn_info, stream_name, consumer_config
+        )
+        audit_action(
+            request, "create_consumer", "consumer",
+            consumer_config.name or consumer_config.durable_name,
+            connection_id,
+            details={"stream": stream_name},
         )
         return consumer_info
 
@@ -143,6 +150,7 @@ async def delete_consumer(
     connection_id: str,
     stream_name: str,
     consumer_name: str,
+    request: Request,
     _: None = Depends(require_admin),
 ):
     """
@@ -160,6 +168,10 @@ async def delete_consumer(
 
     try:
         success = await ConsumerService.delete_consumer(conn_info, stream_name, consumer_name)
+        audit_action(
+            request, "delete_consumer", "consumer", consumer_name,
+            connection_id, details={"stream": stream_name},
+        )
         return ConsumerDeleteResponse(success=success, deleted_consumer=consumer_name)
 
     except NotFoundError:
