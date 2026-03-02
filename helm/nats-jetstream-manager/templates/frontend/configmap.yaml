@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nats-jetstream-manager.fullname" . }}-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nats-jetstream-manager.frontend.labels" . | nindent 4 }}
+data:
+  {{- if .Values.frontend.config.apiUrl }}
+  NEXT_PUBLIC_API_URL: {{ .Values.frontend.config.apiUrl | quote }}
+  {{- else if and .Values.ingress.enabled .Values.ingress.backend.host }}
+  NEXT_PUBLIC_API_URL: {{ printf "http%s://%s" (ternary "s" "" (not (empty .Values.ingress.backend.tls))) .Values.ingress.backend.host | quote }}
+  {{- else }}
+  NEXT_PUBLIC_API_URL: {{ printf "http://%s-backend.%s.svc.cluster.local:%d" (include "nats-jetstream-manager.fullname" .) .Release.Namespace (int .Values.backend.service.port) | quote }}
+  {{- end }}

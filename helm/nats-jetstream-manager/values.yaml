@@ -1,0 +1,190 @@
+# -- Override the chart name
+nameOverride: ""
+# -- Override the full release name
+fullnameOverride: ""
+
+# -- Number of old ReplicaSets to retain
+revisionHistoryLimit: 3
+
+serviceAccount:
+  # -- Create a ServiceAccount
+  create: true
+  # -- Annotations for the ServiceAccount (e.g. for IRSA or Workload Identity)
+  annotations: {}
+  # -- Override the ServiceAccount name
+  name: ""
+
+# ------------------------------------------------------------
+# Backend (FastAPI / Python)
+# ------------------------------------------------------------
+backend:
+  image:
+    repository: nats-jetstream-manager/backend
+    tag: ""  # defaults to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+
+  # -- Number of replicas (ignored when HPA is enabled)
+  replicaCount: 1
+
+  config:
+    # -- NATS server URL
+    natsUrl: "nats://nats:4222"
+    # -- Log level
+    logLevel: "info"
+    # -- Additional non-secret env vars
+    extraEnv: {}
+
+  secrets:
+    # -- Use an existing Secret instead of creating one
+    existingSecret: ""
+    # -- Admin API token (ignored when existingSecret is set)
+    adminToken: ""
+    # -- Viewer API token (ignored when existingSecret is set)
+    viewerToken: ""
+    # -- SMTP password (ignored when existingSecret is set)
+    smtpPassword: ""
+
+  persistence:
+    # -- Enable PVC for SQLite data
+    enabled: true
+    # -- Storage class (empty = cluster default)
+    storageClass: ""
+    # -- Access mode
+    accessMode: ReadWriteOnce
+    # -- PVC size
+    size: 1Gi
+    # -- Annotations for the PVC
+    annotations: {}
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  autoscaling:
+    # -- Enable HPA (not recommended with SQLite persistence)
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+
+  podDisruptionBudget:
+    # -- Enable PDB
+    enabled: false
+    minAvailable: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podSecurityContext:
+    fsGroup: 1000
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+
+# ------------------------------------------------------------
+# Frontend (Next.js)
+# ------------------------------------------------------------
+frontend:
+  image:
+    repository: nats-jetstream-manager/frontend
+    tag: ""  # defaults to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+
+  # -- Number of replicas (ignored when HPA is enabled)
+  replicaCount: 1
+
+  config:
+    # -- Backend API URL passed as NEXT_PUBLIC_API_URL at build time
+    apiUrl: ""
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  autoscaling:
+    # -- Enable HPA for frontend
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+
+  podDisruptionBudget:
+    # -- Enable PDB
+    enabled: false
+    minAvailable: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podSecurityContext:
+    fsGroup: 1001
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+
+# ------------------------------------------------------------
+# Ingress
+# ------------------------------------------------------------
+ingress:
+  # -- Enable Ingress resources
+  enabled: false
+  # -- Ingress class name
+  className: ""
+  # -- Shared annotations for both ingress resources
+  annotations: {}
+  frontend:
+    # -- Frontend hostname
+    host: ""
+    # -- Frontend path
+    path: /
+    # -- Path type
+    pathType: Prefix
+    # -- TLS configuration
+    tls: []
+    #  - secretName: frontend-tls
+    #    hosts:
+    #      - app.example.com
+  backend:
+    # -- Backend hostname
+    host: ""
+    # -- Backend path
+    path: /
+    # -- Path type
+    pathType: Prefix
+    # -- TLS configuration
+    tls: []
+    #  - secretName: backend-tls
+    #    hosts:
+    #      - api.example.com
+
+# ------------------------------------------------------------
+# Network Policy
+# ------------------------------------------------------------
+networkPolicy:
+  # -- Enable NetworkPolicy resources
+  enabled: false
+
+# -- Global image pull secrets
+imagePullSecrets: []
