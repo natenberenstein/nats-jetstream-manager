@@ -1,0 +1,14 @@
+{{- if .Values.frontend.podDisruptionBudget.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "nats-jetstream-manager.fullname" . }}-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nats-jetstream-manager.frontend.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.frontend.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "nats-jetstream-manager.frontend.selectorLabels" . | nindent 6 }}
+{{- end }}

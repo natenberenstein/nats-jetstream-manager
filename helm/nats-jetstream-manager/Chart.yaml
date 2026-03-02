@@ -1,0 +1,13 @@
+apiVersion: v2
+name: nats-jetstream-manager
+description: A Helm chart for NATS JetStream Manager - a web UI for managing NATS JetStream clusters
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - nats
+  - jetstream
+  - streaming
+  - messaging
+maintainers:
+  - name: ncbernar
