@@ -1,15 +1,13 @@
 """Connection manager for handling multiple NATS connections."""
 
 import asyncio
-import logging
+from loguru import logger
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Optional
 
 import nats
 from nats.js import JetStreamContext
-
-logger = logging.getLogger(__name__)
 
 
 class ConnectionInfo:
@@ -39,11 +37,11 @@ class ConnectionManager:
     """Manages multiple NATS connections with automatic cleanup."""
 
     def __init__(self, max_connections: int = 100, timeout_seconds: int = 300):
-        self.connections: Dict[str, ConnectionInfo] = {}
+        self.connections: dict[str, ConnectionInfo] = {}
         self.max_connections = max_connections
         self.timeout_seconds = timeout_seconds
         self._lock = asyncio.Lock()
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
 
     async def start(self):
         """Start the connection manager and cleanup task."""
@@ -191,6 +189,9 @@ class ConnectionManager:
                 user=user,
                 password=password,
                 token=token,
+                allow_reconnect=False,
+                connect_timeout=5,
+                max_reconnect_attempts=2,
             )
 
             # Check if JetStream is enabled

@@ -2,25 +2,44 @@
 
 import asyncio
 import logging
+import sys
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 
+from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.connection_manager import connection_manager
-from app.api.v1.router import api_router
-from app.models.schemas import HealthResponse
 from app.core.db import init_db
-from app.services.metrics_service import MetricsService
+from app.models.schemas import HealthResponse
 from app.services.health_service import HealthService
+from app.services.metrics_service import MetricsService
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+# Configure loguru
+logger.remove()
+logger.add(
+    sys.stderr,
+    level=settings.log_level.upper(),
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan> - <level>{message}</level>",
+    colorize=True,
 )
 
-logger = logging.getLogger(__name__)
+# Intercept stdlib logging (used by nats-py, uvicorn, etc.) and route through loguru
+class _InterceptHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+        frame, depth = logging.currentframe(), 2
+        while frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back  # type: ignore[assignment]
+            depth += 1
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
 
 
 async def _metrics_collection_loop():

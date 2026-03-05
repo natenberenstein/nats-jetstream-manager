@@ -1,6 +1,6 @@
 """Service for managing NATS JetStream streams."""
 
-import logging
+from loguru import logger
 from typing import Any
 
 from nats.js import api
@@ -13,7 +13,7 @@ from nats.js.errors import NotFoundError
 from app.core.connection_manager import ConnectionInfo
 from app.models.schemas import StreamCreateRequest, StreamUpdateRequest
 
-logger = logging.getLogger(__name__)
+
 
 
 class StreamService:

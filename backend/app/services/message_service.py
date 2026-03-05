@@ -1,7 +1,7 @@
 """Service for managing NATS JetStream messages."""
 
 import json
-import logging
+from loguru import logger
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from typing import Any, Awaitable, Callable
@@ -11,7 +11,7 @@ from nats.js.errors import NotFoundError
 from app.core.connection_manager import ConnectionInfo
 from app.models.schemas import MessageBatchPublishRequest, MessagePublishRequest
 
-logger = logging.getLogger(__name__)
+
 
 
 class MessageService:

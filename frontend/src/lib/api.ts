@@ -82,7 +82,7 @@ export const connectionApi = {
     fetchApi<{ connections: ConnectionListItem[]; total: number }>('/connections'),
 
   test: (request: ConnectionRequest) =>
-    fetchApi<{ success: boolean; jetstream_enabled: boolean; server_info: any }>(
+    fetchApi<{ success: boolean; jetstream_enabled: boolean; server_info: any; error?: string }>(
       '/connections/test',
       {
         method: 'POST',
