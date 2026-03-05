@@ -17,7 +17,7 @@ from app.services.health_service import HealthService
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.version,
     description="A web-based management interface for NATS JetStream clusters",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Configure CORS
@@ -102,10 +102,7 @@ async def health_check():
     Returns:
         Application health status and version
     """
-    return HealthResponse(
-        status="healthy",
-        version=settings.version
-    )
+    return HealthResponse(status="healthy", version=settings.version)
 
 
 @app.get("/", tags=["root"])
@@ -120,5 +117,5 @@ async def root():
         "message": "NATS JetStream Manager API",
         "version": settings.version,
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }

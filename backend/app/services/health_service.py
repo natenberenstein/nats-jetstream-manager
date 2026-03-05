@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 
 from app.core.config import settings
 from app.core.connection_manager import connection_manager
-from app.core.db import get_db_connection
+from app.core.db import get_db_session
+from app.models.health import ConnectionHealth
 
 logger = logging.getLogger(__name__)
 
@@ -37,46 +38,53 @@ class HealthService:
                 status = "down"
                 error_msg = str(e)
 
-            conn = get_db_connection()
-            try:
-                conn.execute(
-                    """INSERT INTO connection_health
-                       (connection_id, url, status, jetstream_ok, error, checked_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (conn_id, conn_info.url, status, int(jetstream_ok), error_msg, now),
+            with get_db_session() as session:
+                session.add(
+                    ConnectionHealth(
+                        connection_id=conn_id,
+                        url=conn_info.url,
+                        status=status,
+                        jetstream_ok=int(jetstream_ok),
+                        error=error_msg,
+                        checked_at=now,
+                    )
                 )
-                conn.commit()
                 rows += 1
-            finally:
-                conn.close()
         return rows
 
     @staticmethod
     def prune_old_records() -> int:
         cutoff = (datetime.utcnow() - timedelta(days=settings.health_retention_days)).isoformat()
-        conn = get_db_connection()
-        try:
-            cur = conn.execute("DELETE FROM connection_health WHERE checked_at < ?", (cutoff,))
-            conn.commit()
-            return cur.rowcount
-        finally:
-            conn.close()
+        with get_db_session() as session:
+            deleted = (
+                session.query(ConnectionHealth)
+                .filter(ConnectionHealth.checked_at < cutoff)
+                .delete(synchronize_session=False)
+            )
+            return deleted
 
     @staticmethod
     def get_health_history(connection_id: str, window_hours: int = 24) -> list[dict]:
         since = (datetime.utcnow() - timedelta(hours=window_hours)).isoformat()
-        conn = get_db_connection()
-        try:
-            rows = conn.execute(
-                """SELECT status, jetstream_ok, error, checked_at
-                   FROM connection_health
-                   WHERE connection_id = ? AND checked_at >= ?
-                   ORDER BY checked_at""",
-                (connection_id, since),
-            ).fetchall()
-            return [dict(r) for r in rows]
-        finally:
-            conn.close()
+        with get_db_session() as session:
+            rows = (
+                session.query(ConnectionHealth)
+                .filter(
+                    ConnectionHealth.connection_id == connection_id,
+                    ConnectionHealth.checked_at >= since,
+                )
+                .order_by(ConnectionHealth.checked_at)
+                .all()
+            )
+            return [
+                {
+                    "status": r.status,
+                    "jetstream_ok": r.jetstream_ok,
+                    "error": r.error,
+                    "checked_at": r.checked_at,
+                }
+                for r in rows
+            ]
 
     @staticmethod
     def get_uptime_summary(connection_id: str, window_hours: int = 24) -> dict:
