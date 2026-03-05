@@ -3,59 +3,44 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core.connection_manager import ConnectionInfo
-from app.core.db import get_db_connection
+from app.core.db import get_db_session
+from app.models.job import Job
 from app.services.message_service import MessageService
 
 
 def _now_iso() -> str:
-    return datetime.now(tz=timezone.utc).isoformat()
+    return datetime.now(tz=UTC).isoformat()
 
 
 class JobService:
-    """In-process async job runner with sqlite-backed status."""
+    """In-process async job runner with ORM-backed status."""
 
     _tasks: dict[str, asyncio.Task[Any]] = {}
 
     @staticmethod
-    def _serialize_json(value: Any) -> str | None:
-        if value is None:
-            return None
-        return json.dumps(value)
-
-    @staticmethod
-    def _deserialize_json(value: str | None) -> dict[str, Any] | None:
-        if not value:
-            return None
-        try:
-            parsed = json.loads(value)
-            return parsed if isinstance(parsed, dict) else {"value": parsed}
-        except json.JSONDecodeError:
-            return {"raw": value}
-
-    @staticmethod
-    def _row_to_job(row: Any) -> dict[str, Any]:
+    def _row_to_job(obj: Job) -> dict[str, Any]:
         return {
-            "id": row["id"],
-            "connection_id": row["connection_id"],
-            "job_type": row["job_type"],
-            "status": row["status"],
-            "progress": float(row["progress"] or 0),
-            "current": row["current"],
-            "total": row["total"],
-            "message": row["message"],
-            "error": row["error"],
-            "payload": JobService._deserialize_json(row["payload_json"]),
-            "result": JobService._deserialize_json(row["result_json"]),
-            "cancel_requested": bool(row["cancel_requested"]),
-            "created_at": row["created_at"],
-            "started_at": row["started_at"],
-            "completed_at": row["completed_at"],
+            "id": obj.id,
+            "connection_id": obj.connection_id,
+            "job_type": obj.job_type,
+            "status": obj.status,
+            "progress": float(obj.progress or 0),
+            "current": obj.current,
+            "total": obj.total,
+            "message": obj.message,
+            "error": obj.error,
+            "payload": obj.payload_json,
+            "result": obj.result_json,
+            "cancel_requested": bool(obj.cancel_requested),
+            "created_at": obj.created_at,
+            "started_at": obj.started_at,
+            "completed_at": obj.completed_at,
         }
 
     @staticmethod
@@ -63,46 +48,41 @@ class JobService:
         job_id = str(uuid.uuid4())
         created_at = _now_iso()
 
-        with get_db_connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO jobs (id, connection_id, job_type, status, progress, payload_json, created_at)
-                VALUES (?, ?, ?, 'pending', 0, ?, ?)
-                """,
-                (job_id, connection_id, job_type, JobService._serialize_json(payload), created_at),
+        with get_db_session() as session:
+            job = Job(
+                id=job_id,
+                connection_id=connection_id,
+                job_type=job_type,
+                status="pending",
+                progress=0,
+                payload_json=payload,
+                created_at=created_at,
             )
-            row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-            conn.commit()
-
-        if row is None:
-            raise RuntimeError("Failed to create job")
-        return JobService._row_to_job(row)
+            session.add(job)
+            session.flush()
+            session.refresh(job)
+            return JobService._row_to_job(job)
 
     @staticmethod
     def get_job(job_id: str, connection_id: str | None = None) -> dict[str, Any] | None:
-        with get_db_connection() as conn:
+        with get_db_session() as session:
+            query = session.query(Job).filter(Job.id == job_id)
             if connection_id:
-                row = conn.execute(
-                    "SELECT * FROM jobs WHERE id = ? AND connection_id = ?",
-                    (job_id, connection_id),
-                ).fetchone()
-            else:
-                row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-            return JobService._row_to_job(row) if row else None
+                query = query.filter(Job.connection_id == connection_id)
+            job = query.first()
+            return JobService._row_to_job(job) if job else None
 
     @staticmethod
     def list_jobs(connection_id: str, limit: int = 50) -> list[dict[str, Any]]:
-        with get_db_connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT * FROM jobs
-                WHERE connection_id = ?
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (connection_id, limit),
-            ).fetchall()
-            return [JobService._row_to_job(row) for row in rows]
+        with get_db_session() as session:
+            jobs = (
+                session.query(Job)
+                .filter(Job.connection_id == connection_id)
+                .order_by(Job.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [JobService._row_to_job(j) for j in jobs]
 
     @staticmethod
     def _update_job(
@@ -118,68 +98,54 @@ class JobService:
         started_at: str | None = None,
         completed_at: str | None = None,
     ) -> None:
-        fields: list[str] = []
-        values: list[Any] = []
-
-        if status is not None:
-            fields.append("status = ?")
-            values.append(status)
-        if progress is not None:
-            fields.append("progress = ?")
-            values.append(progress)
-        if current is not None:
-            fields.append("current = ?")
-            values.append(current)
-        if total is not None:
-            fields.append("total = ?")
-            values.append(total)
-        if message is not None:
-            fields.append("message = ?")
-            values.append(message)
-        if error is not None:
-            fields.append("error = ?")
-            values.append(error)
-        if result is not None:
-            fields.append("result_json = ?")
-            values.append(JobService._serialize_json(result))
-        if started_at is not None:
-            fields.append("started_at = ?")
-            values.append(started_at)
-        if completed_at is not None:
-            fields.append("completed_at = ?")
-            values.append(completed_at)
-
-        if not fields:
-            return
-
-        with get_db_connection() as conn:
-            conn.execute(f"UPDATE jobs SET {', '.join(fields)} WHERE id = ?", [*values, job_id])
-            conn.commit()
+        with get_db_session() as session:
+            job = session.query(Job).filter(Job.id == job_id).first()
+            if job is None:
+                return
+            if status is not None:
+                job.status = status
+            if progress is not None:
+                job.progress = progress
+            if current is not None:
+                job.current = current
+            if total is not None:
+                job.total = total
+            if message is not None:
+                job.message = message
+            if error is not None:
+                job.error = error
+            if result is not None:
+                job.result_json = result
+            if started_at is not None:
+                job.started_at = started_at
+            if completed_at is not None:
+                job.completed_at = completed_at
 
     @staticmethod
     def cancel_job(job_id: str, connection_id: str) -> dict[str, Any] | None:
-        with get_db_connection() as conn:
-            conn.execute(
-                "UPDATE jobs SET cancel_requested = 1 WHERE id = ? AND connection_id = ?",
-                (job_id, connection_id),
+        with get_db_session() as session:
+            job = (
+                session.query(Job)
+                .filter(Job.id == job_id, Job.connection_id == connection_id)
+                .first()
             )
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE id = ? AND connection_id = ?",
-                (job_id, connection_id),
-            ).fetchone()
-            conn.commit()
+            if job is None:
+                return None
+            job.cancel_requested = 1
+            session.flush()
+            result = JobService._row_to_job(job)
 
         task = JobService._tasks.get(job_id)
         if task and not task.done():
             task.cancel()
 
-        return JobService._row_to_job(row) if row else None
+        return result
 
     @staticmethod
     def _is_cancel_requested(job_id: str) -> bool:
-        with get_db_connection() as conn:
-            row = conn.execute("SELECT cancel_requested FROM jobs WHERE id = ?", (job_id,)).fetchone()
-            return bool(row and row["cancel_requested"])
+        with get_db_session() as session:
+            val = session.query(Job.cancel_requested).filter(Job.id == job_id).scalar()
+            return bool(val)
 
     @staticmethod
     async def _run_job(

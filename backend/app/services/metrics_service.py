@@ -6,8 +6,9 @@ import logging
 from datetime import datetime, timedelta
 
 from app.core.config import settings
-from app.core.connection_manager import ConnectionInfo, connection_manager
-from app.core.db import get_db_connection
+from app.core.connection_manager import connection_manager
+from app.core.db import get_db_session
+from app.models.metrics import StreamMetric
 
 logger = logging.getLogger(__name__)
 
@@ -24,26 +25,19 @@ class MetricsService:
                 if not conn_info.nc.is_connected:
                     continue
                 streams = await conn_info.js.streams_info()
-                conn = get_db_connection()
-                try:
+                with get_db_session() as session:
                     for si in streams:
-                        conn.execute(
-                            """INSERT INTO stream_metrics
-                               (connection_id, stream_name, messages, bytes, consumer_count, collected_at)
-                               VALUES (?, ?, ?, ?, ?, ?)""",
-                            (
-                                conn_id,
-                                si.config.name,
-                                si.state.messages,
-                                si.state.bytes,
-                                si.state.consumers,
-                                now,
-                            ),
+                        session.add(
+                            StreamMetric(
+                                connection_id=conn_id,
+                                stream_name=si.config.name,
+                                messages=si.state.messages,
+                                bytes=si.state.bytes,
+                                consumer_count=si.state.consumers,
+                                collected_at=now,
+                            )
                         )
                         rows += 1
-                    conn.commit()
-                finally:
-                    conn.close()
             except Exception as e:
                 logger.warning(f"Failed to collect metrics for connection {conn_id}: {e}")
         return rows
@@ -51,13 +45,13 @@ class MetricsService:
     @staticmethod
     def prune_old_metrics() -> int:
         cutoff = (datetime.utcnow() - timedelta(hours=settings.metrics_retention_hours)).isoformat()
-        conn = get_db_connection()
-        try:
-            cur = conn.execute("DELETE FROM stream_metrics WHERE collected_at < ?", (cutoff,))
-            conn.commit()
-            return cur.rowcount
-        finally:
-            conn.close()
+        with get_db_session() as session:
+            deleted = (
+                session.query(StreamMetric)
+                .filter(StreamMetric.collected_at < cutoff)
+                .delete(synchronize_session=False)
+            )
+            return deleted
 
     @staticmethod
     def get_stream_metrics(
@@ -66,27 +60,24 @@ class MetricsService:
         window_minutes: int = 15,
     ) -> list[dict]:
         since = (datetime.utcnow() - timedelta(minutes=window_minutes)).isoformat()
-        conn = get_db_connection()
-        try:
+        with get_db_session() as session:
+            query = session.query(StreamMetric).filter(
+                StreamMetric.connection_id == connection_id,
+                StreamMetric.collected_at >= since,
+            )
             if stream_name:
-                rows = conn.execute(
-                    """SELECT stream_name, messages, bytes, consumer_count, collected_at
-                       FROM stream_metrics
-                       WHERE connection_id = ? AND stream_name = ? AND collected_at >= ?
-                       ORDER BY collected_at""",
-                    (connection_id, stream_name, since),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """SELECT stream_name, messages, bytes, consumer_count, collected_at
-                       FROM stream_metrics
-                       WHERE connection_id = ? AND collected_at >= ?
-                       ORDER BY collected_at""",
-                    (connection_id, since),
-                ).fetchall()
-            return [dict(r) for r in rows]
-        finally:
-            conn.close()
+                query = query.filter(StreamMetric.stream_name == stream_name)
+            rows = query.order_by(StreamMetric.collected_at).all()
+            return [
+                {
+                    "stream_name": r.stream_name,
+                    "messages": r.messages,
+                    "bytes": r.bytes,
+                    "consumer_count": r.consumer_count,
+                    "collected_at": r.collected_at,
+                }
+                for r in rows
+            ]
 
     @staticmethod
     def get_stream_rates(

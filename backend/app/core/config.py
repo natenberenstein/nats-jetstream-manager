@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     viewer_token: str = ""
     user_auth_enabled: bool = True
     database_path: str = "./data/nats_manager.db"
+    database_driver: str = "sqlite"  # "sqlite" or "postgresql"
+    database_url: str = ""  # Required when driver=postgresql
     session_ttl_hours: int = 24 * 7
     invite_ttl_hours: int = 72
 
