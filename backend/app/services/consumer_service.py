@@ -1,7 +1,7 @@
 """Service for managing NATS JetStream consumers."""
 
 from datetime import datetime, timezone
-import logging
+from loguru import logger
 from typing import Any
 
 from nats.js.api import AckPolicy as NatsAckPolicy
@@ -17,7 +17,7 @@ from app.models.schemas import ConsumerCreateRequest
 from app.models.schemas import DeliverPolicy as SchemaDeliverPolicy
 from app.models.schemas import ReplayPolicy as SchemaReplayPolicy
 
-logger = logging.getLogger(__name__)
+
 
 
 class ConsumerService:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import logging
+from loguru import logger
 from datetime import datetime, timedelta
 
 from app.core.config import settings
@@ -10,7 +10,7 @@ from app.core.connection_manager import connection_manager
 from app.core.db import get_db_session
 from app.models.metrics import StreamMetric
 
-logger = logging.getLogger(__name__)
+
 
 
 class MetricsService:

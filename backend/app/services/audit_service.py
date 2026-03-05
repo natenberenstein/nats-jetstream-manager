@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import logging
+from loguru import logger
 from datetime import datetime
 from typing import Any
 
@@ -11,7 +11,7 @@ from sqlalchemy import func
 from app.core.db import get_db_session
 from app.models.audit import AuditLog
 
-logger = logging.getLogger(__name__)
+
 
 
 class AuditService:

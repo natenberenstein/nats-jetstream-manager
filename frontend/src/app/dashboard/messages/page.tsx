@@ -256,6 +256,7 @@ export default function MessagesPage() {
   const diffWorkerRef = useRef<Worker | null>(null);
   const diffJobIdRef = useRef(0);
   const diffContainerRef = useRef<HTMLDivElement>(null);
+  const refetchRef = useRef<() => void>(() => {});
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [favoriteStreams, setFavoriteStreams] = useState<string[]>([]);
 
@@ -342,7 +343,7 @@ export default function MessagesPage() {
     if (headerKey) params.set("header_key", headerKey);
     if (headerValue) params.set("header_value", headerValue);
     if (payloadContains) params.set("payload_contains", payloadContains);
-    router.replace(`${pathname}?${params.toString()}`);
+    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
   }, [
     selectedStream,
     limit,
@@ -352,7 +353,6 @@ export default function MessagesPage() {
     headerValue,
     payloadContains,
     pathname,
-    router,
   ]);
 
   useEffect(() => {
@@ -368,7 +368,7 @@ export default function MessagesPage() {
       }
       if (event.key.toLowerCase() === "r" && !isTyping) {
         event.preventDefault();
-        void refetch();
+        void refetchRef.current();
       }
       if (event.key.toLowerCase() === "l" && !isTyping) {
         event.preventDefault();
@@ -377,7 +377,7 @@ export default function MessagesPage() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  });
+  }, []);
 
   const queryParams = useMemo(
     () => ({
@@ -400,6 +400,7 @@ export default function MessagesPage() {
     error: messagesError,
     refetch,
   } = useMessages(connectionId, selectedStream, queryParams, liveMode ? liveIntervalMs : false);
+  refetchRef.current = refetch;
   const publishMessage = usePublishMessage(connectionId);
   const publishBatch = usePublishBatch(connectionId);
   const startIndexJob = useStartIndexJob(connectionId);
@@ -540,7 +541,7 @@ export default function MessagesPage() {
     });
   };
 
-  const currentMessages = messagesData?.messages ?? [];
+  const currentMessages = useMemo(() => messagesData?.messages ?? [], [messagesData?.messages]);
   const diffMessages = useMemo(
     () =>
       compareSelection
@@ -568,7 +569,8 @@ export default function MessagesPage() {
     };
 
     void loadMissingPayloads();
-  }, [connectionId, selectedStream, diffMessages, loadedPayloads]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionId, selectedStream, diffMessages]);
 
   useEffect(() => {
     if (diffMessages.length !== 2) {
@@ -614,8 +616,12 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (diffMessages.length !== 2 || !showDiffViewer) {
-      setDiffRows([]);
-      setDiffSummary({ equal: 0, added: 0, removed: 0, changed: 0 });
+      setDiffRows((prev) => (prev.length === 0 ? prev : []));
+      setDiffSummary((prev) =>
+        prev.equal === 0 && prev.added === 0 && prev.removed === 0 && prev.changed === 0
+          ? prev
+          : { equal: 0, added: 0, removed: 0, changed: 0 }
+      );
       setDiffBusy(false);
       return;
     }

@@ -45,7 +45,6 @@ async def test_connection(request: ConnectionRequest):
 async def create_connection(
     request: ConnectionRequest,
     http_request: Request,
-    _: None = Depends(require_admin),
 ):
     """
     Establish a connection to a NATS cluster and create a session.

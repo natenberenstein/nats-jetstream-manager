@@ -27,7 +27,8 @@ export default function HomePage() {
     password: '',
   });
 
-  const [testResult, setTestResult] = useState<{ success: boolean; jetstream: boolean } | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; jetstream: boolean; error?: string } | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   const handleAuth = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -45,11 +46,14 @@ export default function HomePage() {
 
   const handleTest = async () => {
     setTestResult(null);
+    setIsTesting(true);
     try {
       const result = await testConnection(formData);
-      setTestResult({ success: result.success, jetstream: result.jetstream_enabled });
-    } catch {
-      setTestResult({ success: false, jetstream: false });
+      setTestResult({ success: result.success, jetstream: result.jetstream_enabled, error: result.error });
+    } catch (err) {
+      setTestResult({ success: false, jetstream: false, error: err instanceof Error ? err.message : 'Connection test failed' });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -131,7 +135,7 @@ export default function HomePage() {
                       <>
                         <XCircle className="w-5 h-5" />
                         <AlertTitle>Connection failed</AlertTitle>
-                        <AlertDescription>Check URL and credentials.</AlertDescription>
+                        <AlertDescription>{testResult.error || 'Check URL and credentials.'}</AlertDescription>
                       </>
                     )}
                   </Alert>
@@ -146,8 +150,15 @@ export default function HomePage() {
                 )}
 
                 <div className="flex gap-3">
-                  <Button type="button" variant="secondary" onClick={handleTest} disabled={isConnecting || !isAuthenticated} className="flex-1">
-                    Test Connection
+                  <Button type="button" variant="secondary" onClick={handleTest} disabled={isConnecting || isTesting || !isAuthenticated} className="flex-1">
+                    {isTesting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      'Test Connection'
+                    )}
                   </Button>
                   <Button type="submit" disabled={isConnecting || !isAuthenticated} className="flex-1">
                     {isConnecting ? (

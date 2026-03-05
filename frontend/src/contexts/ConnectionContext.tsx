@@ -31,7 +31,7 @@ interface ConnectionContextValue extends ConnectionState {
   switchConnection: (connectionId: string) => void;
   renameConnection: (connectionId: string, name: string) => void;
   refreshConnections: () => Promise<void>;
-  testConnection: (request: ConnectionRequest) => Promise<{ success: boolean; jetstream_enabled: boolean }>;
+  testConnection: (request: ConnectionRequest) => Promise<{ success: boolean; jetstream_enabled: boolean; error?: string }>;
   isConnecting: boolean;
   error: string | null;
 }

@@ -54,7 +54,7 @@ export default function ClustersPage() {
     setResult(null);
     try {
       const test = await testConnection(form);
-      setResult(test.success ? `Connection OK (JetStream: ${test.jetstream_enabled ? 'enabled' : 'disabled'})` : 'Connection failed');
+      setResult(test.success ? `Connection OK (JetStream: ${test.jetstream_enabled ? 'enabled' : 'disabled'})` : `Connection failed: ${test.error || 'Unknown error'}`);
     } catch (err) {
       setResult(err instanceof Error ? err.message : 'Connection test failed');
     }
