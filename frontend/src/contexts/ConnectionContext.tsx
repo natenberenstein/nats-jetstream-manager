@@ -25,13 +25,18 @@ interface ConnectionState {
 }
 
 interface ConnectionContextValue extends ConnectionState {
-  connect: (request: ConnectionRequest, options?: { name?: string; makeActive?: boolean }) => Promise<void>;
+  connect: (
+    request: ConnectionRequest,
+    options?: { name?: string; makeActive?: boolean },
+  ) => Promise<void>;
   disconnect: (connectionId?: string) => Promise<void>;
   disconnectAll: () => Promise<void>;
   switchConnection: (connectionId: string) => void;
   renameConnection: (connectionId: string, name: string) => void;
   refreshConnections: () => Promise<void>;
-  testConnection: (request: ConnectionRequest) => Promise<{ success: boolean; jetstream_enabled: boolean; error?: string }>;
+  testConnection: (
+    request: ConnectionRequest,
+  ) => Promise<{ success: boolean; jetstream_enabled: boolean; error?: string }>;
   isConnecting: boolean;
   error: string | null;
 }
@@ -64,24 +69,31 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const persistMeta = useCallback((nextConnections: ManagedConnection[], nextActiveId: string | null) => {
-    if (typeof window === 'undefined') return;
-    const meta: Record<string, ConnectionMeta> = {};
-    for (const conn of nextConnections) {
-      meta[conn.connectionId] = { name: conn.name, url: conn.url };
-    }
-    localStorage.setItem(CONNECTION_META_KEY, JSON.stringify(meta));
-    if (nextActiveId) localStorage.setItem(ACTIVE_CONNECTION_KEY, nextActiveId);
-    else localStorage.removeItem(ACTIVE_CONNECTION_KEY);
-  }, []);
+  const persistMeta = useCallback(
+    (nextConnections: ManagedConnection[], nextActiveId: string | null) => {
+      if (typeof window === 'undefined') return;
+      const meta: Record<string, ConnectionMeta> = {};
+      for (const conn of nextConnections) {
+        meta[conn.connectionId] = { name: conn.name, url: conn.url };
+      }
+      localStorage.setItem(CONNECTION_META_KEY, JSON.stringify(meta));
+      if (nextActiveId) localStorage.setItem(ACTIVE_CONNECTION_KEY, nextActiveId);
+      else localStorage.removeItem(ACTIVE_CONNECTION_KEY);
+    },
+    [],
+  );
 
   const refreshConnections = useCallback(async () => {
     setError(null);
     try {
       const response = await connectionApi.list();
       const activeList = response.connections || [];
-      const meta = typeof window !== 'undefined' ? safeParseMeta(localStorage.getItem(CONNECTION_META_KEY)) : {};
-      const preferredActive = typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_CONNECTION_KEY) : null;
+      const meta =
+        typeof window !== 'undefined'
+          ? safeParseMeta(localStorage.getItem(CONNECTION_META_KEY))
+          : {};
+      const preferredActive =
+        typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_CONNECTION_KEY) : null;
 
       const merged = activeList.map((conn, idx) => {
         const fallbackName = `Cluster ${idx + 1}`;
@@ -98,8 +110,12 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
       });
 
       const nextActiveId =
-        (preferredActive && merged.some((c) => c.connectionId === preferredActive) ? preferredActive : null) ||
-        (activeConnectionId && merged.some((c) => c.connectionId === activeConnectionId) ? activeConnectionId : null) ||
+        (preferredActive && merged.some((c) => c.connectionId === preferredActive)
+          ? preferredActive
+          : null) ||
+        (activeConnectionId && merged.some((c) => c.connectionId === activeConnectionId)
+          ? activeConnectionId
+          : null) ||
         merged[0]?.connectionId ||
         null;
 
@@ -120,62 +136,69 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
     setError(null);
     try {
       return await connectionApi.test(request);
-    } catch (err: any) {
-      setError(err.message || 'Connection test failed');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Connection test failed');
       throw err;
     }
   }, []);
 
-  const connect = useCallback(async (request: ConnectionRequest, options?: { name?: string; makeActive?: boolean }) => {
-    setIsConnecting(true);
-    setError(null);
-    try {
-      const response: ConnectionResponse = await connectionApi.connect(request);
-      const makeActive = options?.makeActive ?? true;
-      setConnections((prev) => {
-        const existing = prev.filter((c) => c.connectionId !== response.connection_id);
-        const nextName = options?.name?.trim() || `Cluster ${existing.length + 1}`;
-        const next = [
-          ...existing,
-          {
-            connectionId: response.connection_id,
-            name: nextName,
-            url: request.url,
-            connected: true,
-            jetstream: true,
-          },
-        ];
-        const nextActive = makeActive ? response.connection_id : activeConnectionId;
-        persistMeta(next, nextActive || null);
-        if (makeActive) setActiveConnectionId(response.connection_id);
-        return next;
-      });
-    } catch (err: any) {
-      setError(err.message || 'Connection failed');
-      throw err;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [activeConnectionId, persistMeta]);
+  const connect = useCallback(
+    async (request: ConnectionRequest, options?: { name?: string; makeActive?: boolean }) => {
+      setIsConnecting(true);
+      setError(null);
+      try {
+        const response: ConnectionResponse = await connectionApi.connect(request);
+        const makeActive = options?.makeActive ?? true;
+        setConnections((prev) => {
+          const existing = prev.filter((c) => c.connectionId !== response.connection_id);
+          const nextName = options?.name?.trim() || `Cluster ${existing.length + 1}`;
+          const next = [
+            ...existing,
+            {
+              connectionId: response.connection_id,
+              name: nextName,
+              url: request.url,
+              connected: true,
+              jetstream: true,
+            },
+          ];
+          const nextActive = makeActive ? response.connection_id : activeConnectionId;
+          persistMeta(next, nextActive || null);
+          if (makeActive) setActiveConnectionId(response.connection_id);
+          return next;
+        });
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Connection failed');
+        throw err;
+      } finally {
+        setIsConnecting(false);
+      }
+    },
+    [activeConnectionId, persistMeta],
+  );
 
-  const disconnect = useCallback(async (connectionId?: string) => {
-    const targetId = connectionId || activeConnectionId;
-    if (!targetId) return;
+  const disconnect = useCallback(
+    async (connectionId?: string) => {
+      const targetId = connectionId || activeConnectionId;
+      if (!targetId) return;
 
-    try {
-      await connectionApi.disconnect(targetId);
-      setConnections((prev) => {
-        const next = prev.filter((c) => c.connectionId !== targetId);
-        const nextActive = activeConnectionId === targetId ? (next[0]?.connectionId || null) : activeConnectionId;
-        setActiveConnectionId(nextActive);
-        persistMeta(next, nextActive);
-        return next;
-      });
-    } catch (err: any) {
-      setError(err.message || 'Disconnect failed');
-      throw err;
-    }
-  }, [activeConnectionId, persistMeta]);
+      try {
+        await connectionApi.disconnect(targetId);
+        setConnections((prev) => {
+          const next = prev.filter((c) => c.connectionId !== targetId);
+          const nextActive =
+            activeConnectionId === targetId ? next[0]?.connectionId || null : activeConnectionId;
+          setActiveConnectionId(nextActive);
+          persistMeta(next, nextActive);
+          return next;
+        });
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Disconnect failed');
+        throw err;
+      }
+    },
+    [activeConnectionId, persistMeta],
+  );
 
   const disconnectAll = useCallback(async () => {
     const ids = connections.map((c) => c.connectionId);
@@ -191,23 +214,29 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
     persistMeta([], null);
   }, [connections, persistMeta]);
 
-  const switchConnection = useCallback((connectionId: string) => {
-    if (!connections.some((c) => c.connectionId === connectionId)) return;
-    setActiveConnectionId(connectionId);
-    persistMeta(connections, connectionId);
-  }, [connections, persistMeta]);
+  const switchConnection = useCallback(
+    (connectionId: string) => {
+      if (!connections.some((c) => c.connectionId === connectionId)) return;
+      setActiveConnectionId(connectionId);
+      persistMeta(connections, connectionId);
+    },
+    [connections, persistMeta],
+  );
 
-  const renameConnection = useCallback((connectionId: string, name: string) => {
-    const normalized = name.trim();
-    if (!normalized) return;
-    setConnections((prev) => {
-      const next = prev.map((conn) =>
-        conn.connectionId === connectionId ? { ...conn, name: normalized } : conn
-      );
-      persistMeta(next, activeConnectionId);
-      return next;
-    });
-  }, [activeConnectionId, persistMeta]);
+  const renameConnection = useCallback(
+    (connectionId: string, name: string) => {
+      const normalized = name.trim();
+      if (!normalized) return;
+      setConnections((prev) => {
+        const next = prev.map((conn) =>
+          conn.connectionId === connectionId ? { ...conn, name: normalized } : conn,
+        );
+        persistMeta(next, activeConnectionId);
+        return next;
+      });
+    },
+    [activeConnectionId, persistMeta],
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -230,7 +259,7 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
 
   const activeConnection = useMemo(
     () => connections.find((conn) => conn.connectionId === activeConnectionId) || null,
-    [connections, activeConnectionId]
+    [connections, activeConnectionId],
   );
 
   const value = useMemo<ConnectionContextValue>(
@@ -264,7 +293,7 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
       testConnection,
       isConnecting,
       error,
-    ]
+    ],
   );
 
   return <ConnectionContext.Provider value={value}>{children}</ConnectionContext.Provider>;

@@ -73,11 +73,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const updateProfile = useCallback(async (fullName?: string | null) => {
-    setError(null);
-    const next = await authApi.updateProfile({ full_name: fullName });
-    persist(token, next);
-  }, [token]);
+  const updateProfile = useCallback(
+    async (fullName?: string | null) => {
+      setError(null);
+      const next = await authApi.updateProfile({ full_name: fullName });
+      persist(token, next);
+    },
+    [token],
+  );
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -95,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const me = await authApi.me();
         persist(storedToken, me);
-      } catch (err) {
+      } catch {
         persist(null, null);
       } finally {
         setIsLoading(false);
@@ -118,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshMe,
       updateProfile,
     }),
-    [user, token, isLoading, error, login, signup, logout, refreshMe, updateProfile]
+    [user, token, isLoading, error, login, signup, logout, refreshMe, updateProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

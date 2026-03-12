@@ -16,7 +16,7 @@ import {
 import { JobsService } from './jobs.service';
 import { IndexBuildJobDto } from './dto/job.dto';
 import { AdminGuard } from '../common/guards/admin.guard';
-import { ConnectionsService } from '../connections/connections.service';
+import { ConnectionsService, ConnectionInfo } from '../connections/connections.service';
 import { MessagesService } from '../messages/messages.service';
 
 @Controller('connections/:connectionId/jobs')
@@ -37,10 +37,7 @@ export class JobsController {
   }
 
   @Get(':jobId')
-  async getJob(
-    @Param('connectionId') connectionId: string,
-    @Param('jobId') jobId: string,
-  ) {
+  async getJob(@Param('connectionId') connectionId: string, @Param('jobId') jobId: string) {
     const job = await this.jobsService.getJob(connectionId, jobId);
     return this.jobsService.convertJobToResponse(job);
   }
@@ -60,17 +57,15 @@ export class JobsController {
     });
 
     // Run index build in background
-    this.runIndexBuild(connectionId, job.id, conn, dto.stream_name, dto.limit).catch(
-      (err) => {
-        this.jobsService
-          .updateJob(job.id, {
-            status: 'failed',
-            error: err.message,
-            completed_at: new Date(),
-          })
-          .catch(() => {});
-      },
-    );
+    this.runIndexBuild(connectionId, job.id, conn, dto.stream_name, dto.limit).catch((err) => {
+      this.jobsService
+        .updateJob(job.id, {
+          status: 'failed',
+          error: err.message,
+          completed_at: new Date(),
+        })
+        .catch(() => {});
+    });
 
     return this.jobsService.convertJobToResponse(job);
   }
@@ -78,19 +73,16 @@ export class JobsController {
   @Post(':jobId/cancel')
   @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
-  async cancelJob(
-    @Param('connectionId') connectionId: string,
-    @Param('jobId') jobId: string,
-  ) {
+  async cancelJob(@Param('connectionId') connectionId: string, @Param('jobId') jobId: string) {
     return this.jobsService.cancelJob(connectionId, jobId);
   }
 
   private async runIndexBuild(
     connectionId: string,
     jobId: string,
-    conn: any,
+    conn: ConnectionInfo,
     streamName: string,
-    limit?: number,
+    _limit?: number,
   ): Promise<void> {
     await this.jobsService.updateJob(jobId, {
       status: 'running',
@@ -123,10 +115,10 @@ export class JobsController {
         message: 'Index build completed',
         result_json: JSON.stringify(result ?? {}),
       });
-    } catch (error) {
+    } catch (error: unknown) {
       await this.jobsService.updateJob(jobId, {
         status: 'failed',
-        error: error.message,
+        error: (error as Error).message,
         completed_at: new Date(),
       });
     }

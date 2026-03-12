@@ -41,10 +41,7 @@ export class HealthHistoryService {
     private readonly configService: ConfigService,
     private readonly connectionsService: ConnectionsService,
   ) {
-    this.retentionDays = parseInt(
-      this.configService.get<string>('HEALTH_RETENTION_DAYS', '7'),
-      10,
-    );
+    this.retentionDays = parseInt(this.configService.get<string>('HEALTH_RETENTION_DAYS', '7'), 10);
   }
 
   @Interval(30_000)
@@ -62,8 +59,8 @@ export class HealthHistoryService {
           await conn.jsm.getAccountInfo();
           jetstreamOk = true;
           status = 'up';
-        } catch (err) {
-          error = err.message;
+        } catch (err: unknown) {
+          error = (err as Error).message;
           // Connection exists but JetStream may be down
           status = conn.nc.isClosed() ? 'down' : 'up';
         }
@@ -78,14 +75,14 @@ export class HealthHistoryService {
         });
 
         await this.healthRepo.save(record);
-      } catch (err) {
+      } catch (err: unknown) {
         // Connection may have been removed between listing and checking
         const record = this.healthRepo.create({
           connection_id: connItem.connection_id,
           url: connItem.url,
           status: 'down',
           jetstream_ok: false,
-          error: err.message,
+          error: (err as Error).message,
           checked_at: new Date(),
         });
 
@@ -97,9 +94,7 @@ export class HealthHistoryService {
   }
 
   async pruneOldRecords(): Promise<void> {
-    const cutoff = new Date(
-      Date.now() - this.retentionDays * 24 * 60 * 60 * 1000,
-    );
+    const cutoff = new Date(Date.now() - this.retentionDays * 24 * 60 * 60 * 1000);
 
     const result = await this.healthRepo
       .createQueryBuilder()
@@ -140,10 +135,7 @@ export class HealthHistoryService {
     };
   }
 
-  async getUptimeSummary(
-    connectionId: string,
-    windowHours: number,
-  ): Promise<UptimeSummary> {
+  async getUptimeSummary(connectionId: string, windowHours: number): Promise<UptimeSummary> {
     const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
 
     const records = await this.healthRepo.find({
@@ -169,9 +161,7 @@ export class HealthHistoryService {
       uptime_pct: Math.round(uptimePct * 100) / 100,
       last_status: lastRecord?.status ?? undefined,
       last_error: lastRecord?.error ?? undefined,
-      last_checked_at: lastRecord
-        ? new Date(lastRecord.checked_at).toISOString()
-        : undefined,
+      last_checked_at: lastRecord ? new Date(lastRecord.checked_at).toISOString() : undefined,
     };
   }
 }

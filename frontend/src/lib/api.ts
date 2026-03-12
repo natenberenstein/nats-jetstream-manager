@@ -37,19 +37,21 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_BASE = `${API_URL}/api/v1`;
 
 class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(message);
     this.name = 'ApiError';
   }
 }
 
-async function fetchApi<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  const role = typeof window !== 'undefined' ? (localStorage.getItem('nats_ui_role_v1') || 'admin') : 'admin';
-  const authToken = typeof window !== 'undefined' ? localStorage.getItem('nats_auth_token_v1') : null;
+  const role =
+    typeof window !== 'undefined' ? localStorage.getItem('nats_ui_role_v1') || 'admin' : 'admin';
+  const authToken =
+    typeof window !== 'undefined' ? localStorage.getItem('nats_auth_token_v1') : null;
 
   const response = await fetch(url, {
     ...options,
@@ -78,16 +80,15 @@ async function fetchApi<T>(
 
 // Connection API
 export const connectionApi = {
-  list: () =>
-    fetchApi<{ connections: ConnectionListItem[]; total: number }>('/connections'),
+  list: () => fetchApi<{ connections: ConnectionListItem[]; total: number }>('/connections'),
 
   test: (request: ConnectionRequest) =>
-    fetchApi<{ success: boolean; jetstream_enabled: boolean; server_info: any; error?: string }>(
+    fetchApi<{ success: boolean; jetstream_enabled: boolean; server_info: object; error?: string }>(
       '/connections/test',
       {
         method: 'POST',
         body: JSON.stringify(request),
-      }
+      },
     ),
 
   connect: (request: ConnectionRequest) =>
@@ -172,7 +173,9 @@ export const jobApi = {
     }),
 
   list: (connectionId: string, limit = 50) =>
-    fetchApi<{ jobs: JobInfo[]; total: number }>(`/connections/${connectionId}/jobs?limit=${limit}`),
+    fetchApi<{ jobs: JobInfo[]; total: number }>(
+      `/connections/${connectionId}/jobs?limit=${limit}`,
+    ),
 
   get: (connectionId: string, jobId: string) =>
     fetchApi<JobInfo>(`/connections/${connectionId}/jobs/${jobId}`),
@@ -186,9 +189,7 @@ export const jobApi = {
 // Stream API
 export const streamApi = {
   list: (connectionId: string) =>
-    fetchApi<{ streams: StreamInfo[]; total: number }>(
-      `/connections/${connectionId}/streams`
-    ),
+    fetchApi<{ streams: StreamInfo[]; total: number }>(`/connections/${connectionId}/streams`),
 
   get: (connectionId: string, streamName: string) =>
     fetchApi<StreamInfo>(`/connections/${connectionId}/streams/${streamName}`),
@@ -210,7 +211,7 @@ export const streamApi = {
       `/connections/${connectionId}/streams/${streamName}`,
       {
         method: 'DELETE',
-      }
+      },
     ),
 
   purge: (connectionId: string, streamName: string) =>
@@ -218,7 +219,7 @@ export const streamApi = {
       `/connections/${connectionId}/streams/${streamName}/purge`,
       {
         method: 'POST',
-      }
+      },
     ),
 };
 
@@ -226,34 +227,31 @@ export const streamApi = {
 export const consumerApi = {
   list: (connectionId: string, streamName: string) =>
     fetchApi<{ consumers: ConsumerInfo[]; total: number }>(
-      `/connections/${connectionId}/streams/${streamName}/consumers`
+      `/connections/${connectionId}/streams/${streamName}/consumers`,
     ),
 
   get: (connectionId: string, streamName: string, consumerName: string) =>
     fetchApi<ConsumerInfo>(
-      `/connections/${connectionId}/streams/${streamName}/consumers/${consumerName}`
+      `/connections/${connectionId}/streams/${streamName}/consumers/${consumerName}`,
     ),
 
   create: (connectionId: string, streamName: string, config: ConsumerConfig) =>
-    fetchApi<ConsumerInfo>(
-      `/connections/${connectionId}/streams/${streamName}/consumers`,
-      {
-        method: 'POST',
-        body: JSON.stringify(config),
-      }
-    ),
+    fetchApi<ConsumerInfo>(`/connections/${connectionId}/streams/${streamName}/consumers`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
 
   delete: (connectionId: string, streamName: string, consumerName: string) =>
     fetchApi<{ success: boolean; deleted_consumer: string }>(
       `/connections/${connectionId}/streams/${streamName}/consumers/${consumerName}`,
       {
         method: 'DELETE',
-      }
+      },
     ),
 
   analytics: (connectionId: string, streamName: string) =>
     fetchApi<ConsumerAnalytics>(
-      `/connections/${connectionId}/streams/${streamName}/consumers/analytics`
+      `/connections/${connectionId}/streams/${streamName}/consumers/analytics`,
     ),
 };
 
@@ -265,20 +263,21 @@ export const messageApi = {
       body: JSON.stringify(request),
     }),
 
-  publishBatch: (connectionId: string, subject: string, messages: any[], headers?: Record<string, string>) =>
+  publishBatch: (
+    connectionId: string,
+    subject: string,
+    messages: unknown[],
+    headers?: Record<string, string>,
+  ) =>
     fetchApi<{ published: number; results: MessagePublishResponse[] }>(
       `/connections/${connectionId}/messages/publish-batch`,
       {
         method: 'POST',
         body: JSON.stringify({ subject, messages, headers }),
-      }
+      },
     ),
 
-  getMessages: (
-    connectionId: string,
-    streamName: string,
-    query: GetMessagesParams = {}
-  ) => {
+  getMessages: (connectionId: string, streamName: string, query: GetMessagesParams = {}) => {
     const {
       limit = 50,
       seqStart,
@@ -304,7 +303,7 @@ export const messageApi = {
     if (payloadContains) searchParams.append('payload_contains', payloadContains);
 
     return fetchApi<MessagesResponse>(
-      `/connections/${connectionId}/streams/${streamName}/messages?${searchParams}`
+      `/connections/${connectionId}/streams/${streamName}/messages?${searchParams}`,
     );
   },
 
@@ -317,7 +316,7 @@ export const messageApi = {
       {
         method: 'POST',
         body: JSON.stringify(request),
-      }
+      },
     ),
 
   buildIndex: (connectionId: string, streamName: string, limit = 2000) =>
@@ -326,56 +325,51 @@ export const messageApi = {
       {
         method: 'POST',
         body: JSON.stringify({ limit }),
-      }
+      },
     ),
 
   searchIndex: (connectionId: string, streamName: string, query: string, limit = 100) =>
     fetchApi<MessageIndexSearchResponse>(
-      `/connections/${connectionId}/streams/${streamName}/messages/index/search?query=${encodeURIComponent(query)}&limit=${limit}`
+      `/connections/${connectionId}/streams/${streamName}/messages/index/search?query=${encodeURIComponent(query)}&limit=${limit}`,
     ),
 
-  validateSchema: (connectionId: string, schema: any, payload: any) =>
-    fetchApi<SchemaValidationResponse>(
-      `/connections/${connectionId}/messages/validate-schema`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ schema, payload }),
-      }
-    ),
+  validateSchema: (connectionId: string, schema: Record<string, unknown>, payload: unknown) =>
+    fetchApi<SchemaValidationResponse>(`/connections/${connectionId}/messages/validate-schema`, {
+      method: 'POST',
+      body: JSON.stringify({ schema, payload }),
+    }),
 };
 
 export const metricsApi = {
   getStreamMetrics: (connectionId: string, streamName: string, window = 15) =>
     fetchApi<StreamMetricsResponse>(
-      `/connections/${connectionId}/metrics/streams/${encodeURIComponent(streamName)}?window=${window}`
+      `/connections/${connectionId}/metrics/streams/${encodeURIComponent(streamName)}?window=${window}`,
     ),
 
   getAllStreamMetrics: (connectionId: string, window = 15) =>
     fetchApi<StreamMetricsSummaryResponse>(
-      `/connections/${connectionId}/metrics/streams?window=${window}`
+      `/connections/${connectionId}/metrics/streams?window=${window}`,
     ),
 };
 
 export const connectionHealthApi = {
   getHistory: (connectionId: string, window = 24) =>
-    fetchApi<HealthHistoryResponse>(
-      `/connections/${connectionId}/health/history?window=${window}`
-    ),
+    fetchApi<HealthHistoryResponse>(`/connections/${connectionId}/health/history?window=${window}`),
 
   getUptime: (connectionId: string, window = 24) =>
-    fetchApi<UptimeSummary>(
-      `/connections/${connectionId}/health/uptime?window=${window}`
-    ),
+    fetchApi<UptimeSummary>(`/connections/${connectionId}/health/uptime?window=${window}`),
 };
 
 export const auditApi = {
-  list: (params: {
-    limit?: number;
-    offset?: number;
-    action?: string;
-    resource_type?: string;
-    user_id?: number;
-  } = {}) => {
+  list: (
+    params: {
+      limit?: number;
+      offset?: number;
+      action?: string;
+      resource_type?: string;
+      user_id?: number;
+    } = {},
+  ) => {
     const searchParams = new URLSearchParams();
     if (params.limit) searchParams.append('limit', params.limit.toString());
     if (params.offset) searchParams.append('offset', params.offset.toString());

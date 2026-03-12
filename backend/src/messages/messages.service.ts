@@ -1,8 +1,8 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   JetStreamClient,
   JetStreamManager,
-  NatsConnection,
+  StoredMsg,
   StringCodec,
   headers as natsHeaders,
   MsgHdrs,
@@ -48,7 +48,7 @@ const sc = StringCodec();
  */
 function natsSubjectToRegex(pattern: string): RegExp {
   const parts = pattern.split('.');
-  const regexParts = parts.map((part, idx) => {
+  const regexParts = parts.map((part, _idx) => {
     if (part === '>') {
       // `>` is only valid as the last token
       return '.+';
@@ -80,7 +80,7 @@ function decodePayload(data: Uint8Array): string {
   }
 }
 
-function tryParseJson(raw: string): any {
+function tryParseJson(raw: string): unknown {
   try {
     return JSON.parse(raw);
   } catch {
@@ -259,7 +259,7 @@ export class MessagesService {
     try {
       const sm = await jsm.streams.getMessage(streamName, { seq });
       return this.mapStoredMessage(sm, true);
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Message with sequence ${seq} not found in stream ${streamName}`);
     }
   }
@@ -274,7 +274,7 @@ export class MessagesService {
     request: MessageReplayRequestDto,
   ): Promise<MessageReplayResponseDto> {
     // Fetch the original message
-    let sm: any;
+    let sm: StoredMsg;
     try {
       sm = await jsm.streams.getMessage(streamName, { seq });
     } catch {
@@ -403,7 +403,8 @@ export class MessagesService {
         matches.push({
           seq: msg.seq,
           subject: msg.subject,
-          payload_preview: msg.payload.length > 200 ? msg.payload.slice(0, 200) + '...' : msg.payload,
+          payload_preview:
+            msg.payload.length > 200 ? msg.payload.slice(0, 200) + '...' : msg.payload,
           headers: Object.keys(msg.headers).length > 0 ? msg.headers : undefined,
         });
       }
@@ -421,7 +422,7 @@ export class MessagesService {
 
   // ── Schema Validation ────────────────────────────────────────────────────
 
-  validateSchema(data: any, schema: JsonSchemaDefinition): ValidateSchemaResponseDto {
+  validateSchema(data: unknown, schema: JsonSchemaDefinition): ValidateSchemaResponseDto {
     const errors: string[] = [];
     this.validateValue(data, schema, '', errors);
 
@@ -444,7 +445,7 @@ export class MessagesService {
     headerValue: string | undefined,
     payloadContains: string | undefined,
   ): Promise<MessageDataDto | null> {
-    let sm: any;
+    let sm: StoredMsg;
     try {
       sm = await jsm.streams.getMessage(streamName, { seq });
     } catch {
@@ -478,14 +479,18 @@ export class MessagesService {
   }
 
   private mapStoredMessage(
-    sm: any,
+    sm: StoredMsg,
     includePayload: boolean,
     previewBytes?: number,
   ): MessageDataDto {
     const raw = decodePayload(sm.data);
     const payloadSize = sm.data ? sm.data.length : 0;
     const headers = extractHeaders(sm.header);
-    const time = sm.time ? (sm.time instanceof Date ? sm.time.toISOString() : String(sm.time)) : null;
+    const time = sm.time
+      ? sm.time instanceof Date
+        ? sm.time.toISOString()
+        : String(sm.time)
+      : null;
 
     const dto: MessageDataDto = {
       subject: sm.subject,
@@ -509,7 +514,7 @@ export class MessagesService {
   }
 
   private validateValue(
-    value: any,
+    value: unknown,
     schema: JsonSchemaDefinition,
     path: string,
     errors: string[],
@@ -574,7 +579,7 @@ export class MessagesService {
           return;
         }
         if (schema.items) {
-          value.forEach((item: any, idx: number) => {
+          value.forEach((item: unknown, idx: number) => {
             this.validateValue(item, schema.items!, `${path}[${idx}]`, errors);
           });
         }
@@ -585,24 +590,27 @@ export class MessagesService {
           errors.push(`${fieldLabel}: expected object`);
           return;
         }
-        // Check required fields
-        if (schema.required) {
-          for (const field of schema.required) {
-            if (!(field in value)) {
-              errors.push(`${path ? path + '.' : ''}${field}: required field is missing`);
+        {
+          const obj = value as Record<string, unknown>;
+          // Check required fields
+          if (schema.required) {
+            for (const field of schema.required) {
+              if (!(field in obj)) {
+                errors.push(`${path ? path + '.' : ''}${field}: required field is missing`);
+              }
             }
           }
-        }
-        // Validate known properties
-        if (schema.properties) {
-          for (const [propName, propSchema] of Object.entries(schema.properties)) {
-            if (propName in value) {
-              this.validateValue(
-                value[propName],
-                propSchema,
-                path ? `${path}.${propName}` : propName,
-                errors,
-              );
+          // Validate known properties
+          if (schema.properties) {
+            for (const [propName, propSchema] of Object.entries(schema.properties)) {
+              if (propName in obj) {
+                this.validateValue(
+                  obj[propName],
+                  propSchema,
+                  path ? `${path}.${propName}` : propName,
+                  errors,
+                );
+              }
             }
           }
         }

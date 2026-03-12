@@ -1,11 +1,11 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 /**
  * Merge Tailwind CSS classes
  */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -78,7 +78,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 /**
  * Parse JSON safely
  */
-export function safeJsonParse(text: string, defaultValue: any = null): any {
+export function safeJsonParse<T = unknown>(text: string, defaultValue: T | null = null): T | null {
   try {
     return JSON.parse(text);
   } catch {

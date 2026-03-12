@@ -1,6 +1,12 @@
-import { Injectable, UnauthorizedException, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes, pbkdf2Sync } from 'crypto';
 import { User } from '../database/entities/user.entity';
@@ -213,7 +219,7 @@ export class AuthService {
     return await this.inviteRepository.save(invite);
   }
 
-  async listInvites(): Promise<any[]> {
+  async listInvites(): Promise<Array<Invite & { status: string }>> {
     const invites = await this.inviteRepository.find({
       order: { created_at: 'DESC' },
     });

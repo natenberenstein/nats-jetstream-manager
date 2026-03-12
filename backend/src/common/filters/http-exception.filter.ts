@@ -1,5 +1,13 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { Response } from 'express';
+import { HttpExceptionResponseBody } from '../types/nats-extended';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -10,7 +18,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let detail = 'Internal server error';
+    let detail: string | string[] = 'Internal server error';
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -18,7 +26,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       if (typeof resp === 'string') {
         detail = resp;
       } else if (typeof resp === 'object' && resp !== null) {
-        detail = (resp as any).message || (resp as any).detail || detail;
+        const body = resp as HttpExceptionResponseBody;
+        detail = body.message || body.detail || detail;
         if (Array.isArray(detail)) {
           detail = detail.join('; ');
         }

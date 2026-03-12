@@ -184,7 +184,13 @@ export interface ConsumerConfig {
   name?: string;
   durable_name?: string;
   description?: string;
-  deliver_policy?: 'all' | 'last' | 'new' | 'by_start_sequence' | 'by_start_time' | 'last_per_subject';
+  deliver_policy?:
+    | 'all'
+    | 'last'
+    | 'new'
+    | 'by_start_sequence'
+    | 'by_start_time'
+    | 'last_per_subject';
   opt_start_seq?: number;
   opt_start_time?: string;
   ack_policy?: 'explicit' | 'all' | 'none';
@@ -241,7 +247,7 @@ export interface ConsumerAnalytics {
 // Message types
 export interface MessagePublishRequest {
   subject: string;
-  data: any;
+  data: unknown;
   headers?: Record<string, string>;
 }
 
@@ -254,7 +260,7 @@ export interface MessagePublishResponse {
 export interface MessageData {
   subject: string;
   seq: number;
-  data?: any;
+  data?: unknown;
   data_preview?: string;
   payload_size?: number;
   headers?: Record<string, string>;

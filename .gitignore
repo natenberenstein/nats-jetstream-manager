@@ -1,31 +1,9 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.pytest_cache/
-.coverage
-htmlcov/
-*.egg-info/
-dist/
-build/
-
-# uv
-.uv/
-uv.lock
-
 # Node
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+dist/
 .next/
 out/
 .vercel
@@ -43,9 +21,13 @@ out/
 *~
 .DS_Store
 
-# Docker
+# Logs
 *.log
+
+# Coverage
+coverage/
 
 # Project specific
 backend/.env
+backend/data/
 frontend/.env.local

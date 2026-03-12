@@ -1,13 +1,41 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { AckPolicy, DeliverPolicy, ReplayPolicy } from 'nats';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { AckPolicy, DeliverPolicy, ReplayPolicy, ConsumerInfo } from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
 import { StreamsService } from '../streams/streams.service';
 import { ConsumerCreateDto } from './dto/consumer.dto';
+
+export interface ConsumerMetric {
+  name: string;
+  stream_name: string;
+  num_pending: number;
+  num_ack_pending: number;
+  num_waiting: number;
+  stream_lag: number;
+  unacked_span: number;
+  ack_wait_ns?: number;
+}
+
+export interface ConsumerResponse {
+  stream_name: string;
+  name: string;
+  created: string;
+  config: Record<string, unknown>;
+  delivered: { consumer_seq: number; stream_seq: number };
+  ack_floor: { consumer_seq: number; stream_seq: number };
+  num_pending: number;
+  num_waiting: number;
+  num_ack_pending: number;
+}
+
+export interface ConsumerAnalytics {
+  stream_name: string;
+  total_consumers: number;
+  total_pending: number;
+  total_ack_pending: number;
+  max_stream_lag: number;
+  consumers: ConsumerMetric[];
+  generated_at: string;
+}
 
 const DELIVER_POLICY_MAP: Record<string, DeliverPolicy> = {
   all: DeliverPolicy.All,
@@ -61,7 +89,7 @@ export class ConsumersService {
   async listConsumers(
     connectionId: string,
     streamName: string,
-  ): Promise<{ consumers: any[]; total: number }> {
+  ): Promise<{ consumers: ConsumerResponse[]; total: number }> {
     const { jsm } = this.connectionsService.getConnection(connectionId);
 
     const consumers = await jsm.consumers.list(streamName).next();
@@ -74,16 +102,16 @@ export class ConsumersService {
     connectionId: string,
     streamName: string,
     consumerName: string,
-  ): Promise<any> {
+  ): Promise<ConsumerResponse> {
     const { jsm } = this.connectionsService.getConnection(connectionId);
 
     try {
       const ci = await jsm.consumers.info(streamName, consumerName);
       return this.convertConsumerInfo(ci);
-    } catch (error) {
+    } catch (error: unknown) {
       if (
-        error.message?.includes('consumer not found') ||
-        error.message?.includes('not found')
+        (error as Error).message?.includes('consumer not found') ||
+        (error as Error).message?.includes('not found')
       ) {
         throw new NotFoundException(
           `Consumer '${consumerName}' not found on stream '${streamName}'`,
@@ -97,10 +125,10 @@ export class ConsumersService {
     connectionId: string,
     streamName: string,
     dto: ConsumerCreateDto,
-  ): Promise<any> {
+  ): Promise<ConsumerResponse> {
     const { jsm } = this.connectionsService.getConnection(connectionId);
 
-    const config: Record<string, any> = {};
+    const config: Record<string, unknown> = {};
 
     if (dto.durable_name) config.durable_name = dto.durable_name;
     if (dto.name) config.name = dto.name;
@@ -112,40 +140,30 @@ export class ConsumersService {
     if (dto.deliver_policy) {
       config.deliver_policy = DELIVER_POLICY_MAP[dto.deliver_policy];
       if (config.deliver_policy === undefined) {
-        throw new BadRequestException(
-          `Invalid deliver_policy: ${dto.deliver_policy}`,
-        );
+        throw new BadRequestException(`Invalid deliver_policy: ${dto.deliver_policy}`);
       }
     }
 
     if (dto.ack_policy) {
       config.ack_policy = ACK_POLICY_MAP[dto.ack_policy];
       if (config.ack_policy === undefined) {
-        throw new BadRequestException(
-          `Invalid ack_policy: ${dto.ack_policy}`,
-        );
+        throw new BadRequestException(`Invalid ack_policy: ${dto.ack_policy}`);
       }
     }
 
     if (dto.replay_policy) {
       config.replay_policy = REPLAY_POLICY_MAP[dto.replay_policy];
       if (config.replay_policy === undefined) {
-        throw new BadRequestException(
-          `Invalid replay_policy: ${dto.replay_policy}`,
-        );
+        throw new BadRequestException(`Invalid replay_policy: ${dto.replay_policy}`);
       }
     }
 
-    if (dto.opt_start_seq !== undefined)
-      config.opt_start_seq = dto.opt_start_seq;
-    if (dto.opt_start_time !== undefined)
-      config.opt_start_time = dto.opt_start_time;
+    if (dto.opt_start_seq !== undefined) config.opt_start_seq = dto.opt_start_seq;
+    if (dto.opt_start_time !== undefined) config.opt_start_time = dto.opt_start_time;
     if (dto.ack_wait !== undefined) config.ack_wait = dto.ack_wait;
     if (dto.max_deliver !== undefined) config.max_deliver = dto.max_deliver;
-    if (dto.rate_limit_bps !== undefined)
-      config.rate_limit_bps = dto.rate_limit_bps;
-    if (dto.max_ack_pending !== undefined)
-      config.max_ack_pending = dto.max_ack_pending;
+    if (dto.rate_limit_bps !== undefined) config.rate_limit_bps = dto.rate_limit_bps;
+    if (dto.max_ack_pending !== undefined) config.max_ack_pending = dto.max_ack_pending;
     if (dto.max_waiting !== undefined) config.max_waiting = dto.max_waiting;
 
     try {
@@ -154,10 +172,8 @@ export class ConsumersService {
         `Consumer created on stream '${streamName}': ${dto.durable_name || dto.name || 'ephemeral'}`,
       );
       return this.convertConsumerInfo(ci);
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to create consumer: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      throw new BadRequestException(`Failed to create consumer: ${(error as Error).message}`);
     }
   }
 
@@ -170,29 +186,22 @@ export class ConsumersService {
 
     try {
       await jsm.consumers.delete(streamName, consumerName);
-      this.logger.log(
-        `Consumer '${consumerName}' deleted from stream '${streamName}'`,
-      );
+      this.logger.log(`Consumer '${consumerName}' deleted from stream '${streamName}'`);
       return { success: true, deleted_consumer: consumerName };
-    } catch (error) {
+    } catch (error: unknown) {
       if (
-        error.message?.includes('consumer not found') ||
-        error.message?.includes('not found')
+        (error as Error).message?.includes('consumer not found') ||
+        (error as Error).message?.includes('not found')
       ) {
         throw new NotFoundException(
           `Consumer '${consumerName}' not found on stream '${streamName}'`,
         );
       }
-      throw new BadRequestException(
-        `Failed to delete consumer: ${error.message}`,
-      );
+      throw new BadRequestException(`Failed to delete consumer: ${(error as Error).message}`);
     }
   }
 
-  async getConsumerAnalytics(
-    connectionId: string,
-    streamName: string,
-  ): Promise<any> {
+  async getConsumerAnalytics(connectionId: string, streamName: string): Promise<ConsumerAnalytics> {
     const { jsm } = this.connectionsService.getConnection(connectionId);
 
     // Get stream info for last_seq
@@ -222,7 +231,7 @@ export class ConsumersService {
         maxStreamLag = streamLag;
       }
 
-      const metric: Record<string, any> = {
+      const metric: ConsumerMetric = {
         name: ci.name || ci.config?.durable_name || '',
         stream_name: streamName,
         num_pending: numPending,
@@ -250,30 +259,25 @@ export class ConsumersService {
     };
   }
 
-  private convertConsumerInfo(ci: any): any {
+  private convertConsumerInfo(ci: ConsumerInfo): ConsumerResponse {
     const config = ci.config ?? {};
 
     return {
       stream_name: ci.stream_name ?? '',
       name: ci.name || config.durable_name || '',
-      created: ci.created instanceof Date
-        ? ci.created.toISOString()
-        : ci.created ?? '',
+      created: String(ci.created ?? ''),
       config: {
         name: config.name,
         durable_name: config.durable_name,
         description: config.description,
-        deliver_policy:
-          DELIVER_POLICY_REVERSE[config.deliver_policy] ?? 'all',
+        deliver_policy: DELIVER_POLICY_REVERSE[config.deliver_policy] ?? 'all',
         opt_start_seq: config.opt_start_seq,
         opt_start_time: config.opt_start_time,
-        ack_policy:
-          ACK_POLICY_REVERSE[config.ack_policy] ?? 'explicit',
+        ack_policy: ACK_POLICY_REVERSE[config.ack_policy] ?? 'explicit',
         ack_wait: config.ack_wait,
         max_deliver: config.max_deliver,
         filter_subject: config.filter_subject,
-        replay_policy:
-          REPLAY_POLICY_REVERSE[config.replay_policy] ?? 'instant',
+        replay_policy: REPLAY_POLICY_REVERSE[config.replay_policy] ?? 'instant',
         sample_freq: config.sample_freq,
         rate_limit_bps: config.rate_limit_bps,
         max_ack_pending: config.max_ack_pending,

@@ -57,8 +57,8 @@ export class AuditService {
       });
 
       await this.auditRepo.save(entry);
-    } catch (error) {
-      this.logger.error(`Failed to write audit log: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(`Failed to write audit log: ${(error as Error).message}`);
     }
   }
 

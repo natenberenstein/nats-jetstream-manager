@@ -21,7 +21,7 @@ export class MessagePublishRequestDto {
   subject: string;
 
   @IsNotEmpty()
-  data: any;
+  data: unknown;
 
   @IsOptional()
   @IsObject()
@@ -66,7 +66,7 @@ export class JsonSchemaDefinition {
 
   @IsOptional()
   @IsArray()
-  enum?: any[];
+  enum?: unknown[];
 
   @IsOptional()
   items?: JsonSchemaDefinition;
@@ -90,7 +90,7 @@ export class JsonSchemaDefinition {
 
 export class ValidateSchemaRequestDto {
   @IsNotEmpty()
-  data: any;
+  data: unknown;
 
   @IsNotEmpty()
   @IsObject()
@@ -181,7 +181,7 @@ export class MessagePublishBatchResponseDto {
 export class MessageDataDto {
   subject: string;
   seq: number;
-  data?: any;
+  data?: unknown;
   data_preview?: string;
   payload_size?: number;
   headers?: Record<string, string>;

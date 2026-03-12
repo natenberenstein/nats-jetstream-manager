@@ -1,16 +1,6 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, BadRequestException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
-import {
-  connect,
-  NatsConnection,
-  JetStreamManager,
-  JetStreamClient,
-} from 'nats';
+import { connect, NatsConnection, JetStreamManager, JetStreamClient } from 'nats';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface ConnectionInfo {
@@ -40,8 +30,7 @@ export class ConnectionsService implements OnModuleDestroy {
 
   constructor() {
     this.maxConnections = parseInt(process.env.MAX_CONNECTIONS ?? '10', 10);
-    this.connectionTimeoutMs =
-      parseInt(process.env.CONNECTION_TIMEOUT_SECONDS ?? '300', 10) * 1000;
+    this.connectionTimeoutMs = parseInt(process.env.CONNECTION_TIMEOUT_SECONDS ?? '300', 10) * 1000;
   }
 
   async createConnection(
@@ -73,9 +62,7 @@ export class ConnectionsService implements OnModuleDestroy {
       lastAccessed: now,
     });
 
-    this.logger.log(
-      `Connection ${connectionId} established to ${this.sanitizeUrl(url)}`,
-    );
+    this.logger.log(`Connection ${connectionId} established to ${this.sanitizeUrl(url)}`);
 
     return {
       connection_id: connectionId,
@@ -87,9 +74,7 @@ export class ConnectionsService implements OnModuleDestroy {
   getConnection(connectionId: string): ConnectionInfo {
     const conn = this.connections.get(connectionId);
     if (!conn) {
-      throw new BadRequestException(
-        `Connection ${connectionId} not found or has expired`,
-      );
+      throw new BadRequestException(`Connection ${connectionId} not found or has expired`);
     }
 
     conn.lastAccessed = new Date();
@@ -104,10 +89,8 @@ export class ConnectionsService implements OnModuleDestroy {
 
     try {
       await conn.nc.drain();
-    } catch (error) {
-      this.logger.warn(
-        `Error draining connection ${connectionId}: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      this.logger.warn(`Error draining connection ${connectionId}: ${(error as Error).message}`);
     }
 
     this.connections.delete(connectionId);
@@ -122,7 +105,7 @@ export class ConnectionsService implements OnModuleDestroy {
   ): Promise<{
     success: boolean;
     jetstream_enabled: boolean;
-    server_info: any;
+    server_info: object;
     error?: string;
   }> {
     let nc: NatsConnection | null = null;
@@ -145,12 +128,12 @@ export class ConnectionsService implements OnModuleDestroy {
         jetstream_enabled: jetstreamEnabled,
         server_info: serverInfo ?? {},
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return {
         success: false,
         jetstream_enabled: false,
         server_info: {},
-        error: error.message,
+        error: (error as Error).message,
       };
     } finally {
       if (nc) {
@@ -218,8 +201,8 @@ export class ConnectionsService implements OnModuleDestroy {
     for (const id of expiredIds) {
       const conn = this.connections.get(id);
       if (conn) {
-        conn.nc.drain().catch((err) => {
-          this.logger.warn(`Error draining expired connection ${id}: ${err.message}`);
+        conn.nc.drain().catch((err: unknown) => {
+          this.logger.warn(`Error draining expired connection ${id}: ${(err as Error).message}`);
         });
         this.connections.delete(id);
         this.logger.log(`Expired connection ${id} cleaned up`);
@@ -237,18 +220,14 @@ export class ConnectionsService implements OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     this.logger.log('Draining all NATS connections...');
 
-    const drainPromises = Array.from(this.connections.entries()).map(
-      async ([id, conn]) => {
-        try {
-          await conn.nc.drain();
-          this.logger.log(`Drained connection ${id}`);
-        } catch (error) {
-          this.logger.warn(
-            `Error draining connection ${id}: ${error.message}`,
-          );
-        }
-      },
-    );
+    const drainPromises = Array.from(this.connections.entries()).map(async ([id, conn]) => {
+      try {
+        await conn.nc.drain();
+        this.logger.log(`Drained connection ${id}`);
+      } catch (error: unknown) {
+        this.logger.warn(`Error draining connection ${id}: ${(error as Error).message}`);
+      }
+    });
 
     await Promise.allSettled(drainPromises);
     this.connections.clear();
@@ -261,7 +240,7 @@ export class ConnectionsService implements OnModuleDestroy {
     password?: string,
     token?: string,
   ): Promise<NatsConnection> {
-    const opts: Record<string, any> = { servers: url };
+    const opts: Record<string, unknown> = { servers: url };
 
     if (user && password) {
       opts.user = user;

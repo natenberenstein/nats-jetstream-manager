@@ -8,7 +8,7 @@ export function useMessages(
   connectionId: string | null,
   streamName: string | null,
   params: GetMessagesParams = {},
-  refetchInterval: number | false = false
+  refetchInterval: number | false = false,
 ) {
   return useQuery({
     queryKey: ['messages', connectionId, streamName, params],
@@ -21,7 +21,7 @@ export function useMessages(
 export function useMessage(
   connectionId: string | null,
   streamName: string | null,
-  seq: number | null
+  seq: number | null,
 ) {
   return useQuery({
     queryKey: ['message', connectionId, streamName, seq],
@@ -45,8 +45,15 @@ export function usePublishBatch(connectionId: string | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ subject, messages, headers }: { subject: string; messages: any[]; headers?: Record<string, string> }) =>
-      messageApi.publishBatch(connectionId!, subject, messages, headers),
+    mutationFn: ({
+      subject,
+      messages,
+      headers,
+    }: {
+      subject: string;
+      messages: unknown[];
+      headers?: Record<string, string>;
+    }) => messageApi.publishBatch(connectionId!, subject, messages, headers),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
     },

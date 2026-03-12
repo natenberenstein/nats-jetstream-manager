@@ -68,9 +68,9 @@ export class MetricsService {
 
           await this.metricRepo.save(metric);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         this.logger.warn(
-          `Failed to collect metrics for connection ${connItem.connection_id}: ${error.message}`,
+          `Failed to collect metrics for connection ${connItem.connection_id}: ${(error as Error).message}`,
         );
       }
     }
@@ -173,8 +173,7 @@ export class MetricsService {
       if (i > 0) {
         const previous = metrics[i - 1];
         const timeDiffSeconds =
-          (new Date(current.collected_at).getTime() -
-            new Date(previous.collected_at).getTime()) /
+          (new Date(current.collected_at).getTime() - new Date(previous.collected_at).getTime()) /
           1000;
 
         if (timeDiffSeconds > 0) {

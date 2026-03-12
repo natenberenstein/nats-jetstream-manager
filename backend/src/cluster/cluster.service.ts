@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConnectionsService } from '../connections/connections.service';
+import {
+  ExtendedServerInfo,
+  ExtendedAccountInfo,
+  ExtendedAccountLimits,
+  ExtendedStreamInfo,
+} from '../common/types/nats-extended';
 
 export interface ClusterNodeInfo {
   name: string;
@@ -76,22 +82,19 @@ export class ClusterService {
     const warnings: string[] = [];
 
     // Gather server info
-    const serverInfo = nc.info;
+    const serverInfo = nc.info as ExtendedServerInfo | undefined;
     sources.push('server_info');
 
     const serverVersion = serverInfo?.version;
     const connectedServer = serverInfo?.server_name || serverInfo?.server_id;
-    const clusterName = (serverInfo as any)?.cluster;
+    const clusterName = serverInfo?.cluster;
     const discoveredServers = serverInfo?.connect_urls || [];
-    const routeCount = (serverInfo as any)?.routes ?? 0;
-    const gatewayCount = (serverInfo as any)?.gateways ?? 0;
-    const leafnodeCount = (serverInfo as any)?.leafnodes ?? 0;
+    const routeCount = serverInfo?.routes ?? 0;
+    const gatewayCount = serverInfo?.gateways ?? 0;
+    const leafnodeCount = serverInfo?.leafnodes ?? 0;
 
-    const isClustered =
-      !!clusterName || discoveredServers.length > 1 || routeCount > 0;
-    const topology: 'standalone' | 'clustered' = isClustered
-      ? 'clustered'
-      : 'standalone';
+    const isClustered = !!clusterName || discoveredServers.length > 1 || routeCount > 0;
+    const topology: 'standalone' | 'clustered' = isClustered ? 'clustered' : 'standalone';
 
     // Gather JetStream account info
     let streamCount = 0;
@@ -104,35 +107,35 @@ export class ClusterService {
     let limits: ClusterLimits | null = null;
 
     try {
-      const accountInfo = await jsm.getAccountInfo();
+      const accountInfo = (await jsm.getAccountInfo()) as ExtendedAccountInfo;
       sources.push('jetstream_account_info');
 
       streamCount = accountInfo.streams ?? 0;
       consumerCount = accountInfo.consumers ?? 0;
-      totalMessages = (accountInfo as any).messages ?? 0;
-      totalBytes = (accountInfo as any).storage ?? 0;
-      jsDomain = (accountInfo as any).domain;
+      totalMessages = accountInfo.messages ?? 0;
+      totalBytes = accountInfo.storage ?? 0;
+      jsDomain = accountInfo.domain;
 
-      if ((accountInfo as any).api) {
-        jsApiTotal = (accountInfo as any).api.total;
-        jsApiErrors = (accountInfo as any).api.errors;
+      if (accountInfo.api) {
+        jsApiTotal = accountInfo.api.total;
+        jsApiErrors = accountInfo.api.errors;
       }
 
       if (accountInfo.limits) {
-        const l = accountInfo.limits;
+        const l = accountInfo.limits as ExtendedAccountLimits;
         limits = {
           max_memory: l.max_memory,
           max_storage: l.max_storage,
           max_streams: l.max_streams,
           max_consumers: l.max_consumers,
           max_ack_pending: l.max_ack_pending,
-          memory_max_stream_bytes: (l as any).memory_max_stream_bytes,
-          storage_max_stream_bytes: (l as any).storage_max_stream_bytes,
-          max_bytes_required: (l as any).max_bytes_required,
+          memory_max_stream_bytes: l.memory_max_stream_bytes,
+          storage_max_stream_bytes: l.storage_max_stream_bytes,
+          max_bytes_required: !!l.max_bytes_required,
         };
       }
-    } catch (error) {
-      this.logger.warn(`Failed to get JetStream account info: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.warn(`Failed to get JetStream account info: ${(error as Error).message}`);
       caveats.push('JetStream account info unavailable');
     }
 
@@ -152,22 +155,20 @@ export class ClusterService {
       sources.push('stream_list');
 
       for (const si of streams) {
-        const cluster = (si as any).cluster;
+        const cluster = (si as ExtendedStreamInfo).cluster;
         if (!cluster) {
           continue;
         }
 
         const leader = cluster.leader;
-        const replicas: ClusterNodeInfo[] = (cluster.replicas || []).map(
-          (r: any) => ({
-            name: r.name,
-            is_leader: false,
-            current: r.current,
-            active: r.active,
-            offline: r.offline,
-            lag: r.lag,
-          }),
-        );
+        const replicas: ClusterNodeInfo[] = (cluster.replicas || []).map((r) => ({
+          name: r.name,
+          is_leader: false,
+          current: r.current,
+          active: r.active,
+          offline: r.offline,
+          lag: r.lag,
+        }));
 
         if (leader) {
           // Track leader node
@@ -183,21 +184,18 @@ export class ClusterService {
         }
 
         const isLeaderless = !leader;
-        const isQuorumDegraded =
-          replicas.some((r) => r.offline) || isLeaderless;
+        const isQuorumDegraded = replicas.some((r) => r.offline) || isLeaderless;
 
         if (isLeaderless) {
           leaderlessStreams++;
-          warnings.push(
-            `Stream "${(si as any).config?.name}" has no leader`,
-          );
+          warnings.push(`Stream "${(si as ExtendedStreamInfo).config?.name}" has no leader`);
         }
         if (isQuorumDegraded) {
           quorumDegradedStreams++;
         }
 
         streamHealth.push({
-          stream_name: (si as any).config?.name ?? 'unknown',
+          stream_name: (si as ExtendedStreamInfo).config?.name ?? 'unknown',
           cluster_name: cluster.name,
           leader,
           replicas,
@@ -205,15 +203,13 @@ export class ClusterService {
           leaderless: isLeaderless,
         });
       }
-    } catch (error) {
-      this.logger.warn(`Failed to list streams for cluster health: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.warn(`Failed to list streams for cluster health: ${(error as Error).message}`);
       caveats.push('Stream health information unavailable');
     }
 
     const nodes = Array.from(nodesMap.values());
-    const nodeCount = isClustered
-      ? Math.max(nodes.length, discoveredServers.length, 1)
-      : 1;
+    const nodeCount = isClustered ? Math.max(nodes.length, discoveredServers.length, 1) : 1;
 
     const mixedVersions = versions.size > 1;
 

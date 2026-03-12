@@ -92,35 +92,27 @@ export class StreamsService {
     return { streams, total: streams.length };
   }
 
-  async getStream(
-    connectionId: string,
-    name: string,
-  ): Promise<StreamInfoResponse> {
+  async getStream(connectionId: string, name: string): Promise<StreamInfoResponse> {
     const { jsm } = this.connectionsService.getConnection(connectionId);
 
     try {
       const si = await jsm.streams.info(name);
       return this.convertStreamInfo(si);
-    } catch (error) {
-      if (error.message?.includes('stream not found')) {
+    } catch (error: unknown) {
+      if ((error as Error).message?.includes('stream not found')) {
         throw new NotFoundException(`Stream '${name}' not found`);
       }
       throw error;
     }
   }
 
-  async createStream(
-    connectionId: string,
-    dto: StreamCreateDto,
-  ): Promise<StreamInfoResponse> {
+  async createStream(connectionId: string, dto: StreamCreateDto): Promise<StreamInfoResponse> {
     const { jsm } = this.connectionsService.getConnection(connectionId);
 
     const config = this.buildNatsConfig(dto);
     const si = await jsm.streams.add(config);
 
-    this.logger.log(
-      `Stream '${dto.name}' created on connection ${connectionId}`,
-    );
+    this.logger.log(`Stream '${dto.name}' created on connection ${connectionId}`);
 
     return this.convertStreamInfo(si);
   }
@@ -136,8 +128,8 @@ export class StreamsService {
     let currentInfo: NatsStreamInfo;
     try {
       currentInfo = await jsm.streams.info(name);
-    } catch (error) {
-      if (error.message?.includes('stream not found')) {
+    } catch (error: unknown) {
+      if ((error as Error).message?.includes('stream not found')) {
         throw new NotFoundException(`Stream '${name}' not found`);
       }
       throw error;
@@ -188,14 +180,9 @@ export class StreamsService {
       updatedConfig.description = dto.description;
     }
 
-    const si = await jsm.streams.update(
-      name,
-      updatedConfig as NatsStreamConfig,
-    );
+    const si = await jsm.streams.update(name, updatedConfig as NatsStreamConfig);
 
-    this.logger.log(
-      `Stream '${name}' updated on connection ${connectionId}`,
-    );
+    this.logger.log(`Stream '${name}' updated on connection ${connectionId}`);
 
     return this.convertStreamInfo(si);
   }
@@ -208,12 +195,10 @@ export class StreamsService {
 
     try {
       const result = await jsm.streams.delete(name);
-      this.logger.log(
-        `Stream '${name}' deleted on connection ${connectionId}`,
-      );
+      this.logger.log(`Stream '${name}' deleted on connection ${connectionId}`);
       return { success: result, deleted_stream: name };
-    } catch (error) {
-      if (error.message?.includes('stream not found')) {
+    } catch (error: unknown) {
+      if ((error as Error).message?.includes('stream not found')) {
         throw new NotFoundException(`Stream '${name}' not found`);
       }
       throw error;
@@ -232,8 +217,8 @@ export class StreamsService {
         `Stream '${name}' purged on connection ${connectionId}: ${info.purged} messages removed`,
       );
       return { success: info.success, purged: info.success };
-    } catch (error) {
-      if (error.message?.includes('stream not found')) {
+    } catch (error: unknown) {
+      if ((error as Error).message?.includes('stream not found')) {
         throw new NotFoundException(`Stream '${name}' not found`);
       }
       throw error;
@@ -253,14 +238,10 @@ export class StreamsService {
         max_consumers: config.max_consumers,
         max_msgs: config.max_msgs,
         max_bytes: config.max_bytes,
-        max_age: config.max_age
-          ? config.max_age / NANOS_PER_SECOND
-          : 0,
+        max_age: config.max_age ? config.max_age / NANOS_PER_SECOND : 0,
         max_msg_size: config.max_msg_size,
         discard: DISCARD_REVERSE[config.discard] ?? 'old',
-        duplicate_window: config.duplicate_window
-          ? config.duplicate_window / NANOS_PER_SECOND
-          : 0,
+        duplicate_window: config.duplicate_window ? config.duplicate_window / NANOS_PER_SECOND : 0,
         replicas: config.num_replicas,
         no_ack: config.no_ack,
         description: config.description,
@@ -274,9 +255,7 @@ export class StreamsService {
         first_ts: state.first_ts || undefined,
         last_ts: state.last_ts || undefined,
       },
-      created: typeof si.created === 'object' && si.created !== null
-        ? (si.created as any).toISOString()
-        : String(si.created),
+      created: String(si.created),
     };
   }
 

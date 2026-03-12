@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConnectionsService } from '../connections/connections.service';
+import { ExtendedAccountInfo, ExtendedStreamInfo } from '../common/types/nats-extended';
 
 export interface SystemMetricPoint {
   name: string;
@@ -58,7 +59,7 @@ export class SystemService {
     let storageUtilization: number | undefined;
 
     try {
-      const accountInfo = await jsm.getAccountInfo();
+      const accountInfo = (await jsm.getAccountInfo()) as ExtendedAccountInfo;
 
       streams = accountInfo.streams ?? 0;
       consumers = accountInfo.consumers ?? 0;
@@ -66,12 +67,12 @@ export class SystemService {
       storageUsed = accountInfo.storage ?? 0;
 
       // Total messages/bytes come from the account-level stats
-      messages = (accountInfo as any).messages ?? 0;
+      messages = accountInfo.messages ?? 0;
       bytes = storageUsed;
 
-      if ((accountInfo as any).api) {
-        jsApiTotal = (accountInfo as any).api.total;
-        jsApiErrors = (accountInfo as any).api.errors;
+      if (accountInfo.api) {
+        jsApiTotal = accountInfo.api.total;
+        jsApiErrors = accountInfo.api.errors;
       }
 
       if (accountInfo.limits) {
@@ -85,10 +86,8 @@ export class SystemService {
           storageUtilization = storageUsed / storageLimit;
         }
       }
-    } catch (error) {
-      this.logger.warn(
-        `Failed to get JetStream account info: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      this.logger.warn(`Failed to get JetStream account info: ${(error as Error).message}`);
     }
 
     // Gather per-stream stats for top streams
@@ -99,8 +98,8 @@ export class SystemService {
       const streamInfos = await jsm.streams.list().next();
 
       for (const si of streamInfos) {
-        const config = (si as any).config;
-        const state = (si as any).state;
+        const config = (si as ExtendedStreamInfo).config;
+        const state = (si as ExtendedStreamInfo).state;
         if (!config || !state) {
           continue;
         }
@@ -120,10 +119,8 @@ export class SystemService {
           bytes += streamBytes;
         }
       }
-    } catch (error) {
-      this.logger.warn(
-        `Failed to list streams for observability: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      this.logger.warn(`Failed to list streams for observability: ${(error as Error).message}`);
     }
 
     // Sort descending and take top N

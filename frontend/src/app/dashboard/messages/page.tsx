@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,29 +17,29 @@ import {
   Save,
   Star,
   WrapText,
-} from "lucide-react";
+} from 'lucide-react';
 
-import { messageApi } from "@/lib/api";
-import { MessageData } from "@/lib/types";
-import { useConnection } from "@/contexts/ConnectionContext";
-import { useMessages, usePublishBatch, usePublishMessage } from "@/hooks/useMessages";
-import { useCancelJob, useJobs, useStartIndexJob } from "@/hooks/useJobs";
-import { useStreams } from "@/hooks/useStreams";
-import { useUiRole } from "@/hooks/useUiRole";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { messageApi } from '@/lib/api';
+import { MessageData } from '@/lib/types';
+import { useConnection } from '@/contexts/ConnectionContext';
+import { useMessages, usePublishBatch, usePublishMessage } from '@/hooks/useMessages';
+import { useCancelJob, useJobs, useStartIndexJob } from '@/hooks/useJobs';
+import { useStreams } from '@/hooks/useStreams';
+import { useUiRole } from '@/hooks/useUiRole';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 interface SavedView {
   name: string;
   query: Record<string, string>;
 }
 
-type DiffCellType = "equal" | "added" | "removed" | "changed" | "empty";
+type DiffCellType = 'equal' | 'added' | 'removed' | 'changed' | 'empty';
 
 interface DiffCell {
   text: string;
@@ -59,12 +59,12 @@ interface DiffSummary {
 }
 
 type DiffDisplayRow =
-  | { kind: "row"; row: DiffRow; originalIndex: number }
-  | { kind: "collapsed"; count: number };
+  | { kind: 'row'; row: DiffRow; originalIndex: number }
+  | { kind: 'collapsed'; count: number };
 
 interface DiffWorkerRequest {
   id: number;
-  mode: "line" | "json";
+  mode: 'line' | 'json';
   left: string;
   right: string;
 }
@@ -76,12 +76,12 @@ interface DiffWorkerResponse {
   error?: string;
 }
 
-const SAVED_VIEWS_KEY = "nats_saved_message_views_v1";
-const FAVORITE_STREAMS_KEY = "nats_favorite_streams_v1";
+const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
+const FAVORITE_STREAMS_KEY = 'nats_favorite_streams_v1';
 
 function parseHeaders(input: string): Record<string, string> | undefined {
   const lines = input
-    .split("\n")
+    .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
 
@@ -91,7 +91,7 @@ function parseHeaders(input: string): Record<string, string> | undefined {
 
   const headers: Record<string, string> = {};
   for (const line of lines) {
-    const separator = line.indexOf(":");
+    const separator = line.indexOf(':');
     if (separator <= 0) continue;
     const key = line.slice(0, separator).trim();
     const value = line.slice(separator + 1).trim();
@@ -102,7 +102,7 @@ function parseHeaders(input: string): Record<string, string> | undefined {
 
 function parsePayload(input: string): unknown {
   const trimmed = input.trim();
-  if (!trimmed) return "";
+  if (!trimmed) return '';
   try {
     return JSON.parse(trimmed);
   } catch {
@@ -111,7 +111,7 @@ function parsePayload(input: string): unknown {
 }
 
 function formatPayload(data: unknown): string {
-  if (typeof data === "string") return data;
+  if (typeof data === 'string') return data;
   try {
     return JSON.stringify(data, null, 2);
   } catch {
@@ -121,25 +121,25 @@ function formatPayload(data: unknown): string {
 
 function maskSensitiveText(value: string): string {
   return value
-    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[email]")
-    .replace(/\b(token|api[_-]?key|password)\b\s*[:=]\s*["']?[^"',\s]+/gi, "$1:[masked]");
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[email]')
+    .replace(/\b(token|api[_-]?key|password)\b\s*[:=]\s*["']?[^"',\s]+/gi, '$1:[masked]');
 }
 
 function toCsv(messages: MessageData[]): string {
-  const header = ["seq", "subject", "payload_size", "time"];
+  const header = ['seq', 'subject', 'payload_size', 'time'];
   const rows = messages.map((m) => [
     String(m.seq),
-    JSON.stringify(m.subject ?? ""),
+    JSON.stringify(m.subject ?? ''),
     String(m.payload_size ?? 0),
-    JSON.stringify(m.time ?? ""),
+    JSON.stringify(m.time ?? ''),
   ]);
-  return [header.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  return [header.join(','), ...rows.map((r) => r.join(','))].join('\n');
 }
 
 function downloadFile(filename: string, content: string, mimeType: string): void {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   a.click();
@@ -148,32 +148,36 @@ function downloadFile(filename: string, content: string, mimeType: string): void
 
 function diffCellClass(type: DiffCellType): string {
   switch (type) {
-    case "added":
-      return "bg-emerald-100/70 dark:bg-emerald-900/20";
-    case "removed":
-      return "bg-rose-100/70 dark:bg-rose-900/20";
-    case "changed":
-      return "bg-amber-100/70 dark:bg-amber-900/20";
-    case "empty":
-      return "bg-muted/20";
+    case 'added':
+      return 'bg-emerald-100/70 dark:bg-emerald-900/20';
+    case 'removed':
+      return 'bg-rose-100/70 dark:bg-rose-900/20';
+    case 'changed':
+      return 'bg-amber-100/70 dark:bg-amber-900/20';
+    case 'empty':
+      return 'bg-muted/20';
     default:
-      return "bg-transparent";
+      return 'bg-transparent';
   }
 }
 
 function collapseEqualRows(rows: DiffRow[], context = 2): DiffDisplayRow[] {
   const changedIndexes = rows
     .map((row, idx) => ({ row, idx }))
-    .filter(({ row }) => !(row.left.type === "equal" && row.right.type === "equal"))
+    .filter(({ row }) => !(row.left.type === 'equal' && row.right.type === 'equal'))
     .map(({ idx }) => idx);
 
   if (changedIndexes.length === 0) {
-    return rows.map((row, idx) => ({ kind: "row", row, originalIndex: idx }));
+    return rows.map((row, idx) => ({ kind: 'row', row, originalIndex: idx }));
   }
 
   const keep = new Set<number>();
   for (const idx of changedIndexes) {
-    for (let i = Math.max(0, idx - context); i <= Math.min(rows.length - 1, idx + context); i += 1) {
+    for (
+      let i = Math.max(0, idx - context);
+      i <= Math.min(rows.length - 1, idx + context);
+      i += 1
+    ) {
       keep.add(i);
     }
   }
@@ -182,22 +186,21 @@ function collapseEqualRows(rows: DiffRow[], context = 2): DiffDisplayRow[] {
   let i = 0;
   while (i < rows.length) {
     if (keep.has(i)) {
-      display.push({ kind: "row", row: rows[i], originalIndex: i });
+      display.push({ kind: 'row', row: rows[i], originalIndex: i });
       i += 1;
       continue;
     }
 
-    let start = i;
+    const start = i;
     while (i < rows.length && !keep.has(i)) i += 1;
     const count = i - start;
-    if (count > 0) display.push({ kind: "collapsed", count });
+    if (count > 0) display.push({ kind: 'collapsed', count });
   }
 
   return display;
 }
 
 export default function MessagesPage() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const subjectInputRef = useRef<HTMLInputElement>(null);
@@ -207,24 +210,24 @@ export default function MessagesPage() {
   const { data: streamsData } = useStreams(connectionId);
   const streamNames = useMemo(
     () => (streamsData?.streams || []).map((stream) => stream.config.name),
-    [streamsData?.streams]
+    [streamsData?.streams],
   );
 
   const { role, isAdmin } = useUiRole();
   const [maskSensitive, setMaskSensitive] = useState(false);
 
   const [selectedStream, setSelectedStream] = useState<string | null>(null);
-  const [subject, setSubject] = useState("");
+  const [subject, setSubject] = useState('');
   const [payload, setPayload] = useState('{\n  "event": "example"\n}');
-  const [headersInput, setHeadersInput] = useState("");
+  const [headersInput, setHeadersInput] = useState('');
   const [batchMode, setBatchMode] = useState(false);
   const [batchPayload, setBatchPayload] = useState('{"event":"one"}\n{"event":"two"}');
-  const [replaySubject, setReplaySubject] = useState("");
+  const [replaySubject, setReplaySubject] = useState('');
 
-  const [filterSubject, setFilterSubject] = useState("");
-  const [headerKey, setHeaderKey] = useState("");
-  const [headerValue, setHeaderValue] = useState("");
-  const [payloadContains, setPayloadContains] = useState("");
+  const [filterSubject, setFilterSubject] = useState('');
+  const [headerKey, setHeaderKey] = useState('');
+  const [headerValue, setHeaderValue] = useState('');
+  const [payloadContains, setPayloadContains] = useState('');
 
   const [liveMode, setLiveMode] = useState(false);
   const [liveIntervalMs, setLiveIntervalMs] = useState(2000);
@@ -240,7 +243,7 @@ export default function MessagesPage() {
   const [compareLoading, setCompareLoading] = useState<Record<number, boolean>>({});
   const [diffWrap, setDiffWrap] = useState(true);
   const [diffExpanded, setDiffExpanded] = useState(true);
-  const [diffMode, setDiffMode] = useState<"line" | "json">("line");
+  const [diffMode, setDiffMode] = useState<'line' | 'json'>('line');
   const [showChangedOnly, setShowChangedOnly] = useState(true);
   const [diffRows, setDiffRows] = useState<DiffRow[]>([]);
   const [diffSummary, setDiffSummary] = useState<DiffSummary>({
@@ -266,18 +269,23 @@ export default function MessagesPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
-  const [indexQuery, setIndexQuery] = useState("");
+  const [indexQuery, setIndexQuery] = useState('');
   const [indexLimit, setIndexLimit] = useState(2000);
   const [indexMatches, setIndexMatches] = useState<
     Array<{ seq: number; subject: string; payload_preview: string }>
   >([]);
-  const [indexMeta, setIndexMeta] = useState<{ indexed_messages: number; built_at?: string } | null>(null);
+  const [indexMeta, setIndexMeta] = useState<{
+    indexed_messages: number;
+    built_at?: string;
+  } | null>(null);
   const [indexLoading, setIndexLoading] = useState(false);
   const [schemaText, setSchemaText] = useState('{\n  "type": "object"\n}');
-  const [schemaSeqInput, setSchemaSeqInput] = useState("");
-  const [schemaResult, setSchemaResult] = useState<{ valid: boolean; errors: string[] } | null>(null);
-  const [dlqSeqInput, setDlqSeqInput] = useState("");
-  const [dlqTargetSubject, setDlqTargetSubject] = useState("");
+  const [schemaSeqInput, setSchemaSeqInput] = useState('');
+  const [schemaResult, setSchemaResult] = useState<{ valid: boolean; errors: string[] } | null>(
+    null,
+  );
+  const [dlqSeqInput, setDlqSeqInput] = useState('');
+  const [dlqTargetSubject, setDlqTargetSubject] = useState('');
   const [toolBusy, setToolBusy] = useState(false);
   const [activeIndexJobId, setActiveIndexJobId] = useState<string | null>(null);
 
@@ -301,17 +309,17 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    const streamFromQuery = searchParams.get("stream");
-    const limitFromQuery = searchParams.get("limit");
-    const liveFromQuery = searchParams.get("live");
-    const filterSubjectFromQuery = searchParams.get("filter_subject");
-    const headerKeyFromQuery = searchParams.get("header_key");
-    const headerValueFromQuery = searchParams.get("header_value");
-    const payloadContainsFromQuery = searchParams.get("payload_contains");
+    const streamFromQuery = searchParams.get('stream');
+    const limitFromQuery = searchParams.get('limit');
+    const liveFromQuery = searchParams.get('live');
+    const filterSubjectFromQuery = searchParams.get('filter_subject');
+    const headerKeyFromQuery = searchParams.get('header_key');
+    const headerValueFromQuery = searchParams.get('header_value');
+    const payloadContainsFromQuery = searchParams.get('payload_contains');
 
     if (streamFromQuery) setSelectedStream(streamFromQuery);
     if (limitFromQuery) setLimit(Number(limitFromQuery));
-    if (liveFromQuery) setLiveMode(liveFromQuery === "1");
+    if (liveFromQuery) setLiveMode(liveFromQuery === '1');
     if (filterSubjectFromQuery) setFilterSubject(filterSubjectFromQuery);
     if (headerKeyFromQuery) setHeaderKey(headerKeyFromQuery);
     if (headerValueFromQuery) setHeaderValue(headerValueFromQuery);
@@ -336,14 +344,14 @@ export default function MessagesPage() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (selectedStream) params.set("stream", selectedStream);
-    params.set("limit", String(limit));
-    if (liveMode) params.set("live", "1");
-    if (filterSubject) params.set("filter_subject", filterSubject);
-    if (headerKey) params.set("header_key", headerKey);
-    if (headerValue) params.set("header_value", headerValue);
-    if (payloadContains) params.set("payload_contains", payloadContains);
-    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    if (selectedStream) params.set('stream', selectedStream);
+    params.set('limit', String(limit));
+    if (liveMode) params.set('live', '1');
+    if (filterSubject) params.set('filter_subject', filterSubject);
+    if (headerKey) params.set('header_key', headerKey);
+    if (headerValue) params.set('header_value', headerValue);
+    if (payloadContains) params.set('payload_contains', payloadContains);
+    window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
   }, [
     selectedStream,
     limit,
@@ -359,24 +367,24 @@ export default function MessagesPage() {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const isTyping =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
         (target as HTMLElement | null)?.isContentEditable;
-      if (event.key === "/" && !isTyping) {
+      if (event.key === '/' && !isTyping) {
         event.preventDefault();
         subjectInputRef.current?.focus();
       }
-      if (event.key.toLowerCase() === "r" && !isTyping) {
+      if (event.key.toLowerCase() === 'r' && !isTyping) {
         event.preventDefault();
         void refetchRef.current();
       }
-      if (event.key.toLowerCase() === "l" && !isTyping) {
+      if (event.key.toLowerCase() === 'l' && !isTyping) {
         event.preventDefault();
         setLiveMode((prev) => !prev);
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   const queryParams = useMemo(
@@ -390,7 +398,7 @@ export default function MessagesPage() {
       payloadContains: payloadContains || undefined,
       previewBytes: 2048,
     }),
-    [limit, seqStart, liveMode, filterSubject, headerKey, headerValue, payloadContains]
+    [limit, seqStart, liveMode, filterSubject, headerKey, headerValue, payloadContains],
   );
 
   const {
@@ -419,7 +427,7 @@ export default function MessagesPage() {
     setLastResult(null);
 
     if (!subject.trim()) {
-      setError("Subject is required.");
+      setError('Subject is required.');
       return;
     }
 
@@ -427,12 +435,12 @@ export default function MessagesPage() {
     try {
       if (batchMode) {
         const messages = batchPayload
-          .split("\n")
+          .split('\n')
           .map((line) => line.trim())
           .filter(Boolean)
           .map((line) => parsePayload(line));
         if (messages.length === 0) {
-          setError("Add at least one message line for batch publish.");
+          setError('Add at least one message line for batch publish.');
           return;
         }
         const result = await publishBatch.mutateAsync({
@@ -451,7 +459,7 @@ export default function MessagesPage() {
       }
       await refetch();
     } catch (publishError) {
-      setError(publishError instanceof Error ? publishError.message : "Failed to publish message");
+      setError(publishError instanceof Error ? publishError.message : 'Failed to publish message');
     }
   };
 
@@ -497,7 +505,7 @@ export default function MessagesPage() {
       setLoadedPayloads((prev) => ({ ...prev, [seq]: fullMessage.data }));
       setExpandedPayloads((prev) => ({ ...prev, [seq]: true }));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load full payload");
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load full payload');
     } finally {
       setPayloadLoading((prev) => ({ ...prev, [seq]: false }));
     }
@@ -510,7 +518,7 @@ export default function MessagesPage() {
   const handleReplayMessage = async (message: MessageData) => {
     if (!isAdmin) return;
     if (!connectionId || !selectedStream || !replaySubject.trim()) {
-      setError("Replay subject is required.");
+      setError('Replay subject is required.');
       return;
     }
     try {
@@ -525,7 +533,7 @@ export default function MessagesPage() {
       });
       setLastResult(`Replayed seq ${message.seq} to ${replaySubject} as seq ${result.seq}.`);
     } catch (replayError) {
-      setError(replayError instanceof Error ? replayError.message : "Failed to replay message");
+      setError(replayError instanceof Error ? replayError.message : 'Failed to replay message');
     }
   };
 
@@ -547,7 +555,7 @@ export default function MessagesPage() {
       compareSelection
         .map((seq) => currentMessages.find((m) => m.seq === seq))
         .filter((m): m is MessageData => !!m),
-    [compareSelection, currentMessages]
+    [compareSelection, currentMessages],
   );
 
   useEffect(() => {
@@ -561,7 +569,7 @@ export default function MessagesPage() {
           const fullMessage = await messageApi.getMessage(connectionId, selectedStream, msg.seq);
           setLoadedPayloads((prev) => ({ ...prev, [msg.seq]: fullMessage.data }));
         } catch (error) {
-          console.error("Failed to load compare payload", msg.seq, error);
+          console.error('Failed to load compare payload', msg.seq, error);
         } finally {
           setCompareLoading((prev) => ({ ...prev, [msg.seq]: false }));
         }
@@ -581,15 +589,15 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!showDiffViewer) return;
     const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previous;
     };
   }, [showDiffViewer]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const worker = new Worker(new URL("../../../workers/diff.worker.ts", import.meta.url));
+    if (typeof window === 'undefined') return;
+    const worker = new Worker(new URL('../../../workers/diff.worker.ts', import.meta.url));
     diffWorkerRef.current = worker;
 
     worker.onmessage = (event: MessageEvent<DiffWorkerResponse>) => {
@@ -605,7 +613,7 @@ export default function MessagesPage() {
 
     worker.onerror = () => {
       setDiffBusy(false);
-      setError("Diff worker failed");
+      setError('Diff worker failed');
     };
 
     return () => {
@@ -620,7 +628,7 @@ export default function MessagesPage() {
       setDiffSummary((prev) =>
         prev.equal === 0 && prev.added === 0 && prev.removed === 0 && prev.changed === 0
           ? prev
-          : { equal: 0, added: 0, removed: 0, changed: 0 }
+          : { equal: 0, added: 0, removed: 0, changed: 0 },
       );
       setDiffBusy(false);
       return;
@@ -632,12 +640,12 @@ export default function MessagesPage() {
       ? formatPayload(loadedPayloads[leftMessage.seq])
       : leftMessage.data !== undefined
         ? formatPayload(leftMessage.data)
-        : formatPayload(leftMessage.data_preview ?? "");
+        : formatPayload(leftMessage.data_preview ?? '');
     const rightBase = Object.prototype.hasOwnProperty.call(loadedPayloads, rightMessage.seq)
       ? formatPayload(loadedPayloads[rightMessage.seq])
       : rightMessage.data !== undefined
         ? formatPayload(rightMessage.data)
-        : formatPayload(rightMessage.data_preview ?? "");
+        : formatPayload(rightMessage.data_preview ?? '');
     const left = maskSensitive ? maskSensitiveText(leftBase) : leftBase;
     const right = maskSensitive ? maskSensitiveText(rightBase) : rightBase;
     const worker = diffWorkerRef.current;
@@ -651,17 +659,20 @@ export default function MessagesPage() {
   }, [diffMessages, loadedPayloads, diffMode, maskSensitive, showDiffViewer]);
 
   const saveCurrentView = () => {
-    const name = window.prompt("Save view as:");
+    const name = window.prompt('Save view as:');
     if (!name) return;
     const params = new URLSearchParams();
-    if (selectedStream) params.set("stream", selectedStream);
-    params.set("limit", String(limit));
-    if (liveMode) params.set("live", "1");
-    if (filterSubject) params.set("filter_subject", filterSubject);
-    if (headerKey) params.set("header_key", headerKey);
-    if (headerValue) params.set("header_value", headerValue);
-    if (payloadContains) params.set("payload_contains", payloadContains);
-    const nextViews = [...savedViews.filter((v) => v.name !== name), { name, query: Object.fromEntries(params) }];
+    if (selectedStream) params.set('stream', selectedStream);
+    params.set('limit', String(limit));
+    if (liveMode) params.set('live', '1');
+    if (filterSubject) params.set('filter_subject', filterSubject);
+    if (headerKey) params.set('header_key', headerKey);
+    if (headerValue) params.set('header_value', headerValue);
+    if (payloadContains) params.set('payload_contains', payloadContains);
+    const nextViews = [
+      ...savedViews.filter((v) => v.name !== name),
+      { name, query: Object.fromEntries(params) },
+    ];
     setSavedViews(nextViews);
     localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(nextViews));
   };
@@ -672,11 +683,11 @@ export default function MessagesPage() {
     const q = view.query;
     setSelectedStream(q.stream || null);
     setLimit(Number(q.limit || 25));
-    setLiveMode(q.live === "1");
-    setFilterSubject(q.filter_subject || "");
-    setHeaderKey(q.header_key || "");
-    setHeaderValue(q.header_value || "");
-    setPayloadContains(q.payload_contains || "");
+    setLiveMode(q.live === '1');
+    setFilterSubject(q.filter_subject || '');
+    setHeaderKey(q.header_key || '');
+    setHeaderValue(q.header_value || '');
+    setPayloadContains(q.payload_contains || '');
     setSeqStart(undefined);
     setCursorHistory([]);
   };
@@ -691,11 +702,11 @@ export default function MessagesPage() {
   };
 
   const exportJson = () => {
-    downloadFile("messages.json", JSON.stringify(currentMessages, null, 2), "application/json");
+    downloadFile('messages.json', JSON.stringify(currentMessages, null, 2), 'application/json');
   };
 
   const exportCsv = () => {
-    downloadFile("messages.csv", toCsv(currentMessages), "text/csv");
+    downloadFile('messages.csv', toCsv(currentMessages), 'text/csv');
   };
 
   const handleBuildIndex = async () => {
@@ -703,11 +714,14 @@ export default function MessagesPage() {
     setIndexLoading(true);
     setError(null);
     try {
-      const job = await startIndexJob.mutateAsync({ streamName: selectedStream, limit: indexLimit });
+      const job = await startIndexJob.mutateAsync({
+        streamName: selectedStream,
+        limit: indexLimit,
+      });
       setActiveIndexJobId(job.id);
       setLastResult(`Started background index job ${job.id.slice(0, 8)}…`);
     } catch (buildError) {
-      setError(buildError instanceof Error ? buildError.message : "Failed to build message index");
+      setError(buildError instanceof Error ? buildError.message : 'Failed to build message index');
     } finally {
       setIndexLoading(false);
     }
@@ -715,21 +729,24 @@ export default function MessagesPage() {
 
   const activeIndexJob = useMemo(
     () => (jobsData?.jobs || []).find((job) => job.id === activeIndexJobId) || null,
-    [jobsData?.jobs, activeIndexJobId]
+    [jobsData?.jobs, activeIndexJobId],
   );
 
   useEffect(() => {
     if (!activeIndexJob) return;
-    if (activeIndexJob.status === "completed") {
+    if (activeIndexJob.status === 'completed') {
       const indexed = Number(activeIndexJob.result?.indexed_messages ?? 0);
-      setIndexMeta({ indexed_messages: indexed, built_at: activeIndexJob.completed_at || undefined });
+      setIndexMeta({
+        indexed_messages: indexed,
+        built_at: activeIndexJob.completed_at || undefined,
+      });
       setLastResult(`Index build completed (${indexed} messages).`);
       setActiveIndexJobId(null);
-    } else if (activeIndexJob.status === "failed") {
-      setError(activeIndexJob.error || "Index build failed");
+    } else if (activeIndexJob.status === 'failed') {
+      setError(activeIndexJob.error || 'Index build failed');
       setActiveIndexJobId(null);
-    } else if (activeIndexJob.status === "cancelled") {
-      setLastResult("Index build cancelled.");
+    } else if (activeIndexJob.status === 'cancelled') {
+      setLastResult('Index build cancelled.');
       setActiveIndexJobId(null);
     }
   }, [activeIndexJob]);
@@ -739,12 +756,19 @@ export default function MessagesPage() {
     setIndexLoading(true);
     setError(null);
     try {
-      const result = await messageApi.searchIndex(connectionId, selectedStream, indexQuery.trim(), 100);
+      const result = await messageApi.searchIndex(
+        connectionId,
+        selectedStream,
+        indexQuery.trim(),
+        100,
+      );
       setIndexMatches(result.matches || []);
       setIndexMeta({ indexed_messages: result.indexed_messages, built_at: result.built_at });
       setLastResult(`Indexed search returned ${result.total} matches.`);
     } catch (searchError) {
-      setError(searchError instanceof Error ? searchError.message : "Failed to search message index");
+      setError(
+        searchError instanceof Error ? searchError.message : 'Failed to search message index',
+      );
     } finally {
       setIndexLoading(false);
     }
@@ -755,7 +779,7 @@ export default function MessagesPage() {
     if (existing !== undefined) return existing;
     const inPage = currentMessages.find((m) => m.seq === seq);
     if (inPage?.data !== undefined) return inPage.data;
-    if (!connectionId || !selectedStream) throw new Error("Connection and stream required");
+    if (!connectionId || !selectedStream) throw new Error('Connection and stream required');
     const full = await messageApi.getMessage(connectionId, selectedStream, seq);
     setLoadedPayloads((prev) => ({ ...prev, [seq]: full.data }));
     return full.data;
@@ -765,7 +789,7 @@ export default function MessagesPage() {
     if (!connectionId) return;
     const seq = Number(schemaSeqInput || compareSelection[0]);
     if (!Number.isFinite(seq) || seq <= 0) {
-      setError("Provide a valid sequence number for schema validation.");
+      setError('Provide a valid sequence number for schema validation.');
       return;
     }
 
@@ -773,7 +797,7 @@ export default function MessagesPage() {
     try {
       parsedSchema = JSON.parse(schemaText);
     } catch {
-      setError("Schema must be valid JSON.");
+      setError('Schema must be valid JSON.');
       return;
     }
 
@@ -783,9 +807,13 @@ export default function MessagesPage() {
       const payloadToValidate = await resolveMessagePayloadBySeq(seq);
       const result = await messageApi.validateSchema(connectionId, parsedSchema, payloadToValidate);
       setSchemaResult(result);
-      setLastResult(result.valid ? `Seq ${seq} is schema-valid.` : `Seq ${seq} failed schema validation.`);
+      setLastResult(
+        result.valid ? `Seq ${seq} is schema-valid.` : `Seq ${seq} failed schema validation.`,
+      );
     } catch (validationError) {
-      setError(validationError instanceof Error ? validationError.message : "Schema validation failed");
+      setError(
+        validationError instanceof Error ? validationError.message : 'Schema validation failed',
+      );
     } finally {
       setToolBusy(false);
     }
@@ -795,11 +823,11 @@ export default function MessagesPage() {
     if (!isAdmin || !connectionId || !selectedStream) return;
     const seq = Number(dlqSeqInput || compareSelection[0]);
     if (!Number.isFinite(seq) || seq <= 0) {
-      setError("Provide a valid source sequence for DLQ replay.");
+      setError('Provide a valid source sequence for DLQ replay.');
       return;
     }
     if (!dlqTargetSubject.trim()) {
-      setError("Target subject is required for DLQ replay.");
+      setError('Target subject is required for DLQ replay.');
       return;
     }
 
@@ -809,14 +837,14 @@ export default function MessagesPage() {
       const replay = await messageApi.replay(connectionId, selectedStream, seq, {
         target_subject: dlqTargetSubject.trim(),
         copy_headers: true,
-        extra_headers: { "x-replayed-from-seq": String(seq) },
+        extra_headers: { 'x-replayed-from-seq': String(seq) },
       });
       setLastResult(
-        `Replayed seq ${replay.source_seq} to ${replay.target_subject} as seq ${replay.published_seq}.`
+        `Replayed seq ${replay.source_seq} to ${replay.target_subject} as seq ${replay.published_seq}.`,
       );
       await refetch();
     } catch (replayError) {
-      setError(replayError instanceof Error ? replayError.message : "DLQ replay failed");
+      setError(replayError instanceof Error ? replayError.message : 'DLQ replay failed');
     } finally {
       setToolBusy(false);
     }
@@ -824,9 +852,10 @@ export default function MessagesPage() {
 
   const renderPayload = (message: MessageData): string => {
     const base =
-      expandedPayloads[message.seq] && Object.prototype.hasOwnProperty.call(loadedPayloads, message.seq)
+      expandedPayloads[message.seq] &&
+      Object.prototype.hasOwnProperty.call(loadedPayloads, message.seq)
         ? formatPayload(loadedPayloads[message.seq])
-        : formatPayload(message.data_preview ?? "");
+        : formatPayload(message.data_preview ?? '');
     return maskSensitive ? maskSensitiveText(base) : base;
   };
 
@@ -834,8 +863,8 @@ export default function MessagesPage() {
     () =>
       showChangedOnly
         ? collapseEqualRows(diffRows)
-        : diffRows.map((row, originalIndex) => ({ kind: "row" as const, row, originalIndex })),
-    [diffRows, showChangedOnly]
+        : diffRows.map((row, originalIndex) => ({ kind: 'row' as const, row, originalIndex })),
+    [diffRows, showChangedOnly],
   );
 
   useEffect(() => {
@@ -846,8 +875,8 @@ export default function MessagesPage() {
       setDiffViewportHeight(el.clientHeight || 320);
     };
     updateHeight();
-    window.addEventListener("resize", updateHeight);
-    return () => window.removeEventListener("resize", updateHeight);
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
   }, [diffExpanded, diffWrap, displayDiffRows.length, showDiffViewer]);
 
   useEffect(() => {
@@ -864,9 +893,15 @@ export default function MessagesPage() {
   const overscan = 20;
   const totalDiffRows = displayDiffRows.length;
   const visibleStart = diffWrap ? 0 : Math.max(0, Math.floor(diffScrollTop / rowHeight) - overscan);
-  const visibleCount = diffWrap ? totalDiffRows : Math.ceil(diffViewportHeight / rowHeight) + overscan * 2;
-  const visibleEnd = diffWrap ? totalDiffRows : Math.min(totalDiffRows, visibleStart + visibleCount);
-  const visibleDiffRows = diffWrap ? displayDiffRows : displayDiffRows.slice(visibleStart, visibleEnd);
+  const visibleCount = diffWrap
+    ? totalDiffRows
+    : Math.ceil(diffViewportHeight / rowHeight) + overscan * 2;
+  const visibleEnd = diffWrap
+    ? totalDiffRows
+    : Math.min(totalDiffRows, visibleStart + visibleCount);
+  const visibleDiffRows = diffWrap
+    ? displayDiffRows
+    : displayDiffRows.slice(visibleStart, visibleEnd);
   const topSpacerHeight = diffWrap ? 0 : visibleStart * rowHeight;
   const bottomSpacerHeight = diffWrap ? 0 : Math.max(0, (totalDiffRows - visibleEnd) * rowHeight);
   const canShowDiffViewer = showDiffViewer && diffMessages.length === 2;
@@ -875,7 +910,9 @@ export default function MessagesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold mb-2">Messages</h1>
-        <p className="text-muted-foreground">Publish, filter, compare, replay, and monitor messages</p>
+        <p className="text-muted-foreground">
+          Publish, filter, compare, replay, and monitor messages
+        </p>
       </div>
 
       <Card>
@@ -893,7 +930,10 @@ export default function MessagesPage() {
           <div className="space-y-1 lg:col-span-2">
             <Label>Saved Views</Label>
             <div className="flex gap-2">
-              <Select defaultValue="" onChange={(e) => e.target.value && applySavedView(e.target.value)}>
+              <Select
+                defaultValue=""
+                onChange={(e) => e.target.value && applySavedView(e.target.value)}
+              >
                 <option value="">Select a saved view</option>
                 {savedViews.map((view) => (
                   <option key={view.name} value={view.name}>
@@ -918,7 +958,10 @@ export default function MessagesPage() {
                 Auto-scroll
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={maskSensitive} onChange={(e) => setMaskSensitive(e.target.checked)} />
+                <Checkbox
+                  checked={maskSensitive}
+                  onChange={(e) => setMaskSensitive(e.target.checked)}
+                />
                 Mask sensitive
               </label>
             </div>
@@ -938,7 +981,7 @@ export default function MessagesPage() {
                   <Label>Stream</Label>
                   <div className="flex gap-2">
                     <Select
-                      value={selectedStream || ""}
+                      value={selectedStream || ''}
                       onChange={(event) => handleSelectStream(event.target.value)}
                       disabled={streamNames.length === 0}
                     >
@@ -952,12 +995,17 @@ export default function MessagesPage() {
                         ))
                       )}
                     </Select>
-                    <Button variant="outline" onClick={toggleFavoriteStream} type="button" disabled={!selectedStream}>
+                    <Button
+                      variant="outline"
+                      onClick={toggleFavoriteStream}
+                      type="button"
+                      disabled={!selectedStream}
+                    >
                       <Star
                         className={`w-4 h-4 ${
                           selectedStream && favoriteStreams.includes(selectedStream)
-                            ? "fill-yellow-400 text-yellow-500"
-                            : ""
+                            ? 'fill-yellow-400 text-yellow-500'
+                            : ''
                         }`}
                       />
                     </Button>
@@ -1002,7 +1050,11 @@ export default function MessagesPage() {
                 </label>
 
                 <div className="flex items-center gap-2">
-                  <Checkbox id="batchMode" checked={batchMode} onChange={(event) => setBatchMode(event.target.checked)} />
+                  <Checkbox
+                    id="batchMode"
+                    checked={batchMode}
+                    onChange={(event) => setBatchMode(event.target.checked)}
+                  />
                   <Label htmlFor="batchMode" className="text-sm font-normal">
                     Batch mode (one message per line)
                   </Label>
@@ -1042,15 +1094,26 @@ export default function MessagesPage() {
                 </label>
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
-                {lastResult && <p className="text-sm text-emerald-600 dark:text-emerald-400">{lastResult}</p>}
+                {lastResult && (
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400">{lastResult}</p>
+                )}
 
                 <Button
                   type="submit"
-                  disabled={!connectionId || !selectedStream || publishMessage.isPending || publishBatch.isPending}
+                  disabled={
+                    !connectionId ||
+                    !selectedStream ||
+                    publishMessage.isPending ||
+                    publishBatch.isPending
+                  }
                   className="w-full"
                 >
                   <Plus className="w-4 h-4" />
-                  {publishMessage.isPending || publishBatch.isPending ? "Publishing..." : batchMode ? "Publish Batch" : "Publish Message"}
+                  {publishMessage.isPending || publishBatch.isPending
+                    ? 'Publishing...'
+                    : batchMode
+                      ? 'Publish Batch'
+                      : 'Publish Message'}
                 </Button>
               </CardContent>
             </form>
@@ -1069,7 +1132,11 @@ export default function MessagesPage() {
                     onChange={(e) => setIndexQuery(e.target.value)}
                     placeholder="Search subject/header/payload preview"
                   />
-                  <Button variant="outline" onClick={handleSearchIndex} disabled={!selectedStream || indexLoading}>
+                  <Button
+                    variant="outline"
+                    onClick={handleSearchIndex}
+                    disabled={!selectedStream || indexLoading}
+                  >
                     Search
                   </Button>
                 </div>
@@ -1081,7 +1148,11 @@ export default function MessagesPage() {
                     value={indexLimit}
                     onChange={(e) => setIndexLimit(Number(e.target.value))}
                   />
-                  <Button variant="outline" onClick={handleBuildIndex} disabled={!isAdmin || !selectedStream || indexLoading}>
+                  <Button
+                    variant="outline"
+                    onClick={handleBuildIndex}
+                    disabled={!isAdmin || !selectedStream || indexLoading}
+                  >
                     Build Index
                   </Button>
                 </div>
@@ -1089,7 +1160,8 @@ export default function MessagesPage() {
                   <div className="rounded border p-2 text-xs space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">Index Job: {activeIndexJob.status}</span>
-                      {(activeIndexJob.status === "pending" || activeIndexJob.status === "running") && (
+                      {(activeIndexJob.status === 'pending' ||
+                        activeIndexJob.status === 'running') && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -1101,26 +1173,35 @@ export default function MessagesPage() {
                       )}
                     </div>
                     <div className="h-2 rounded bg-muted overflow-hidden">
-                      <div className="h-full bg-primary transition-all" style={{ width: `${activeIndexJob.progress}%` }} />
+                      <div
+                        className="h-full bg-primary transition-all"
+                        style={{ width: `${activeIndexJob.progress}%` }}
+                      />
                     </div>
                     <div className="text-muted-foreground">
                       {activeIndexJob.current ?? 0}/{activeIndexJob.total ?? 0}
-                      {activeIndexJob.message ? ` | ${activeIndexJob.message}` : ""}
+                      {activeIndexJob.message ? ` | ${activeIndexJob.message}` : ''}
                     </div>
                   </div>
                 )}
                 {indexMeta && (
                   <p className="text-xs text-muted-foreground">
                     Indexed: {indexMeta.indexed_messages}
-                    {indexMeta.built_at ? ` | built ${new Date(indexMeta.built_at).toLocaleString()}` : ""}
+                    {indexMeta.built_at
+                      ? ` | built ${new Date(indexMeta.built_at).toLocaleString()}`
+                      : ''}
                   </p>
                 )}
                 {indexMatches.length > 0 && (
                   <div className="max-h-44 overflow-auto border rounded divide-y text-xs">
                     {indexMatches.slice(0, 10).map((m) => (
                       <div key={m.seq} className="p-2">
-                        <div className="font-medium">{m.subject} (seq {m.seq})</div>
-                        <div className="text-muted-foreground line-clamp-2">{m.payload_preview}</div>
+                        <div className="font-medium">
+                          {m.subject} (seq {m.seq})
+                        </div>
+                        <div className="text-muted-foreground line-clamp-2">
+                          {m.payload_preview}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1134,14 +1215,17 @@ export default function MessagesPage() {
                   min={1}
                   value={dlqSeqInput}
                   onChange={(e) => setDlqSeqInput(e.target.value)}
-                  placeholder={`Source seq (defaults to selected: ${compareSelection[0] ?? "-"})`}
+                  placeholder={`Source seq (defaults to selected: ${compareSelection[0] ?? '-'})`}
                 />
                 <Input
                   value={dlqTargetSubject}
                   onChange={(e) => setDlqTargetSubject(e.target.value)}
                   placeholder="Target subject (e.g. orders.retry)"
                 />
-                <Button onClick={handleDlqReplay} disabled={!isAdmin || toolBusy || !selectedStream}>
+                <Button
+                  onClick={handleDlqReplay}
+                  disabled={!isAdmin || toolBusy || !selectedStream}
+                >
                   Replay to Target
                 </Button>
               </div>
@@ -1153,7 +1237,7 @@ export default function MessagesPage() {
                   min={1}
                   value={schemaSeqInput}
                   onChange={(e) => setSchemaSeqInput(e.target.value)}
-                  placeholder={`Seq to validate (defaults to selected: ${compareSelection[0] ?? "-"})`}
+                  placeholder={`Seq to validate (defaults to selected: ${compareSelection[0] ?? '-'})`}
                 />
                 <Textarea
                   value={schemaText}
@@ -1161,12 +1245,18 @@ export default function MessagesPage() {
                   rows={5}
                   className="font-mono"
                 />
-                <Button variant="outline" onClick={handleValidateSchema} disabled={toolBusy || !connectionId}>
+                <Button
+                  variant="outline"
+                  onClick={handleValidateSchema}
+                  disabled={toolBusy || !connectionId}
+                >
                   Validate Payload
                 </Button>
                 {schemaResult && (
-                  <div className={`text-xs rounded border p-2 ${schemaResult.valid ? "text-emerald-600" : "text-destructive"}`}>
-                    {schemaResult.valid ? "Valid payload" : schemaResult.errors.join(" | ")}
+                  <div
+                    className={`text-xs rounded border p-2 ${schemaResult.valid ? 'text-emerald-600' : 'text-destructive'}`}
+                  >
+                    {schemaResult.valid ? 'Valid payload' : schemaResult.errors.join(' | ')}
                   </div>
                 )}
               </div>
@@ -1183,7 +1273,9 @@ export default function MessagesPage() {
                   Selected seq {diffMessages[0].seq} and seq {diffMessages[1].seq}
                 </div>
                 {(compareLoading[diffMessages[0].seq] || compareLoading[diffMessages[1].seq]) && (
-                  <div className="text-xs text-muted-foreground">Loading full payloads for diff…</div>
+                  <div className="text-xs text-muted-foreground">
+                    Loading full payloads for diff…
+                  </div>
                 )}
                 <Button size="sm" onClick={() => setShowDiffViewer(true)}>
                   Open Diff Viewer
@@ -1196,7 +1288,9 @@ export default function MessagesPage() {
         <Card className="xl:col-span-3 overflow-hidden">
           <CardHeader className="border-b">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle className="text-lg">Recent Messages {selectedStream ? `(${selectedStream})` : ""}</CardTitle>
+              <CardTitle className="text-lg">
+                Recent Messages {selectedStream ? `(${selectedStream})` : ''}
+              </CardTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <Select
                   value={String(limit)}
@@ -1211,16 +1305,30 @@ export default function MessagesPage() {
                   <option value={50}>50</option>
                   <option value={100}>100</option>
                 </Select>
-                <Select value={String(liveIntervalMs)} onChange={(e) => setLiveIntervalMs(Number(e.target.value))} className="w-24">
+                <Select
+                  value={String(liveIntervalMs)}
+                  onChange={(e) => setLiveIntervalMs(Number(e.target.value))}
+                  className="w-24"
+                >
                   <option value={1000}>1s</option>
                   <option value={2000}>2s</option>
                   <option value={5000}>5s</option>
                 </Select>
-                <Button onClick={() => refetch()} disabled={!selectedStream} variant="outline" size="sm">
+                <Button
+                  onClick={() => refetch()}
+                  disabled={!selectedStream}
+                  variant="outline"
+                  size="sm"
+                >
                   <RefreshCw className="w-4 h-4" />
                   Refresh
                 </Button>
-                <Button onClick={handlePreviousPage} disabled={cursorHistory.length === 0} variant="outline" size="sm">
+                <Button
+                  onClick={handlePreviousPage}
+                  disabled={cursorHistory.length === 0}
+                  variant="outline"
+                  size="sm"
+                >
                   <ChevronLeft className="w-4 h-4" />
                   Prev
                 </Button>
@@ -1242,7 +1350,7 @@ export default function MessagesPage() {
                   CSV
                 </Button>
                 <Button
-                  variant={diffMessages.length === 2 ? "default" : "outline"}
+                  variant={diffMessages.length === 2 ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setShowDiffViewer(true)}
                   disabled={diffMessages.length !== 2}
@@ -1252,34 +1360,62 @@ export default function MessagesPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mt-3">
-              <Input placeholder="Filter subject (e.g. orders.*)" value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)} />
-              <Input placeholder="Header key" value={headerKey} onChange={(e) => setHeaderKey(e.target.value)} />
-              <Input placeholder="Header value" value={headerValue} onChange={(e) => setHeaderValue(e.target.value)} />
-              <Input placeholder="Payload contains" value={payloadContains} onChange={(e) => setPayloadContains(e.target.value)} />
+              <Input
+                placeholder="Filter subject (e.g. orders.*)"
+                value={filterSubject}
+                onChange={(e) => setFilterSubject(e.target.value)}
+              />
+              <Input
+                placeholder="Header key"
+                value={headerKey}
+                onChange={(e) => setHeaderKey(e.target.value)}
+              />
+              <Input
+                placeholder="Header value"
+                value={headerValue}
+                onChange={(e) => setHeaderValue(e.target.value)}
+              />
+              <Input
+                placeholder="Payload contains"
+                value={payloadContains}
+                onChange={(e) => setPayloadContains(e.target.value)}
+              />
             </div>
             <div className="flex items-center gap-4 mt-3 text-sm">
               <label className="flex items-center gap-2">
-                <Checkbox checked={showHeadersCol} onChange={(e) => setShowHeadersCol(e.target.checked)} />
+                <Checkbox
+                  checked={showHeadersCol}
+                  onChange={(e) => setShowHeadersCol(e.target.checked)}
+                />
                 Headers
               </label>
               <label className="flex items-center gap-2">
-                <Checkbox checked={showSizeCol} onChange={(e) => setShowSizeCol(e.target.checked)} />
+                <Checkbox
+                  checked={showSizeCol}
+                  onChange={(e) => setShowSizeCol(e.target.checked)}
+                />
                 Size
               </label>
               <label className="flex items-center gap-2">
-                <Checkbox checked={showTimeCol} onChange={(e) => setShowTimeCol(e.target.checked)} />
+                <Checkbox
+                  checked={showTimeCol}
+                  onChange={(e) => setShowTimeCol(e.target.checked)}
+                />
                 Time
               </label>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {!selectedStream ? (
-              <div className="p-8 text-center text-muted-foreground">Select or create a stream to view messages.</div>
+              <div className="p-8 text-center text-muted-foreground">
+                Select or create a stream to view messages.
+              </div>
             ) : isLoading ? (
               <div className="p-8 text-center text-muted-foreground">Loading messages...</div>
             ) : isError ? (
               <div className="p-8 text-center text-destructive">
-                Failed to load messages: {messagesError instanceof Error ? messagesError.message : "Unknown error"}
+                Failed to load messages:{' '}
+                {messagesError instanceof Error ? messagesError.message : 'Unknown error'}
               </div>
             ) : currentMessages.length > 0 ? (
               <div ref={listContainerRef} className="max-h-[740px] overflow-y-auto divide-y">
@@ -1296,23 +1432,37 @@ export default function MessagesPage() {
                       </div>
                       {showTimeCol && (
                         <span className="text-xs text-muted-foreground">
-                          {message.time ? new Date(message.time).toLocaleString() : "-"}
+                          {message.time ? new Date(message.time).toLocaleString() : '-'}
                         </span>
                       )}
                     </div>
 
-                    <pre className="text-xs bg-muted/40 border rounded p-3 overflow-x-auto">{renderPayload(message)}</pre>
+                    <pre className="text-xs bg-muted/40 border rounded p-3 overflow-x-auto">
+                      {renderPayload(message)}
+                    </pre>
 
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-xs text-muted-foreground">
                         {showSizeCol && <>Size: {message.payload_size ?? 0} bytes</>}
-                        {showHeadersCol && message.headers && Object.keys(message.headers).length > 0 && (
-                          <> | Headers: {Object.entries(message.headers).map(([k, v]) => `${k}: ${v}`).join(" | ")}</>
-                        )}
+                        {showHeadersCol &&
+                          message.headers &&
+                          Object.keys(message.headers).length > 0 && (
+                            <>
+                              {' '}
+                              | Headers:{' '}
+                              {Object.entries(message.headers)
+                                .map(([k, v]) => `${k}: ${v}`)
+                                .join(' | ')}
+                            </>
+                          )}
                       </div>
                       <div className="flex items-center gap-2">
                         {expandedPayloads[message.seq] ? (
-                          <Button variant="outline" size="sm" onClick={() => handleHidePayload(message.seq)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleHidePayload(message.seq)}
+                          >
                             <EyeOff className="w-4 h-4" />
                             Hide
                           </Button>
@@ -1325,10 +1475,10 @@ export default function MessagesPage() {
                           >
                             <Eye className="w-4 h-4" />
                             {payloadLoading[message.seq]
-                              ? "Loading..."
+                              ? 'Loading...'
                               : Object.prototype.hasOwnProperty.call(loadedPayloads, message.seq)
-                                ? "Show"
-                                : "Load"}
+                                ? 'Show'
+                                : 'Load'}
                           </Button>
                         )}
                         <Button
@@ -1346,7 +1496,9 @@ export default function MessagesPage() {
                 ))}
               </div>
             ) : (
-              <div className="p-8 text-center text-muted-foreground">No messages found for current filters.</div>
+              <div className="p-8 text-center text-muted-foreground">
+                No messages found for current filters.
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1372,22 +1524,29 @@ export default function MessagesPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setDiffWrap((v) => !v)}>
                   <WrapText className="w-4 h-4" />
-                  {diffWrap ? "No Wrap" : "Wrap"}
+                  {diffWrap ? 'No Wrap' : 'Wrap'}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setDiffExpanded((v) => !v)}>
-                  {diffExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                  {diffExpanded ? "Compact" : "Expanded"}
+                  {diffExpanded ? (
+                    <Minimize2 className="w-4 h-4" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4" />
+                  )}
+                  {diffExpanded ? 'Compact' : 'Expanded'}
                 </Button>
                 <Select
                   value={diffMode}
-                  onChange={(event) => setDiffMode(event.target.value as "line" | "json")}
+                  onChange={(event) => setDiffMode(event.target.value as 'line' | 'json')}
                   className="w-28"
                 >
                   <option value="line">Line</option>
                   <option value="json">JSON path</option>
                 </Select>
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={showChangedOnly} onChange={(e) => setShowChangedOnly(e.target.checked)} />
+                  <Checkbox
+                    checked={showChangedOnly}
+                    onChange={(e) => setShowChangedOnly(e.target.checked)}
+                  />
                   Changed only
                 </label>
                 {diffBusy && (
@@ -1400,8 +1559,12 @@ export default function MessagesPage() {
 
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded bg-muted px-2 py-1">Changed: {diffSummary.changed}</span>
-                <span className="rounded bg-emerald-100/70 px-2 py-1">Added: {diffSummary.added}</span>
-                <span className="rounded bg-rose-100/70 px-2 py-1">Removed: {diffSummary.removed}</span>
+                <span className="rounded bg-emerald-100/70 px-2 py-1">
+                  Added: {diffSummary.added}
+                </span>
+                <span className="rounded bg-rose-100/70 px-2 py-1">
+                  Removed: {diffSummary.removed}
+                </span>
                 <span className="rounded bg-muted px-2 py-1">Equal: {diffSummary.equal}</span>
               </div>
 
@@ -1417,11 +1580,13 @@ export default function MessagesPage() {
                 <div
                   ref={diffContainerRef}
                   onScroll={handleDiffScroll}
-                  className={`${diffExpanded ? "max-h-[72vh]" : "max-h-72"} overflow-auto font-mono`}
+                  className={`${diffExpanded ? 'max-h-[72vh]' : 'max-h-72'} overflow-auto font-mono`}
                 >
-                  {!diffWrap && topSpacerHeight > 0 && <div style={{ height: `${topSpacerHeight}px` }} />}
+                  {!diffWrap && topSpacerHeight > 0 && (
+                    <div style={{ height: `${topSpacerHeight}px` }} />
+                  )}
                   {visibleDiffRows.map((display, idx) => {
-                    if (display.kind === "collapsed") {
+                    if (display.kind === 'collapsed') {
                       return (
                         <div
                           key={`collapsed-${visibleStart + idx}`}
@@ -1434,28 +1599,30 @@ export default function MessagesPage() {
                     return (
                       <div
                         key={`row-${display.originalIndex}`}
-                        className={`grid grid-cols-2 ${diffWrap ? "" : "h-6"}`}
+                        className={`grid grid-cols-2 ${diffWrap ? '' : 'h-6'}`}
                       >
                         <div
-                          className={`px-3 ${diffWrap ? "py-0.5 whitespace-pre-wrap break-all" : "leading-6 whitespace-pre"} ${diffCellClass(display.row.left.type)}`}
+                          className={`px-3 ${diffWrap ? 'py-0.5 whitespace-pre-wrap break-all' : 'leading-6 whitespace-pre'} ${diffCellClass(display.row.left.type)}`}
                         >
                           <span className="inline-block w-10 text-[10px] text-muted-foreground mr-2 select-none">
                             {display.originalIndex + 1}
                           </span>
-                          {display.row.left.text || " "}
+                          {display.row.left.text || ' '}
                         </div>
                         <div
-                          className={`px-3 border-l ${diffWrap ? "py-0.5 whitespace-pre-wrap break-all" : "leading-6 whitespace-pre"} ${diffCellClass(display.row.right.type)}`}
+                          className={`px-3 border-l ${diffWrap ? 'py-0.5 whitespace-pre-wrap break-all' : 'leading-6 whitespace-pre'} ${diffCellClass(display.row.right.type)}`}
                         >
                           <span className="inline-block w-10 text-[10px] text-muted-foreground mr-2 select-none">
                             {display.originalIndex + 1}
                           </span>
-                          {display.row.right.text || " "}
+                          {display.row.right.text || ' '}
                         </div>
                       </div>
                     );
                   })}
-                  {!diffWrap && bottomSpacerHeight > 0 && <div style={{ height: `${bottomSpacerHeight}px` }} />}
+                  {!diffWrap && bottomSpacerHeight > 0 && (
+                    <div style={{ height: `${bottomSpacerHeight}px` }} />
+                  )}
                 </div>
               </div>
             </div>
