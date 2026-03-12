@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import {
   MessagePublishRequestDto,
@@ -30,6 +31,8 @@ import {
 import { AdminGuard } from '../common/guards/admin.guard';
 import { ConnectionsService } from '../connections/connections.service';
 
+@ApiTags('Messages')
+@ApiBearerAuth()
 @Controller('connections/:connectionId')
 export class MessagesController {
   constructor(
@@ -61,9 +64,7 @@ export class MessagesController {
 
   @Post('messages/validate-schema')
   @HttpCode(HttpStatus.OK)
-  async validateSchema(
-    @Body() body: ValidateSchemaRequestDto,
-  ): Promise<ValidateSchemaResponseDto> {
+  async validateSchema(@Body() body: ValidateSchemaRequestDto): Promise<ValidateSchemaResponseDto> {
     return this.messagesService.validateSchema(body.data, body.schema);
   }
 

@@ -1,13 +1,5 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Put,
-  Body,
-  Headers,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, Headers, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { SignUpDto, LoginDto, ProfileUpdateDto } from './dto/auth.dto';
 import { Public } from '../common/decorators/public.decorator';
@@ -42,6 +34,8 @@ function toUserProfile(user: User): UserProfile {
   };
 }
 
+@ApiTags('Auth')
+@ApiBearerAuth()
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -49,11 +43,7 @@ export class AuthController {
   @Public()
   @Post('signup')
   async signup(@Body() dto: SignUpDto): Promise<AuthSessionResponse> {
-    const user = await this.authService.createUser(
-      dto.email,
-      dto.password,
-      dto.full_name,
-    );
+    const user = await this.authService.createUser(dto.email, dto.password, dto.full_name);
     const session = await this.authService.createSession(user.id);
 
     return {

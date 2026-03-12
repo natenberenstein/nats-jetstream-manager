@@ -1,16 +1,10 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Param,
-  Body,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ConnectionsService } from './connections.service';
 import { ConnectionRequestDto } from './dto/connection.dto';
 
+@ApiTags('Connections')
+@ApiBearerAuth()
 @Controller('connections')
 export class ConnectionsController {
   constructor(private readonly connectionsService: ConnectionsService) {}
@@ -23,23 +17,13 @@ export class ConnectionsController {
   @Post('test')
   @HttpCode(HttpStatus.OK)
   testConnection(@Body() dto: ConnectionRequestDto) {
-    return this.connectionsService.testConnection(
-      dto.url,
-      dto.user,
-      dto.password,
-      dto.token,
-    );
+    return this.connectionsService.testConnection(dto.url, dto.user, dto.password, dto.token);
   }
 
   @Post('connect')
   @HttpCode(HttpStatus.OK)
   createConnection(@Body() dto: ConnectionRequestDto) {
-    return this.connectionsService.createConnection(
-      dto.url,
-      dto.user,
-      dto.password,
-      dto.token,
-    );
+    return this.connectionsService.createConnection(dto.url, dto.user, dto.password, dto.token);
   }
 
   @Get(':id/status')

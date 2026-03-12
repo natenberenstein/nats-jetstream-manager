@@ -9,10 +9,13 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ConsumersService } from './consumers.service';
 import { ConsumerCreateDto } from './dto/consumer.dto';
 import { AdminGuard } from '../common/guards/admin.guard';
 
+@ApiTags('Consumers')
+@ApiBearerAuth()
 @Controller('connections/:connectionId/streams/:streamName/consumers')
 export class ConsumersController {
   constructor(private readonly consumersService: ConsumersService) {}
@@ -30,10 +33,7 @@ export class ConsumersController {
     @Param('connectionId') connectionId: string,
     @Param('streamName') streamName: string,
   ) {
-    return this.consumersService.getConsumerAnalytics(
-      connectionId,
-      streamName,
-    );
+    return this.consumersService.getConsumerAnalytics(connectionId, streamName);
   }
 
   @Post()
@@ -44,11 +44,7 @@ export class ConsumersController {
     @Param('streamName') streamName: string,
     @Body() dto: ConsumerCreateDto,
   ) {
-    return this.consumersService.createConsumer(
-      connectionId,
-      streamName,
-      dto,
-    );
+    return this.consumersService.createConsumer(connectionId, streamName, dto);
   }
 
   @Get(':name')
@@ -68,10 +64,6 @@ export class ConsumersController {
     @Param('streamName') streamName: string,
     @Param('name') name: string,
   ) {
-    return this.consumersService.deleteConsumer(
-      connectionId,
-      streamName,
-      name,
-    );
+    return this.consumersService.deleteConsumer(connectionId, streamName, name);
   }
 }

@@ -10,10 +10,13 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { StreamsService, StreamInfoResponse } from './streams.service';
 import { StreamCreateDto, StreamUpdateDto } from './dto/stream.dto';
 import { AdminGuard } from '../common/guards/admin.guard';
 
+@ApiTags('Streams')
+@ApiBearerAuth()
 @Controller('connections/:connectionId/streams')
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 export class StreamsController {

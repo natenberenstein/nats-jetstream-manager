@@ -20,6 +20,7 @@
     "@commitlint/cli": "^20.4.3",
     "@commitlint/config-conventional": "^20.4.3",
     "concurrently": "^9.1.0",
+    "eslint": "^9.39.4",
     "husky": "^9.1.0",
     "lint-staged": "^15.2.0",
     "prettier": "^3.4.0"
@@ -27,11 +28,11 @@
   "lint-staged": {
     "backend/**/*.ts": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix --config backend/eslint.config.mjs"
     ],
     "frontend/**/*.{ts,tsx}": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix --config frontend/eslint.config.mjs"
     ],
     "*.{json,css,md}": [
       "prettier --write"

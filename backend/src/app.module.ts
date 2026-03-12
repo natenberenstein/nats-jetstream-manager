@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { LoggerModule } from 'nestjs-pino';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { AuthGuard } from './common/guards/auth.guard';
@@ -22,6 +23,22 @@ import * as fs from 'fs';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const isProduction = configService.get<string>('NODE_ENV') === 'production';
+        return {
+          pinoHttp: {
+            level: configService.get<string>('LOG_LEVEL', isProduction ? 'info' : 'debug'),
+            transport: isProduction
+              ? undefined
+              : { target: 'pino-pretty', options: { colorize: true } },
+            autoLogging: { ignore: (req) => (req as { url?: string }).url === '/health' },
+          },
+        };
+      },
+      inject: [ConfigService],
+    }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {

@@ -1,12 +1,5 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  UseGuards,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { Public } from '../common/decorators/public.decorator';
@@ -44,6 +37,8 @@ class AcceptInviteDto {
   full_name?: string;
 }
 
+@ApiTags('Invites')
+@ApiBearerAuth()
 @Controller('invites')
 export class InvitesController {
   constructor(private readonly authService: AuthService) {}
@@ -51,10 +46,7 @@ export class InvitesController {
   @Post()
   @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
-  async createInvite(
-    @CurrentUser() user: User,
-    @Body() dto: CreateInviteDto,
-  ) {
+  async createInvite(@CurrentUser() user: User, @Body() dto: CreateInviteDto) {
     return this.authService.createInvite(
       dto.email,
       dto.role,

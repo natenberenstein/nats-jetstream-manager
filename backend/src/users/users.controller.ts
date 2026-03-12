@@ -9,6 +9,7 @@ import {
   ValidationPipe,
   ParseIntPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from '../auth/auth.service';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -23,6 +24,8 @@ interface UserProfile {
   updated_at: string;
 }
 
+@ApiTags('Users')
+@ApiBearerAuth()
 @Controller('users')
 @UseGuards(AdminGuard)
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -38,12 +41,10 @@ export class UsersController {
       full_name: user.full_name,
       role: user.role,
       is_active: user.is_active,
-      created_at: user.created_at instanceof Date
-        ? user.created_at.toISOString()
-        : String(user.created_at),
-      updated_at: user.updated_at instanceof Date
-        ? user.updated_at.toISOString()
-        : String(user.updated_at),
+      created_at:
+        user.created_at instanceof Date ? user.created_at.toISOString() : String(user.created_at),
+      updated_at:
+        user.updated_at instanceof Date ? user.updated_at.toISOString() : String(user.updated_at),
     }));
   }
 
@@ -59,12 +60,10 @@ export class UsersController {
       full_name: user.full_name,
       role: user.role,
       is_active: user.is_active,
-      created_at: user.created_at instanceof Date
-        ? user.created_at.toISOString()
-        : String(user.created_at),
-      updated_at: user.updated_at instanceof Date
-        ? user.updated_at.toISOString()
-        : String(user.updated_at),
+      created_at:
+        user.created_at instanceof Date ? user.created_at.toISOString() : String(user.created_at),
+      updated_at:
+        user.updated_at instanceof Date ? user.updated_at.toISOString() : String(user.updated_at),
     };
   }
 }
