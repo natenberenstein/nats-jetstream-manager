@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Pagination } from '@/components/ui/pagination';
 
 function StreamEditForm({
   stream,
@@ -216,6 +217,8 @@ export default function StreamsPage() {
   const deleteStream = useDeleteStream(connectionId);
   const createStream = useCreateStream(connectionId);
 
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingStream, setEditingStream] = useState<string | null>(null);
@@ -441,62 +444,72 @@ export default function StreamsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {streamsData.streams.map((stream) => (
-                  <>
-                    <TableRow key={stream.config.name}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedStreams.has(stream.config.name)}
-                          onChange={() => toggleSelectStream(stream.config.name)}
+                {streamsData.streams
+                  .slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+                  .map((stream) => (
+                    <>
+                      <TableRow key={stream.config.name}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedStreams.has(stream.config.name)}
+                            onChange={() => toggleSelectStream(stream.config.name)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{stream.config.name}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {stream.config.subjects.join(', ')}
+                        </TableCell>
+                        <TableCell>{formatNumber(stream.state.messages)}</TableCell>
+                        <TableCell>{formatBytes(stream.state.bytes)}</TableCell>
+                        <TableCell>{stream.state.consumer_count}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="rounded-md">
+                            {stream.config.storage}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button
+                            onClick={() =>
+                              setEditingStream(
+                                editingStream === stream.config.name ? null : stream.config.name,
+                              )
+                            }
+                            variant="ghost"
+                            size="icon"
+                            title="Edit stream"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(stream.config.name)}
+                            variant="ghost"
+                            size="icon"
+                            disabled={deleteStream.isPending}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {editingStream === stream.config.name && connectionId && (
+                        <StreamEditForm
+                          key={`edit-${stream.config.name}`}
+                          stream={stream}
+                          connectionId={connectionId}
+                          onClose={() => setEditingStream(null)}
                         />
-                      </TableCell>
-                      <TableCell className="font-medium">{stream.config.name}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {stream.config.subjects.join(', ')}
-                      </TableCell>
-                      <TableCell>{formatNumber(stream.state.messages)}</TableCell>
-                      <TableCell>{formatBytes(stream.state.bytes)}</TableCell>
-                      <TableCell>{stream.state.consumer_count}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="rounded-md">
-                          {stream.config.storage}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button
-                          onClick={() =>
-                            setEditingStream(
-                              editingStream === stream.config.name ? null : stream.config.name,
-                            )
-                          }
-                          variant="ghost"
-                          size="icon"
-                          title="Edit stream"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          onClick={() => handleDelete(stream.config.name)}
-                          variant="ghost"
-                          size="icon"
-                          disabled={deleteStream.isPending}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                    {editingStream === stream.config.name && connectionId && (
-                      <StreamEditForm
-                        key={`edit-${stream.config.name}`}
-                        stream={stream}
-                        connectionId={connectionId}
-                        onClose={() => setEditingStream(null)}
-                      />
-                    )}
-                  </>
-                ))}
+                      )}
+                    </>
+                  ))}
               </TableBody>
             </Table>
+            <Pagination
+              pageIndex={pageIndex}
+              pageCount={Math.ceil(streamsData.streams.length / pageSize)}
+              pageSize={pageSize}
+              onPageChange={setPageIndex}
+              onPageSizeChange={setPageSize}
+              totalItems={streamsData.streams.length}
+            />
           </CardContent>
         ) : (
           <CardContent className="p-8 text-center">

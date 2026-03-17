@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Pagination } from '@/components/ui/pagination';
 
 const DEFAULT_CONSUMER_FORM: ConsumerConfig = {
   durable_name: '',
@@ -234,6 +235,8 @@ export default function ConsumersPage() {
     [streamsData?.streams],
   );
 
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedStream, setSelectedStream] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedConsumers, setSelectedConsumers] = useState<Set<string>>(new Set());
@@ -389,7 +392,10 @@ export default function ConsumersPage() {
         <div className="flex items-center gap-3">
           <Select
             value={selectedStream || ''}
-            onChange={(event) => setSelectedStream(event.target.value || null)}
+            onChange={(event) => {
+              setSelectedStream(event.target.value || null);
+              setPageIndex(0);
+            }}
             disabled={streamNames.length === 0}
           >
             {streamNames.length === 0 ? (
@@ -740,68 +746,78 @@ export default function ConsumersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {consumersData.consumers.map((consumer) => (
-                  <>
-                    <TableRow key={consumer.name}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedConsumers.has(consumer.name)}
-                          onChange={() => toggleSelectConsumer(consumer.name)}
+                {consumersData.consumers
+                  .slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+                  .map((consumer) => (
+                    <>
+                      <TableRow key={consumer.name}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedConsumers.has(consumer.name)}
+                            onChange={() => toggleSelectConsumer(consumer.name)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{consumer.name}</TableCell>
+                        <TableCell>{consumer.config.durable_name || '-'}</TableCell>
+                        <TableCell>{consumer.config.filter_subject || '*'}</TableCell>
+                        <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
+                        <TableCell>{formatNsToSeconds(consumer.config.ack_wait)}</TableCell>
+                        <TableCell>{consumer.num_pending}</TableCell>
+                        <TableCell>{consumer.num_waiting}</TableCell>
+                        <TableCell>{formatDate(consumer.created)}</TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button
+                            onClick={() =>
+                              setEditingConsumer(
+                                editingConsumer === consumer.name ? null : consumer.name,
+                              )
+                            }
+                            variant="ghost"
+                            size="icon"
+                            title="Edit consumer"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            onClick={() => handleCloneConsumer(consumer)}
+                            variant="ghost"
+                            size="icon"
+                            title="Clone consumer config"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            onClick={() => handleDeleteConsumer(consumer.name)}
+                            disabled={deleteConsumer.isPending}
+                            variant="ghost"
+                            size="icon"
+                            title="Delete consumer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {editingConsumer === consumer.name && connectionId && selectedStream && (
+                        <ConsumerEditForm
+                          key={`edit-${consumer.name}`}
+                          consumer={consumer}
+                          connectionId={connectionId}
+                          streamName={selectedStream}
+                          onClose={() => setEditingConsumer(null)}
                         />
-                      </TableCell>
-                      <TableCell className="font-medium">{consumer.name}</TableCell>
-                      <TableCell>{consumer.config.durable_name || '-'}</TableCell>
-                      <TableCell>{consumer.config.filter_subject || '*'}</TableCell>
-                      <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
-                      <TableCell>{formatNsToSeconds(consumer.config.ack_wait)}</TableCell>
-                      <TableCell>{consumer.num_pending}</TableCell>
-                      <TableCell>{consumer.num_waiting}</TableCell>
-                      <TableCell>{formatDate(consumer.created)}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button
-                          onClick={() =>
-                            setEditingConsumer(
-                              editingConsumer === consumer.name ? null : consumer.name,
-                            )
-                          }
-                          variant="ghost"
-                          size="icon"
-                          title="Edit consumer"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          onClick={() => handleCloneConsumer(consumer)}
-                          variant="ghost"
-                          size="icon"
-                          title="Clone consumer config"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          onClick={() => handleDeleteConsumer(consumer.name)}
-                          disabled={deleteConsumer.isPending}
-                          variant="ghost"
-                          size="icon"
-                          title="Delete consumer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                    {editingConsumer === consumer.name && connectionId && selectedStream && (
-                      <ConsumerEditForm
-                        key={`edit-${consumer.name}`}
-                        consumer={consumer}
-                        connectionId={connectionId}
-                        streamName={selectedStream}
-                        onClose={() => setEditingConsumer(null)}
-                      />
-                    )}
-                  </>
-                ))}
+                      )}
+                    </>
+                  ))}
               </TableBody>
             </Table>
+            <Pagination
+              pageIndex={pageIndex}
+              pageCount={Math.ceil(consumersData.consumers.length / pageSize)}
+              pageSize={pageSize}
+              onPageChange={setPageIndex}
+              onPageSizeChange={setPageSize}
+              totalItems={consumersData.consumers.length}
+            />
           </CardContent>
         ) : (
           <CardContent className="p-8 text-center">
