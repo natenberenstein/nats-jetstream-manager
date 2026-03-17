@@ -3,10 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
-import { APP_GUARD } from '@nestjs/core';
-import { AuthModule } from './auth/auth.module';
-import { AuthGuard } from './common/guards/auth.guard';
-import { UsersModule } from './users/users.module';
 import { ConnectionsModule } from './connections/connections.module';
 import { StreamsModule } from './streams/streams.module';
 import { ConsumersModule } from './consumers/consumers.module';
@@ -57,8 +53,6 @@ import * as fs from 'fs';
       inject: [ConfigService],
     }),
     ScheduleModule.forRoot(),
-    AuthModule,
-    UsersModule,
     ConnectionsModule,
     StreamsModule,
     ConsumersModule,
@@ -70,11 +64,6 @@ import * as fs from 'fs';
     AuditModule,
     JobsModule,
   ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard,
-    },
-  ],
+  providers: [],
 })
 export class AppModule {}

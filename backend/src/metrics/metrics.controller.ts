@@ -1,9 +1,8 @@
 import { Controller, Get, Param, Query, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { MetricsService } from './metrics.service';
 
 @ApiTags('Metrics')
-@ApiBearerAuth()
 @Controller('connections/:connectionId/metrics')
 export class MetricsController {
   constructor(private readonly metricsService: MetricsService) {}

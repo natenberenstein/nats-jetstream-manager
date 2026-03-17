@@ -5,7 +5,6 @@ import {
   Param,
   Query,
   Body,
-  UseGuards,
   DefaultValuePipe,
   ParseIntPipe,
   HttpCode,
@@ -13,15 +12,13 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { JobsService } from './jobs.service';
 import { IndexBuildJobDto } from './dto/job.dto';
-import { AdminGuard } from '../common/guards/admin.guard';
 import { ConnectionsService, ConnectionInfo } from '../connections/connections.service';
 import { MessagesService } from '../messages/messages.service';
 
 @ApiTags('Jobs')
-@ApiBearerAuth()
 @Controller('connections/:connectionId/jobs')
 export class JobsController {
   constructor(
@@ -46,7 +43,6 @@ export class JobsController {
   }
 
   @Post('index-build')
-  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
   async submitIndexBuildJob(
     @Param('connectionId') connectionId: string,
@@ -74,7 +70,6 @@ export class JobsController {
   }
 
   @Post(':jobId/cancel')
-  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
   async cancelJob(@Param('connectionId') connectionId: string, @Param('jobId') jobId: string) {
     return this.jobsService.cancelJob(connectionId, jobId);

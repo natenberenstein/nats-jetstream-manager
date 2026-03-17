@@ -6,11 +6,10 @@ import {
   Param,
   Query,
   ParseIntPipe,
-  UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import {
   MessagePublishRequestDto,
@@ -28,11 +27,9 @@ import {
   ValidateSchemaResponseDto,
   BuildIndexResponseDto,
 } from './dto/message.dto';
-import { AdminGuard } from '../common/guards/admin.guard';
 import { ConnectionsService } from '../connections/connections.service';
 
 @ApiTags('Messages')
-@ApiBearerAuth()
 @Controller('connections/:connectionId')
 export class MessagesController {
   constructor(
@@ -41,7 +38,6 @@ export class MessagesController {
   ) {}
 
   @Post('messages/publish')
-  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
   async publishMessage(
     @Param('connectionId') connectionId: string,
@@ -52,7 +48,6 @@ export class MessagesController {
   }
 
   @Post('messages/publish-batch')
-  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
   async publishBatch(
     @Param('connectionId') connectionId: string,
@@ -103,7 +98,6 @@ export class MessagesController {
   }
 
   @Post('streams/:streamName/messages/:seq/replay')
-  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
   async replayMessage(
     @Param('connectionId') connectionId: string,
@@ -116,7 +110,6 @@ export class MessagesController {
   }
 
   @Post('streams/:streamName/messages/index/build')
-  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
   async buildSearchIndex(
     @Param('connectionId') connectionId: string,

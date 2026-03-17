@@ -8,9 +8,6 @@ import {
   ConnectionStatus,
   ConnectionListItem,
   JobInfo,
-  AuthSessionResponse,
-  InviteInfo,
-  UserProfile,
   ClusterOverview,
   StreamConfig,
   StreamInfo,
@@ -48,17 +45,11 @@ class ApiError extends Error {
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  const role =
-    typeof window !== 'undefined' ? localStorage.getItem('nats_ui_role_v1') || 'admin' : 'admin';
-  const authToken =
-    typeof window !== 'undefined' ? localStorage.getItem('nats_auth_token_v1') : null;
 
   const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'X-User-Role': role,
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...options.headers,
     },
   });
@@ -103,60 +94,6 @@ export const connectionApi = {
   disconnect: (connectionId: string) =>
     fetchApi<void>(`/connections/${connectionId}`, {
       method: 'DELETE',
-    }),
-};
-
-export const authApi = {
-  signup: (request: { email: string; password: string; full_name?: string }) =>
-    fetchApi<AuthSessionResponse>('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    }),
-
-  login: (request: { email: string; password: string }) =>
-    fetchApi<AuthSessionResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    }),
-
-  logout: () =>
-    fetchApi<void>('/auth/logout', {
-      method: 'POST',
-    }),
-
-  me: () => fetchApi<UserProfile>('/auth/me'),
-
-  updateProfile: (request: { full_name?: string | null }) =>
-    fetchApi<UserProfile>('/auth/me', {
-      method: 'PUT',
-      body: JSON.stringify(request),
-    }),
-
-  listUsers: () => fetchApi<UserProfile[]>('/users'),
-
-  updateUserRole: (userId: number, role: 'admin' | 'viewer') =>
-    fetchApi<UserProfile>(`/users/${userId}/role`, {
-      method: 'PATCH',
-      body: JSON.stringify({ role }),
-    }),
-
-  createInvite: (request: {
-    email: string;
-    role: 'admin' | 'viewer';
-    cluster_name?: string;
-    expires_hours?: number;
-  }) =>
-    fetchApi<InviteInfo>('/invites', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    }),
-
-  listInvites: () => fetchApi<InviteInfo[]>('/invites'),
-
-  acceptInvite: (request: { token: string; password: string; full_name?: string }) =>
-    fetchApi<AuthSessionResponse>('/invites/accept', {
-      method: 'POST',
-      body: JSON.stringify(request),
     }),
 };
 
@@ -240,6 +177,20 @@ export const consumerApi = {
       method: 'POST',
       body: JSON.stringify(config),
     }),
+
+  update: (
+    connectionId: string,
+    streamName: string,
+    consumerName: string,
+    config: Partial<ConsumerConfig>,
+  ) =>
+    fetchApi<ConsumerInfo>(
+      `/connections/${connectionId}/streams/${streamName}/consumers/${consumerName}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(config),
+      },
+    ),
 
   delete: (connectionId: string, streamName: string, consumerName: string) =>
     fetchApi<{ success: boolean; deleted_consumer: string }>(

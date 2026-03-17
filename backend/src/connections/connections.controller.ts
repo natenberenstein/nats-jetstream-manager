@@ -1,10 +1,9 @@
 import { Controller, Get, Post, Delete, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { ConnectionsService } from './connections.service';
 import { ConnectionRequestDto } from './dto/connection.dto';
 
 @ApiTags('Connections')
-@ApiBearerAuth()
 @Controller('connections')
 export class ConnectionsController {
   constructor(private readonly connectionsService: ConnectionsService) {}

@@ -1,9 +1,8 @@
-"use client";
+'use client';
 
-import { ChangeEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useConnection } from "@/contexts/ConnectionContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { ChangeEvent, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useConnection } from '@/contexts/ConnectionContext';
 import {
   Database,
   Layers,
@@ -14,95 +13,74 @@ import {
   Search,
   Network,
   LineChart,
-  UserCog,
   BarChart3,
   HeartPulse,
   Shield,
-} from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Select } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { useUiRole } from "@/hooks/useUiRole";
+} from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const {
-    connectionId,
-    url,
-    connected,
-    connections,
-    switchConnection,
-    disconnect,
-  } = useConnection();
-  const { role } = useUiRole();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { connectionId, url, connected, connections, switchConnection, disconnect } =
+    useConnection();
   const [commandOpen, setCommandOpen] = useState(false);
-  const [commandQuery, setCommandQuery] = useState("");
+  const [commandQuery, setCommandQuery] = useState('');
 
   useEffect(() => {
-    if (!connected || !connectionId || !isAuthenticated) {
-      router.push("/");
+    if (!connected || !connectionId) {
+      router.push('/');
     }
-  }, [connected, connectionId, isAuthenticated, router]);
+  }, [connected, connectionId, router]);
 
   const handleDisconnect = async () => {
     await disconnect();
     if (connections.length <= 1) {
-      router.push("/");
+      router.push('/');
     }
   };
 
-  const handleSignOut = async () => {
-    await logout();
-    await disconnect();
-    router.push("/");
-  };
-
   const navItems = [
-    { href: "/dashboard", icon: Activity, label: "Overview" },
-    { href: "/dashboard/cluster", icon: Network, label: "Cluster" },
+    { href: '/dashboard', icon: Activity, label: 'Overview' },
+    { href: '/dashboard/cluster', icon: Network, label: 'Cluster' },
     {
-      href: "/dashboard/observability",
+      href: '/dashboard/observability',
       icon: LineChart,
-      label: "Observability",
+      label: 'Observability',
     },
-    { href: "/dashboard/metrics", icon: BarChart3, label: "Metrics" },
-    { href: "/dashboard/health", icon: HeartPulse, label: "Health" },
-    { href: "/dashboard/clusters", icon: Database, label: "Clusters" },
-    { href: "/dashboard/users", icon: UserCog, label: "Users" },
-    { href: "/dashboard/audit", icon: Shield, label: "Audit Log" },
-    { href: "/dashboard/streams", icon: Layers, label: "Streams" },
-    { href: "/dashboard/consumers", icon: Users, label: "Consumers" },
-    { href: "/dashboard/messages", icon: MessageSquare, label: "Messages" },
+    { href: '/dashboard/metrics', icon: BarChart3, label: 'Metrics' },
+    { href: '/dashboard/health', icon: HeartPulse, label: 'Health' },
+    { href: '/dashboard/clusters', icon: Database, label: 'Clusters' },
+    { href: '/dashboard/audit', icon: Shield, label: 'Audit Log' },
+    { href: '/dashboard/streams', icon: Layers, label: 'Streams' },
+    { href: '/dashboard/consumers', icon: Users, label: 'Consumers' },
+    { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
   ];
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setCommandOpen((prev) => !prev);
       }
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         setCommandOpen(false);
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   const filteredCommands = navItems.filter((item) =>
     item.label.toLowerCase().includes(commandQuery.toLowerCase()),
   );
 
-  if (!connected || !isAuthenticated) {
+  if (!connected) {
     return null;
   }
 
@@ -123,7 +101,7 @@ export default function DashboardLayout({
 
           <div className="flex items-center gap-2">
             <Select
-              value={connectionId || ""}
+              value={connectionId || ''}
               onChange={(e) => switchConnection(e.target.value)}
               className="w-52"
             >
@@ -137,17 +115,9 @@ export default function DashboardLayout({
               <Search className="w-4 h-4" />
               Command
             </Button>
-            <Select value={user?.role || role} disabled className="w-28">
-              <option value="admin">admin</option>
-              <option value="viewer">viewer</option>
-            </Select>
             <Button onClick={handleDisconnect} variant="outline">
               <LogOut className="w-4 h-4" />
               Disconnect
-            </Button>
-            <Button onClick={handleSignOut} variant="destructive">
-              <LogOut className="w-4 h-4" />
-              Sign Out
             </Button>
           </div>
         </div>
@@ -164,8 +134,8 @@ export default function DashboardLayout({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-md transition-colors",
-                    isActive ? "bg-primary/10 text-primary" : "hover:bg-accent",
+                    'flex items-center gap-3 px-4 py-3 rounded-md transition-colors',
+                    isActive ? 'bg-primary/10 text-primary' : 'hover:bg-accent',
                   )}
                 >
                   <item.icon className="w-5 h-5" />
@@ -174,23 +144,6 @@ export default function DashboardLayout({
               );
             })}
           </nav>
-          <div className="p-4 border-t">
-            <Link
-              href="/dashboard/profile"
-              className="block rounded-md border bg-muted/40 p-3 hover:bg-muted transition-colors"
-            >
-              <p className="text-xs text-muted-foreground">Signed in as</p>
-              <p className="text-sm font-medium truncate">
-                {user?.full_name || user?.email || "Unknown user"}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {user?.email}
-              </p>
-              <p className="text-xs mt-1 inline-block rounded bg-background border px-1.5 py-0.5">
-                {user?.role || role}
-              </p>
-            </Link>
-          </div>
         </aside>
 
         {/* Main Content */}
@@ -210,9 +163,7 @@ export default function DashboardLayout({
               autoFocus
               placeholder="Type a command (e.g. streams, messages)..."
               value={commandQuery}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setCommandQuery(e.target.value)
-              }
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setCommandQuery(e.target.value)}
             />
             <div className="max-h-72 overflow-auto space-y-1">
               {filteredCommands.map((item) => (
@@ -222,7 +173,7 @@ export default function DashboardLayout({
                   onClick={() => {
                     router.push(item.href);
                     setCommandOpen(false);
-                    setCommandQuery("");
+                    setCommandQuery('');
                   }}
                 >
                   <item.icon className="w-4 h-4" />

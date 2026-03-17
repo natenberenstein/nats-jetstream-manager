@@ -123,12 +123,8 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
       setActiveConnectionId(nextActiveId);
       persistMeta(merged, nextActiveId);
     } catch (err) {
-      // Ignore unauthenticated refresh failures before login.
-      const status = (err as { status?: number } | null)?.status;
-      if (status !== 401) {
-        const message = err instanceof Error ? err.message : 'Failed to refresh connections';
-        setError(message);
-      }
+      const message = err instanceof Error ? err.message : 'Failed to refresh connections';
+      setError(message);
     }
   }, [activeConnectionId, persistMeta]);
 

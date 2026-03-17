@@ -25,7 +25,7 @@ export function useConsumerAnalytics(connectionId: string | null, streamName: st
 export function useConsumer(
   connectionId: string | null,
   streamName: string | null,
-  consumerName: string | null
+  consumerName: string | null,
 ) {
   return useQuery({
     queryKey: ['consumer', connectionId, streamName, consumerName],
@@ -44,6 +44,29 @@ export function useCreateConsumer(connectionId: string | null, streamName: strin
         throw new Error('Connection and stream are required');
       }
       return consumerApi.create(connectionId, streamName, config);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consumers', connectionId, streamName] });
+      queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
+    },
+  });
+}
+
+export function useUpdateConsumer(connectionId: string | null, streamName: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      consumerName,
+      config,
+    }: {
+      consumerName: string;
+      config: Partial<ConsumerConfig>;
+    }) => {
+      if (!connectionId || !streamName) {
+        throw new Error('Connection and stream are required');
+      }
+      return consumerApi.update(connectionId, streamName, consumerName, config);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consumers', connectionId, streamName] });

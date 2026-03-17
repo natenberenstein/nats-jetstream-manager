@@ -34,36 +34,6 @@ export interface ConnectionListItem {
   last_accessed?: string;
 }
 
-export interface UserProfile {
-  id: number;
-  email: string;
-  full_name?: string | null;
-  role: 'admin' | 'viewer';
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AuthSessionResponse {
-  token: string;
-  expires_at: string;
-  user: UserProfile;
-}
-
-export interface InviteInfo {
-  id: number;
-  email: string;
-  role: 'admin' | 'viewer';
-  token: string;
-  invited_by_user_id?: number | null;
-  cluster_name?: string | null;
-  status: 'pending' | 'accepted' | 'expired' | 'revoked';
-  expires_at: string;
-  accepted_at?: string | null;
-  created_at: string;
-  invite_url?: string | null;
-}
-
 export interface ClusterNodeInfo {
   name: string;
   role?: string;

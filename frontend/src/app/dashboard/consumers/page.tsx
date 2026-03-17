@@ -1,18 +1,23 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useStreams } from '@/hooks/useStreams';
 import {
   useConsumers,
   useCreateConsumer,
   useDeleteConsumer,
+  useUpdateConsumer,
   useConsumerAnalytics,
 } from '@/hooks/useConsumers';
-import { ConsumerConfig } from '@/lib/types';
-import { Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { ConsumerConfig, ConsumerInfo } from '@/lib/types';
+import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
+import { Plus, RefreshCw, Trash2, X, Pencil, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -25,7 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useUiRole } from '@/hooks/useUiRole';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const DEFAULT_CONSUMER_FORM: ConsumerConfig = {
   durable_name: '',
@@ -55,9 +60,174 @@ function formatDate(dateValue?: string): string {
   return new Date(dateValue).toLocaleString();
 }
 
+function ConsumerEditForm({
+  consumer,
+  connectionId,
+  streamName,
+  onClose,
+}: {
+  consumer: ConsumerInfo;
+  connectionId: string;
+  streamName: string;
+  onClose: () => void;
+}) {
+  const updateConsumer = useUpdateConsumer(connectionId, streamName);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch,
+  } = useForm<ConsumerUpdateFormData>({
+    resolver: zodResolver(consumerUpdateSchema),
+    defaultValues: {
+      description: consumer.config.description || '',
+      ack_wait_seconds: (consumer.config.ack_wait ?? 30_000_000_000) / 1_000_000_000,
+      max_deliver: consumer.config.max_deliver ?? -1,
+      max_ack_pending: consumer.config.max_ack_pending ?? 1000,
+      max_waiting: consumer.config.max_waiting ?? 512,
+      rate_limit_bps: consumer.config.rate_limit_bps ?? 0,
+      headers_only: consumer.config.headers_only ?? false,
+    },
+  });
+
+  const headersOnly = watch('headers_only');
+
+  const onSubmit = async (data: ConsumerUpdateFormData) => {
+    try {
+      await updateConsumer.mutateAsync({
+        consumerName: consumer.name,
+        config: {
+          description: data.description || undefined,
+          ack_wait: Math.round(data.ack_wait_seconds * 1_000_000_000),
+          max_deliver: data.max_deliver,
+          max_ack_pending: data.max_ack_pending,
+          max_waiting: data.max_waiting,
+          rate_limit_bps: data.rate_limit_bps,
+          headers_only: data.headers_only,
+        },
+      });
+      toast.success(`Consumer "${consumer.name}" updated successfully.`);
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update consumer');
+    }
+  };
+
+  return (
+    <TableRow>
+      <TableCell colSpan={10}>
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Edit Consumer: {consumer.name}</CardTitle>
+            <CardDescription>
+              Only mutable fields are editable. Immutable fields are shown as read-only.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {/* Immutable fields - read-only */}
+              <div className="rounded border border-muted p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Cannot be changed after creation
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <Label className="text-muted-foreground">Name / Durable</Label>
+                    <Input value={consumer.config.durable_name || consumer.name} disabled />
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Filter Subject</Label>
+                    <Input value={consumer.config.filter_subject || '*'} disabled />
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Deliver Policy</Label>
+                    <Input value={consumer.config.deliver_policy || 'all'} disabled />
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Ack Policy</Label>
+                    <Input value={consumer.config.ack_policy || 'explicit'} disabled />
+                  </div>
+                </div>
+              </div>
+
+              {/* Mutable fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="space-y-1 md:col-span-2">
+                  <Label>Description</Label>
+                  <Input {...register('description')} placeholder="Optional description" />
+                </label>
+
+                <label className="space-y-1">
+                  <Label>Ack Wait (seconds)</Label>
+                  <Input type="number" step="0.1" min={0} {...register('ack_wait_seconds')} />
+                  {errors.ack_wait_seconds && (
+                    <p className="text-xs text-destructive">{errors.ack_wait_seconds.message}</p>
+                  )}
+                </label>
+
+                <label className="space-y-1">
+                  <Label>Max Deliver (-1 = unlimited)</Label>
+                  <Input type="number" {...register('max_deliver')} />
+                  {errors.max_deliver && (
+                    <p className="text-xs text-destructive">{errors.max_deliver.message}</p>
+                  )}
+                </label>
+
+                <label className="space-y-1">
+                  <Label>Max Ack Pending</Label>
+                  <Input type="number" min={0} {...register('max_ack_pending')} />
+                  {errors.max_ack_pending && (
+                    <p className="text-xs text-destructive">{errors.max_ack_pending.message}</p>
+                  )}
+                </label>
+
+                <label className="space-y-1">
+                  <Label>Max Waiting</Label>
+                  <Input type="number" min={0} {...register('max_waiting')} />
+                  {errors.max_waiting && (
+                    <p className="text-xs text-destructive">{errors.max_waiting.message}</p>
+                  )}
+                </label>
+
+                <label className="space-y-1">
+                  <Label>Rate Limit (bytes/sec, 0 = unlimited)</Label>
+                  <Input type="number" min={0} {...register('rate_limit_bps')} />
+                  {errors.rate_limit_bps && (
+                    <p className="text-xs text-destructive">{errors.rate_limit_bps.message}</p>
+                  )}
+                </label>
+
+                <label className="flex items-center gap-2 pt-6">
+                  <Checkbox
+                    checked={headersOnly}
+                    onChange={(e) =>
+                      setValue('headers_only', (e.target as HTMLInputElement).checked)
+                    }
+                  />
+                  <Label>Headers Only</Label>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateConsumer.isPending}>
+                  {updateConsumer.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export default function ConsumersPage() {
   const { connectionId } = useConnection();
-  const { isAdmin } = useUiRole();
   const { data: streamsData } = useStreams(connectionId);
   const streamNames = useMemo(
     () => (streamsData?.streams || []).map((stream) => stream.config.name),
@@ -69,6 +239,9 @@ export default function ConsumersPage() {
   const [selectedConsumers, setSelectedConsumers] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState<ConsumerConfig>(DEFAULT_CONSUMER_FORM);
   const [formError, setFormError] = useState<string | null>(null);
+  const [editingConsumer, setEditingConsumer] = useState<string | null>(null);
+  const [cloneMessage, setCloneMessage] = useState<string | null>(null);
+  const durableNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!selectedStream && streamNames.length > 0) {
@@ -85,6 +258,23 @@ export default function ConsumersPage() {
   const { data: analyticsData } = useConsumerAnalytics(connectionId, selectedStream);
   const createConsumer = useCreateConsumer(connectionId, selectedStream || '');
   const deleteConsumer = useDeleteConsumer(connectionId, selectedStream || '');
+
+  const handleCloneConsumer = (consumer: ConsumerInfo) => {
+    setFormData({
+      ...consumer.config,
+      durable_name: '',
+      name: '',
+    });
+    setShowCreateForm(true);
+    setEditingConsumer(null);
+    setCloneMessage(
+      `Cloned config from "${consumer.name}". Edit the config and create a new consumer. Delete the old one when ready.`,
+    );
+    // Focus the durable name field after render
+    setTimeout(() => {
+      durableNameRef.current?.focus();
+    }, 100);
+  };
 
   const handleCreateConsumer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -112,8 +302,10 @@ export default function ConsumersPage() {
 
     try {
       await createConsumer.mutateAsync(payload);
+      toast.success(`Consumer created successfully.`);
       setFormData(DEFAULT_CONSUMER_FORM);
       setShowCreateForm(false);
+      setCloneMessage(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create consumer';
       setFormError(message);
@@ -121,7 +313,6 @@ export default function ConsumersPage() {
   };
 
   const handleDeleteConsumer = async (consumerName: string) => {
-    if (!isAdmin) return;
     if (!selectedStream) {
       return;
     }
@@ -135,8 +326,9 @@ export default function ConsumersPage() {
 
     try {
       await deleteConsumer.mutateAsync(consumerName);
+      toast.success(`Consumer "${consumerName}" deleted.`);
     } catch (error) {
-      console.error('Failed to delete consumer:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete consumer');
     }
   };
 
@@ -159,7 +351,7 @@ export default function ConsumersPage() {
   };
 
   const handleBulkDeleteConsumers = async () => {
-    if (!isAdmin || !selectedStream || selectedConsumers.size === 0) return;
+    if (!selectedStream || selectedConsumers.size === 0) return;
     const names = Array.from(selectedConsumers);
     const confirmed = window.confirm(
       `Dry run preview:\n${names.slice(0, 10).join('\n')}\n\nDelete ${names.length} consumers from ${selectedStream}?`,
@@ -217,8 +409,14 @@ export default function ConsumersPage() {
           </Button>
 
           <Button
-            onClick={() => setShowCreateForm((prev) => !prev)}
-            disabled={!isAdmin || !selectedStream}
+            onClick={() => {
+              setShowCreateForm((prev) => !prev);
+              if (showCreateForm) {
+                setCloneMessage(null);
+                setFormData(DEFAULT_CONSUMER_FORM);
+              }
+            }}
+            disabled={!selectedStream}
           >
             {showCreateForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             {showCreateForm ? 'Cancel' : 'Create Consumer'}
@@ -226,7 +424,7 @@ export default function ConsumersPage() {
           <Button
             variant="destructive"
             onClick={handleBulkDeleteConsumers}
-            disabled={!isAdmin || selectedConsumers.size === 0 || deleteConsumer.isPending}
+            disabled={selectedConsumers.size === 0 || deleteConsumer.isPending}
           >
             Delete Selected ({selectedConsumers.size})
           </Button>
@@ -323,11 +521,17 @@ export default function ConsumersPage() {
             <CardTitle className="text-lg">Create Consumer</CardTitle>
           </CardHeader>
           <CardContent>
+            {cloneMessage && (
+              <Alert className="mb-4">
+                <AlertDescription>{cloneMessage}</AlertDescription>
+              </Alert>
+            )}
             <form onSubmit={handleCreateConsumer} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="space-y-1">
                   <Label>Durable Name</Label>
                   <Input
+                    ref={durableNameRef}
                     type="text"
                     value={formData.durable_name || ''}
                     onChange={(event) =>
@@ -432,6 +636,61 @@ export default function ConsumersPage() {
                     }
                   />
                 </label>
+
+                <label className="space-y-1">
+                  <Label>Max Ack Pending</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={formData.max_ack_pending ?? 1000}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        max_ack_pending: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <Label>Max Waiting</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={formData.max_waiting ?? 512}
+                    onChange={(event) =>
+                      setFormData((prev) => ({ ...prev, max_waiting: Number(event.target.value) }))
+                    }
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <Label>Rate Limit (bytes/sec)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={formData.rate_limit_bps ?? 0}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        rate_limit_bps: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
+
+                <label className="flex items-center gap-2 pt-6">
+                  <Checkbox
+                    checked={formData.headers_only ?? false}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        headers_only: (e.target as HTMLInputElement).checked,
+                      }))
+                    }
+                  />
+                  <Label>Headers Only</Label>
+                </label>
               </div>
 
               {formError && <p className="text-sm text-destructive">{formError}</p>}
@@ -467,7 +726,6 @@ export default function ConsumersPage() {
                         selectedConsumers.size === consumersData.consumers.length
                       }
                       onChange={toggleSelectAllConsumers}
-                      disabled={!isAdmin}
                     />
                   </TableHead>
                   <TableHead>Name</TableHead>
@@ -483,33 +741,64 @@ export default function ConsumersPage() {
               </TableHeader>
               <TableBody>
                 {consumersData.consumers.map((consumer) => (
-                  <TableRow key={consumer.name}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedConsumers.has(consumer.name)}
-                        onChange={() => toggleSelectConsumer(consumer.name)}
-                        disabled={!isAdmin}
+                  <>
+                    <TableRow key={consumer.name}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedConsumers.has(consumer.name)}
+                          onChange={() => toggleSelectConsumer(consumer.name)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{consumer.name}</TableCell>
+                      <TableCell>{consumer.config.durable_name || '-'}</TableCell>
+                      <TableCell>{consumer.config.filter_subject || '*'}</TableCell>
+                      <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
+                      <TableCell>{formatNsToSeconds(consumer.config.ack_wait)}</TableCell>
+                      <TableCell>{consumer.num_pending}</TableCell>
+                      <TableCell>{consumer.num_waiting}</TableCell>
+                      <TableCell>{formatDate(consumer.created)}</TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button
+                          onClick={() =>
+                            setEditingConsumer(
+                              editingConsumer === consumer.name ? null : consumer.name,
+                            )
+                          }
+                          variant="ghost"
+                          size="icon"
+                          title="Edit consumer"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={() => handleCloneConsumer(consumer)}
+                          variant="ghost"
+                          size="icon"
+                          title="Clone consumer config"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={() => handleDeleteConsumer(consumer.name)}
+                          disabled={deleteConsumer.isPending}
+                          variant="ghost"
+                          size="icon"
+                          title="Delete consumer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    {editingConsumer === consumer.name && connectionId && selectedStream && (
+                      <ConsumerEditForm
+                        key={`edit-${consumer.name}`}
+                        consumer={consumer}
+                        connectionId={connectionId}
+                        streamName={selectedStream}
+                        onClose={() => setEditingConsumer(null)}
                       />
-                    </TableCell>
-                    <TableCell className="font-medium">{consumer.name}</TableCell>
-                    <TableCell>{consumer.config.durable_name || '-'}</TableCell>
-                    <TableCell>{consumer.config.filter_subject || '*'}</TableCell>
-                    <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
-                    <TableCell>{formatNsToSeconds(consumer.config.ack_wait)}</TableCell>
-                    <TableCell>{consumer.num_pending}</TableCell>
-                    <TableCell>{consumer.num_waiting}</TableCell>
-                    <TableCell>{formatDate(consumer.created)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        onClick={() => handleDeleteConsumer(consumer.name)}
-                        disabled={!isAdmin || deleteConsumer.isPending}
-                        variant="ghost"
-                        size="icon"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </Table>

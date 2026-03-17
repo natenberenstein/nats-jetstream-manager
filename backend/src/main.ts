@@ -32,7 +32,6 @@ async function bootstrap() {
     .setTitle('NATS JetStream Manager')
     .setDescription('API for managing and monitoring NATS JetStream clusters')
     .setVersion('1.0.0')
-    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, document);

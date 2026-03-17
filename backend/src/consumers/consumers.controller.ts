@@ -2,20 +2,18 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Param,
   Body,
-  UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConsumersService } from './consumers.service';
-import { ConsumerCreateDto } from './dto/consumer.dto';
-import { AdminGuard } from '../common/guards/admin.guard';
+import { ConsumerCreateDto, ConsumerUpdateDto } from './dto/consumer.dto';
 
 @ApiTags('Consumers')
-@ApiBearerAuth()
 @Controller('connections/:connectionId/streams/:streamName/consumers')
 export class ConsumersController {
   constructor(private readonly consumersService: ConsumersService) {}
@@ -37,7 +35,6 @@ export class ConsumersController {
   }
 
   @Post()
-  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.CREATED)
   createConsumer(
     @Param('connectionId') connectionId: string,
@@ -56,8 +53,18 @@ export class ConsumersController {
     return this.consumersService.getConsumer(connectionId, streamName, name);
   }
 
+  @Put(':name')
+  @ApiOperation({ summary: 'Update a consumer' })
+  async updateConsumer(
+    @Param('connectionId') connectionId: string,
+    @Param('streamName') streamName: string,
+    @Param('name') name: string,
+    @Body() dto: ConsumerUpdateDto,
+  ) {
+    return this.consumersService.updateConsumer(connectionId, streamName, name, dto);
+  }
+
   @Delete(':name')
-  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
   deleteConsumer(
     @Param('connectionId') connectionId: string,

@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { AckPolicy, DeliverPolicy, ReplayPolicy, ConsumerInfo } from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
 import { StreamsService } from '../streams/streams.service';
-import { ConsumerCreateDto } from './dto/consumer.dto';
+import { ConsumerCreateDto, ConsumerUpdateDto } from './dto/consumer.dto';
 
 export interface ConsumerMetric {
   name: string;
@@ -174,6 +174,62 @@ export class ConsumersService {
       return this.convertConsumerInfo(ci);
     } catch (error: unknown) {
       throw new BadRequestException(`Failed to create consumer: ${(error as Error).message}`);
+    }
+  }
+
+  async updateConsumer(
+    connectionId: string,
+    streamName: string,
+    consumerName: string,
+    dto: ConsumerUpdateDto,
+  ): Promise<ConsumerResponse> {
+    const { jsm } = this.connectionsService.getConnection(connectionId);
+
+    // Get existing consumer info
+    let currentInfo: ConsumerInfo;
+    try {
+      currentInfo = await jsm.consumers.info(streamName, consumerName);
+    } catch (error: unknown) {
+      if (
+        (error as Error).message?.includes('consumer not found') ||
+        (error as Error).message?.includes('not found')
+      ) {
+        throw new NotFoundException(
+          `Consumer '${consumerName}' not found on stream '${streamName}'`,
+        );
+      }
+      throw error;
+    }
+
+    // Merge existing config with updated fields
+    const updatedConfig: Record<string, unknown> = {
+      ...currentInfo.config,
+    };
+
+    if (dto.description !== undefined) updatedConfig.description = dto.description;
+    if (dto.sample_freq !== undefined) updatedConfig.sample_freq = dto.sample_freq;
+    if (dto.headers_only !== undefined) updatedConfig.headers_only = dto.headers_only;
+
+    if (dto.ack_policy !== undefined) {
+      const mapped = ACK_POLICY_MAP[dto.ack_policy];
+      if (mapped === undefined) {
+        throw new BadRequestException(`Invalid ack_policy: ${dto.ack_policy}`);
+      }
+      updatedConfig.ack_policy = mapped;
+    }
+
+    if (dto.ack_wait !== undefined) updatedConfig.ack_wait = dto.ack_wait;
+    if (dto.max_deliver !== undefined) updatedConfig.max_deliver = dto.max_deliver;
+    if (dto.rate_limit_bps !== undefined) updatedConfig.rate_limit_bps = dto.rate_limit_bps;
+    if (dto.max_ack_pending !== undefined) updatedConfig.max_ack_pending = dto.max_ack_pending;
+    if (dto.max_waiting !== undefined) updatedConfig.max_waiting = dto.max_waiting;
+
+    try {
+      const ci = await jsm.consumers.update(streamName, consumerName, updatedConfig);
+      this.logger.log(`Consumer '${consumerName}' updated on stream '${streamName}'`);
+      return this.convertConsumerInfo(ci);
+    } catch (error: unknown) {
+      throw new BadRequestException(`Failed to update consumer: ${(error as Error).message}`);
     }
   }
 

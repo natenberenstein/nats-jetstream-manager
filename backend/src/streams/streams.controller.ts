@@ -6,17 +6,14 @@ import {
   Delete,
   Param,
   Body,
-  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { StreamsService, StreamInfoResponse } from './streams.service';
 import { StreamCreateDto, StreamUpdateDto } from './dto/stream.dto';
-import { AdminGuard } from '../common/guards/admin.guard';
 
 @ApiTags('Streams')
-@ApiBearerAuth()
 @Controller('connections/:connectionId/streams')
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 export class StreamsController {
@@ -30,7 +27,6 @@ export class StreamsController {
   }
 
   @Post()
-  @UseGuards(AdminGuard)
   async createStream(
     @Param('connectionId') connectionId: string,
     @Body() dto: StreamCreateDto,
@@ -47,7 +43,6 @@ export class StreamsController {
   }
 
   @Put(':name')
-  @UseGuards(AdminGuard)
   async updateStream(
     @Param('connectionId') connectionId: string,
     @Param('name') name: string,
@@ -57,7 +52,6 @@ export class StreamsController {
   }
 
   @Delete(':name')
-  @UseGuards(AdminGuard)
   async deleteStream(
     @Param('connectionId') connectionId: string,
     @Param('name') name: string,
@@ -66,7 +60,6 @@ export class StreamsController {
   }
 
   @Post(':name/purge')
-  @UseGuards(AdminGuard)
   async purgeStream(
     @Param('connectionId') connectionId: string,
     @Param('name') name: string,

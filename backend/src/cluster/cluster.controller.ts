@@ -1,9 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { ClusterService, ClusterOverview } from './cluster.service';
 
 @ApiTags('Cluster')
-@ApiBearerAuth()
 @Controller('connections/:connectionId/cluster')
 export class ClusterController {
   constructor(private readonly clusterService: ClusterService) {}
