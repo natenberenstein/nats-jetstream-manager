@@ -16,6 +16,12 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "prepare": "husky"
   },
+  "overrides": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3"
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.4.3",
     "@commitlint/config-conventional": "^20.4.3",
@@ -35,9 +41,9 @@
       "prettier --write",
       "eslint --fix --config backend/eslint.config.mjs"
     ],
-    "frontend/**/*.{ts,tsx}": [
+    "frontend/src/**/*.{ts,tsx}": [
       "prettier --write",
-      "eslint --fix --config frontend/eslint.config.mjs"
+      "eslint --fix --no-warn-ignored --config frontend/eslint.config.mjs"
     ],
     "*.{json,css,md}": [
       "prettier --write"

@@ -7,7 +7,7 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   {
-    ignores: ['.next/**', 'out/**', 'node_modules/**'],
+    ignores: ['.next/**', 'out/**', 'node_modules/**', 'next-env.d.ts'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -23,6 +23,7 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
+      '@next/next/no-html-link-for-pages': 'off',
     },
   },
 );
