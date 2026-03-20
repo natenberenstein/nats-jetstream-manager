@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Download, Eye, EyeOff, Play, RefreshCw } from 'lucide-react';
+import { Download, Eye, EyeOff, Play, RefreshCw } from 'lucide-react';
 
 import { MessageData, MessagesResponse } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
 import { Select } from '@/components/ui/select';
 import { downloadFile, formatPayload, maskSensitiveText, toCsv } from './utils';
 
@@ -126,15 +127,6 @@ export function MessageList({
             Recent Messages {selectedStream ? `(${selectedStream})` : ''}
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={String(limit)}
-              onChange={(event) => onLimitChange(Number(event.target.value))}
-              className="w-20"
-            >
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </Select>
             <Select
               value={String(liveIntervalMs)}
               onChange={(e) => onLiveIntervalChange(Number(e.target.value))}
@@ -308,74 +300,27 @@ export function MessageList({
           </div>
         )}
       </CardContent>
-      {selectedStream &&
-        currentMessages.length > 0 &&
-        (() => {
-          const currentPage = cursorHistory.length + 1;
-          const totalPages = messagesData?.total
-            ? Math.ceil(messagesData.total / limit)
-            : currentPage;
-          const hasNext = !!(messagesData?.has_more && messagesData?.next_seq);
-
-          // Build the set of page numbers to display (with ellipses)
-          const pageNumbers: (number | 'ellipsis')[] = [];
-          if (totalPages <= 7) {
-            for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
-          } else {
-            pageNumbers.push(1);
-            if (currentPage > 3) pageNumbers.push('ellipsis');
-            const start = Math.max(2, currentPage - 1);
-            const end = Math.min(totalPages - 1, currentPage + 1);
-            for (let i = start; i <= end; i++) pageNumbers.push(i);
-            if (currentPage < totalPages - 2) pageNumbers.push('ellipsis');
-            pageNumbers.push(totalPages);
+      {selectedStream && currentMessages.length > 0 && messagesData && (
+        <Pagination
+          pageIndex={cursorHistory.length}
+          pageCount={
+            messagesData.total ? Math.ceil(messagesData.total / limit) : cursorHistory.length + 1
           }
-
-          return (
-            <div className="border-t px-4 py-3 flex items-center justify-between bg-muted/30">
-              <span className="text-sm text-muted-foreground">
-                {messagesData?.total != null && <>{messagesData.total.toLocaleString()} messages</>}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  onClick={onPreviousPage}
-                  disabled={cursorHistory.length === 0}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                {pageNumbers.map((page, idx) =>
-                  page === 'ellipsis' ? (
-                    <span key={`ellipsis-${idx}`} className="px-1 text-sm text-muted-foreground">
-                      ...
-                    </span>
-                  ) : (
-                    <Button
-                      key={page}
-                      onClick={() => page !== currentPage && onGoToPage(page)}
-                      variant={page === currentPage ? 'default' : 'outline'}
-                      size="icon"
-                      className="h-8 w-8"
-                    >
-                      {page}
-                    </Button>
-                  ),
-                )}
-                <Button
-                  onClick={onNextPage}
-                  disabled={!hasNext}
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          );
-        })()}
+          pageSize={limit}
+          onPageChange={(newPageIndex) => {
+            const currentPageIndex = cursorHistory.length;
+            if (newPageIndex === currentPageIndex - 1) {
+              onPreviousPage();
+            } else if (newPageIndex === currentPageIndex + 1) {
+              onNextPage();
+            } else {
+              onGoToPage(newPageIndex + 1);
+            }
+          }}
+          onPageSizeChange={onLimitChange}
+          totalItems={messagesData.total ?? currentMessages.length}
+        />
+      )}
     </Card>
   );
 }

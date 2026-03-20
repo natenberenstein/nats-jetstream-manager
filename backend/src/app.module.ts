@@ -38,13 +38,32 @@ import * as fs from 'fs';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
+        const dbType = configService.get<string>('DATABASE_TYPE', 'sqlite');
+
+        if (dbType === 'postgres') {
+          return {
+            type: 'postgres' as const,
+            host: configService.get<string>('DATABASE_HOST', 'localhost'),
+            port: configService.get<number>('DATABASE_PORT', 5432),
+            username: configService.get<string>('DATABASE_USERNAME', 'postgres'),
+            password: configService.get<string>('DATABASE_PASSWORD', ''),
+            database: configService.get<string>('DATABASE_NAME', 'nats_manager'),
+            ssl:
+              configService.get<string>('DATABASE_SSL', 'false') === 'true'
+                ? { rejectUnauthorized: false }
+                : false,
+            autoLoadEntities: true,
+            synchronize: true,
+          };
+        }
+
         const dbPath = configService.get<string>('DATABASE_PATH', './data/nats_manager.db');
         const dir = path.dirname(dbPath);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
         return {
-          type: 'better-sqlite3',
+          type: 'better-sqlite3' as const,
           database: dbPath,
           autoLoadEntities: true,
           synchronize: true,

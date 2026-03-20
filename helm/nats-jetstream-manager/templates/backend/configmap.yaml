@@ -9,6 +9,14 @@ data:
   NATS_URL: {{ .Values.backend.config.natsUrl | quote }}
   LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
   CORS_ORIGINS: {{ include "nats-jetstream-manager.corsOrigins" . | quote }}
+  DATABASE_TYPE: {{ .Values.backend.config.databaseType | quote }}
+  {{- if eq .Values.backend.config.databaseType "postgres" }}
+  DATABASE_HOST: {{ .Values.backend.postgresql.host | quote }}
+  DATABASE_PORT: {{ .Values.backend.postgresql.port | quote }}
+  DATABASE_NAME: {{ .Values.backend.postgresql.database | quote }}
+  DATABASE_USERNAME: {{ .Values.backend.postgresql.username | quote }}
+  DATABASE_SSL: {{ .Values.backend.postgresql.ssl | quote }}
+  {{- end }}
   {{- range $key, $value := .Values.backend.config.extraEnv }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}

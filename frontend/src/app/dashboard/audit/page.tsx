@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 
 const ACTIONS = [
   '',
@@ -24,30 +24,24 @@ const ACTIONS = [
 
 const RESOURCE_TYPES = ['', 'stream', 'consumer', 'message', 'connection'];
 
-const PAGE_SIZE = 50;
-
 export default function AuditPage() {
   const [action, setAction] = useState('');
   const [resourceType, setResourceType] = useState('');
-  const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const [pageIndex, setPageIndex] = useState(0);
 
   const { data, isLoading } = useAuditLog({
-    limit: PAGE_SIZE,
-    offset,
+    limit: pageSize,
+    offset: pageIndex * pageSize,
     action: action || undefined,
     resource_type: resourceType || undefined,
   });
-
-  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
-  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Audit Log</h2>
-        <p className="text-muted-foreground">
-          Track all user actions and changes
-        </p>
+        <p className="text-muted-foreground">Track all user actions and changes</p>
       </div>
 
       {/* Filters */}
@@ -56,12 +50,17 @@ export default function AuditPage() {
           <label className="text-xs text-muted-foreground block mb-1">Action</label>
           <Select
             value={action}
-            onChange={(e) => { setAction(e.target.value); setOffset(0); }}
+            onChange={(e) => {
+              setAction(e.target.value);
+              setPageIndex(0);
+            }}
             className="w-48"
           >
             <option value="">All Actions</option>
             {ACTIONS.filter(Boolean).map((a) => (
-              <option key={a} value={a}>{a}</option>
+              <option key={a} value={a}>
+                {a}
+              </option>
             ))}
           </Select>
         </div>
@@ -69,20 +68,20 @@ export default function AuditPage() {
           <label className="text-xs text-muted-foreground block mb-1">Resource Type</label>
           <Select
             value={resourceType}
-            onChange={(e) => { setResourceType(e.target.value); setOffset(0); }}
+            onChange={(e) => {
+              setResourceType(e.target.value);
+              setPageIndex(0);
+            }}
             className="w-48"
           >
             <option value="">All Types</option>
             {RESOURCE_TYPES.filter(Boolean).map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>
+                {t}
+              </option>
             ))}
           </Select>
         </div>
-        {data && (
-          <div className="ml-auto text-sm text-muted-foreground">
-            {data.total} total entries
-          </div>
-        )}
       </div>
 
       {/* Table */}
@@ -90,7 +89,9 @@ export default function AuditPage() {
         {isLoading ? (
           <p className="p-6 text-sm text-muted-foreground">Loading audit log...</p>
         ) : data && data.entries.length === 0 ? (
-          <p className="p-6 text-sm text-muted-foreground text-center">No audit log entries found.</p>
+          <p className="p-6 text-sm text-muted-foreground text-center">
+            No audit log entries found.
+          </p>
         ) : (
           <div className="overflow-auto">
             <table className="w-full text-sm">
@@ -111,9 +112,7 @@ export default function AuditPage() {
                       {new Date(entry.created_at).toLocaleString()}
                     </td>
                     <td className="p-3 whitespace-nowrap">
-                      {entry.user_email || (
-                        <span className="text-muted-foreground">system</span>
-                      )}
+                      {entry.user_email || <span className="text-muted-foreground">system</span>}
                     </td>
                     <td className="p-3">
                       <Badge variant="outline" className="text-xs font-mono">
@@ -125,9 +124,7 @@ export default function AuditPage() {
                         {entry.resource_type}
                       </Badge>
                     </td>
-                    <td className="p-3 font-mono text-xs">
-                      {entry.resource_name || '-'}
-                    </td>
+                    <td className="p-3 font-mono text-xs">{entry.resource_name || '-'}</td>
                     <td className="p-3 text-xs text-muted-foreground truncate max-w-xs">
                       {entry.details ? JSON.stringify(entry.details) : '-'}
                     </td>
@@ -140,28 +137,15 @@ export default function AuditPage() {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={offset === 0}
-            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage >= totalPages}
-            onClick={() => setOffset(offset + PAGE_SIZE)}
-          >
-            Next
-          </Button>
-        </div>
+      {data && data.total > 0 && (
+        <Pagination
+          pageIndex={pageIndex}
+          pageCount={Math.ceil(data.total / pageSize)}
+          pageSize={pageSize}
+          onPageChange={setPageIndex}
+          onPageSizeChange={setPageSize}
+          totalItems={data.total}
+        />
       )}
     </div>
   );

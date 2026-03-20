@@ -31,8 +31,23 @@ backend:
     natsUrl: "nats://nats:4222"
     # -- Log level
     logLevel: "info"
+    # -- Database type: "sqlite" or "postgres"
+    databaseType: "sqlite"
     # -- Additional non-secret env vars
     extraEnv: {}
+
+  # -- PostgreSQL settings (used when databaseType=postgres)
+  postgresql:
+    # -- PostgreSQL host
+    host: ""
+    # -- PostgreSQL port
+    port: 5432
+    # -- PostgreSQL database name
+    database: "nats_manager"
+    # -- PostgreSQL username
+    username: "postgres"
+    # -- Enable SSL
+    ssl: false
 
   secrets:
     # -- Use an existing Secret instead of creating one
@@ -43,9 +58,11 @@ backend:
     viewerToken: ""
     # -- SMTP password (ignored when existingSecret is set)
     smtpPassword: ""
+    # -- PostgreSQL password (ignored when existingSecret is set)
+    databasePassword: ""
 
   persistence:
-    # -- Enable PVC for SQLite data
+    # -- Enable PVC for SQLite data (not needed when using PostgreSQL)
     enabled: true
     # -- Storage class (empty = cluster default)
     storageClass: ""
@@ -69,7 +86,7 @@ backend:
       memory: 512Mi
 
   autoscaling:
-    # -- Enable HPA (not recommended with SQLite persistence)
+    # -- Enable HPA (not recommended with SQLite; safe with PostgreSQL)
     enabled: false
     minReplicas: 1
     maxReplicas: 3

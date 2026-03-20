@@ -10,7 +10,7 @@ spec:
   replicas: {{ .Values.backend.replicaCount }}
   {{- end }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
-  {{- if .Values.backend.persistence.enabled }}
+  {{- if and .Values.backend.persistence.enabled (ne .Values.backend.config.databaseType "postgres") }}
   strategy:
     type: Recreate
   {{- end }}
@@ -64,12 +64,12 @@ spec:
             {{- toYaml .Values.backend.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.backend.securityContext | nindent 12 }}
-          {{- if .Values.backend.persistence.enabled }}
+          {{- if and .Values.backend.persistence.enabled (ne .Values.backend.config.databaseType "postgres") }}
           volumeMounts:
             - name: data
               mountPath: /app/data
           {{- end }}
-      {{- if .Values.backend.persistence.enabled }}
+      {{- if and .Values.backend.persistence.enabled (ne .Values.backend.config.databaseType "postgres") }}
       volumes:
         - name: data
           persistentVolumeClaim:
