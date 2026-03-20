@@ -248,6 +248,8 @@ export class MessagesService {
       total: totalMessages,
       has_more: nextSeq !== null,
       next_seq: nextSeq,
+      first_seq: firstSeq,
+      last_seq: lastSeq,
     };
   }
 

@@ -40,6 +40,8 @@ interface MessageListProps {
   onRefetch: () => void;
   onNextPage: () => void;
   onPreviousPage: () => void;
+  onFirstPage: () => void;
+  onGoToPage: (page: number) => void;
   onToggleCompare: (seq: number) => void;
   onLoadPayload: (seq: number) => void;
   onHidePayload: (seq: number) => void;
@@ -83,6 +85,7 @@ export function MessageList({
   onRefetch,
   onNextPage,
   onPreviousPage,
+  onGoToPage,
   onToggleCompare,
   onLoadPayload,
   onHidePayload,
@@ -144,24 +147,6 @@ export function MessageList({
             <Button onClick={onRefetch} disabled={!selectedStream} variant="outline" size="sm">
               <RefreshCw className="w-4 h-4" />
               Refresh
-            </Button>
-            <Button
-              onClick={onPreviousPage}
-              disabled={cursorHistory.length === 0}
-              variant="outline"
-              size="sm"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Prev
-            </Button>
-            <Button
-              onClick={onNextPage}
-              disabled={!messagesData?.has_more || !messagesData?.next_seq}
-              variant="outline"
-              size="sm"
-            >
-              Next
-              <ChevronRight className="w-4 h-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={exportJson}>
               <Download className="w-4 h-4" />
@@ -323,6 +308,74 @@ export function MessageList({
           </div>
         )}
       </CardContent>
+      {selectedStream &&
+        currentMessages.length > 0 &&
+        (() => {
+          const currentPage = cursorHistory.length + 1;
+          const totalPages = messagesData?.total
+            ? Math.ceil(messagesData.total / limit)
+            : currentPage;
+          const hasNext = !!(messagesData?.has_more && messagesData?.next_seq);
+
+          // Build the set of page numbers to display (with ellipses)
+          const pageNumbers: (number | 'ellipsis')[] = [];
+          if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+          } else {
+            pageNumbers.push(1);
+            if (currentPage > 3) pageNumbers.push('ellipsis');
+            const start = Math.max(2, currentPage - 1);
+            const end = Math.min(totalPages - 1, currentPage + 1);
+            for (let i = start; i <= end; i++) pageNumbers.push(i);
+            if (currentPage < totalPages - 2) pageNumbers.push('ellipsis');
+            pageNumbers.push(totalPages);
+          }
+
+          return (
+            <div className="border-t px-4 py-3 flex items-center justify-between bg-muted/30">
+              <span className="text-sm text-muted-foreground">
+                {messagesData?.total != null && <>{messagesData.total.toLocaleString()} messages</>}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  onClick={onPreviousPage}
+                  disabled={cursorHistory.length === 0}
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                {pageNumbers.map((page, idx) =>
+                  page === 'ellipsis' ? (
+                    <span key={`ellipsis-${idx}`} className="px-1 text-sm text-muted-foreground">
+                      ...
+                    </span>
+                  ) : (
+                    <Button
+                      key={page}
+                      onClick={() => page !== currentPage && onGoToPage(page)}
+                      variant={page === currentPage ? 'default' : 'outline'}
+                      size="icon"
+                      className="h-8 w-8"
+                    >
+                      {page}
+                    </Button>
+                  ),
+                )}
+                <Button
+                  onClick={onNextPage}
+                  disabled={!hasNext}
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
     </Card>
   );
 }

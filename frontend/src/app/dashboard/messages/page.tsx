@@ -344,6 +344,33 @@ export default function MessagesPage() {
     setSeqStart(previousSeq);
   };
 
+  const handleFirstPage = () => {
+    setCursorHistory([]);
+    setSeqStart(undefined);
+  };
+
+  const handleGoToPage = (page: number) => {
+    if (!messagesData?.first_seq || !messagesData?.last_seq) return;
+    if (page <= 1) {
+      handleFirstPage();
+      return;
+    }
+    const { first_seq, last_seq } = messagesData;
+    const seqRange = last_seq - first_seq + 1;
+    const totalPages = Math.ceil(messagesData.total / limit);
+    // Estimate sequence for the target page proportionally across the seq range
+    const targetSeq = Math.round(first_seq + ((page - 1) / totalPages) * seqRange);
+    const clampedSeq = Math.max(first_seq, Math.min(targetSeq, last_seq));
+    // Build a synthetic cursor history so "Prev" goes back to page 1
+    const history: Array<number | undefined> = [undefined];
+    for (let p = 2; p < page; p++) {
+      const hSeq = Math.round(first_seq + ((p - 1) / totalPages) * seqRange);
+      history.push(Math.max(first_seq, Math.min(hSeq, last_seq)));
+    }
+    setCursorHistory(history);
+    setSeqStart(clampedSeq);
+  };
+
   const handleLoadPayload = async (seq: number) => {
     if (!connectionId || !selectedStream) return;
     if (Object.prototype.hasOwnProperty.call(loadedPayloads, seq)) {
@@ -565,6 +592,8 @@ export default function MessagesPage() {
           onRefetch={refetch}
           onNextPage={handleNextPage}
           onPreviousPage={handlePreviousPage}
+          onFirstPage={handleFirstPage}
+          onGoToPage={handleGoToPage}
           onToggleCompare={toggleCompareSelection}
           onLoadPayload={handleLoadPayload}
           onHidePayload={handleHidePayload}

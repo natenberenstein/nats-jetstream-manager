@@ -242,6 +242,8 @@ export interface MessagesResponse {
   total: number;
   has_more?: boolean;
   next_seq?: number | null;
+  first_seq?: number;
+  last_seq?: number;
 }
 
 export interface MessageReplayRequest {
