@@ -8,10 +8,18 @@ import { useConnection } from '@/contexts/ConnectionContext';
 import { useStreams, useDeleteStream, useCreateStream, useUpdateStream } from '@/hooks/useStreams';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { StreamInfo } from '@/lib/types';
-import { Plus, Trash2, RefreshCw, X, Pencil } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Pencil } from 'lucide-react';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -330,12 +338,9 @@ export default function StreamsPage() {
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>
-          <Button
-            className="flex items-center gap-2"
-            onClick={() => setShowCreateForm((prev) => !prev)}
-          >
-            {showCreateForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {showCreateForm ? 'Cancel' : 'Create Stream'}
+          <Button className="flex items-center gap-2" onClick={() => setShowCreateForm(true)}>
+            <Plus className="w-4 h-4" />
+            Create Stream
           </Button>
           <Button
             variant="destructive"
@@ -347,14 +352,14 @@ export default function StreamsPage() {
         </div>
       </div>
 
-      {showCreateForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Create Stream</CardTitle>
-            <CardDescription>Define stream name and subject patterns.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateStream} className="space-y-4">
+      <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+        <DialogHeader onClose={() => setShowCreateForm(false)}>
+          <DialogTitle>Create Stream</DialogTitle>
+          <DialogDescription>Define stream name and subject patterns.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleCreateStream}>
+          <DialogContent>
+            <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="space-y-1">
                   <Label>Name</Label>
@@ -403,16 +408,18 @@ export default function StreamsPage() {
               </label>
 
               {createError && <p className="text-sm text-destructive">{createError}</p>}
-
-              <div className="flex justify-end">
-                <Button type="submit" disabled={createStream.isPending}>
-                  {createStream.isPending ? 'Creating...' : 'Create Stream'}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+            </div>
+          </DialogContent>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createStream.isPending}>
+              {createStream.isPending ? 'Creating...' : 'Create Stream'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
 
       {/* Streams Table */}
       <Card>

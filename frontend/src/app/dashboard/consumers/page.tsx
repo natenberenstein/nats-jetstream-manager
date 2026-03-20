@@ -15,7 +15,7 @@ import {
 } from '@/hooks/useConsumers';
 import { ConsumerConfig, ConsumerInfo } from '@/lib/types';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
-import { Plus, RefreshCw, Trash2, X, Pencil, Copy } from 'lucide-react';
+import { Plus, RefreshCw, Trash2, Pencil, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,13 @@ import {
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Pagination } from '@/components/ui/pagination';
 
 const DEFAULT_CONSUMER_FORM: ConsumerConfig = {
@@ -139,6 +146,10 @@ function ConsumerEditForm({
                     <Input value={consumer.config.durable_name || consumer.name} disabled />
                   </div>
                   <div>
+                    <Label className="text-muted-foreground">Type</Label>
+                    <Input value={consumer.config.deliver_subject ? 'Push' : 'Pull'} disabled />
+                  </div>
+                  <div>
                     <Label className="text-muted-foreground">Filter Subject</Label>
                     <Input value={consumer.config.filter_subject || '*'} disabled />
                   </div>
@@ -150,6 +161,12 @@ function ConsumerEditForm({
                     <Label className="text-muted-foreground">Ack Policy</Label>
                     <Input value={consumer.config.ack_policy || 'explicit'} disabled />
                   </div>
+                  {consumer.config.deliver_subject && (
+                    <div>
+                      <Label className="text-muted-foreground">Deliver Subject</Label>
+                      <Input value={consumer.config.deliver_subject} disabled />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -295,12 +312,19 @@ export default function ConsumersPage() {
       return;
     }
 
+    if (formData.deliver_subject !== undefined && !formData.deliver_subject.trim()) {
+      setFormError('Deliver subject is required for push consumers.');
+      return;
+    }
+
     const payload: ConsumerConfig = {
       ...formData,
       name: consumerName || undefined,
       durable_name: durableName || undefined,
       description: formData.description?.trim() || undefined,
       filter_subject: formData.filter_subject?.trim() || undefined,
+      deliver_subject: formData.deliver_subject?.trim() || undefined,
+      deliver_group: formData.deliver_group?.trim() || undefined,
     };
 
     try {
@@ -414,18 +438,9 @@ export default function ConsumersPage() {
             Refresh
           </Button>
 
-          <Button
-            onClick={() => {
-              setShowCreateForm((prev) => !prev);
-              if (showCreateForm) {
-                setCloneMessage(null);
-                setFormData(DEFAULT_CONSUMER_FORM);
-              }
-            }}
-            disabled={!selectedStream}
-          >
-            {showCreateForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {showCreateForm ? 'Cancel' : 'Create Consumer'}
+          <Button onClick={() => setShowCreateForm(true)} disabled={!selectedStream}>
+            <Plus className="w-4 h-4" />
+            Create Consumer
           </Button>
           <Button
             variant="destructive"
@@ -521,18 +536,66 @@ export default function ConsumersPage() {
         </CardContent>
       </Card>
 
-      {showCreateForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Create Consumer</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {cloneMessage && (
-              <Alert className="mb-4">
-                <AlertDescription>{cloneMessage}</AlertDescription>
-              </Alert>
-            )}
-            <form onSubmit={handleCreateConsumer} className="space-y-4">
+      <Dialog
+        open={showCreateForm}
+        onOpenChange={(open) => {
+          setShowCreateForm(open);
+          if (!open) {
+            setCloneMessage(null);
+            setFormData(DEFAULT_CONSUMER_FORM);
+          }
+        }}
+      >
+        <DialogHeader
+          onClose={() => {
+            setShowCreateForm(false);
+            setCloneMessage(null);
+            setFormData(DEFAULT_CONSUMER_FORM);
+          }}
+        >
+          <DialogTitle>Create Consumer</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleCreateConsumer}>
+          <DialogContent>
+            <div className="space-y-4">
+              {cloneMessage && (
+                <Alert>
+                  <AlertDescription>{cloneMessage}</AlertDescription>
+                </Alert>
+              )}
+
+              <label className="space-y-1 block">
+                <Label>Consumer Type</Label>
+                <Select
+                  value={formData.deliver_subject !== undefined ? 'push' : 'pull'}
+                  onChange={(event) => {
+                    if (event.target.value === 'pull') {
+                      setFormData((prev) => ({
+                        ...prev,
+                        deliver_subject: undefined,
+                        deliver_group: undefined,
+                        flow_control: undefined,
+                        idle_heartbeat: undefined,
+                      }));
+                    } else {
+                      setFormData((prev) => ({
+                        ...prev,
+                        deliver_subject: '',
+                        max_waiting: undefined,
+                      }));
+                    }
+                  }}
+                >
+                  <option value="pull">Pull</option>
+                  <option value="push">Push</option>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.deliver_subject !== undefined
+                    ? 'Push: server delivers messages to a subject'
+                    : 'Pull: clients request messages on demand'}
+                </p>
+              </label>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="space-y-1">
                   <Label>Durable Name</Label>
@@ -582,6 +645,62 @@ export default function ConsumersPage() {
                     placeholder="Processes order events"
                   />
                 </label>
+
+                {formData.deliver_subject !== undefined && (
+                  <>
+                    <label className="space-y-1">
+                      <Label>Deliver Subject</Label>
+                      <Input
+                        type="text"
+                        value={formData.deliver_subject || ''}
+                        onChange={(event) =>
+                          setFormData((prev) => ({ ...prev, deliver_subject: event.target.value }))
+                        }
+                        placeholder="deliver.orders"
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <Label>Deliver Group (optional)</Label>
+                      <Input
+                        type="text"
+                        value={formData.deliver_group || ''}
+                        onChange={(event) =>
+                          setFormData((prev) => ({ ...prev, deliver_group: event.target.value }))
+                        }
+                        placeholder="worker-group"
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <Label>Idle Heartbeat (nanoseconds, 0 = off)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={formData.idle_heartbeat ?? 0}
+                        onChange={(event) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            idle_heartbeat: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label className="flex items-center gap-2 pt-6">
+                      <Checkbox
+                        checked={formData.flow_control ?? false}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            flow_control: (e.target as HTMLInputElement).checked,
+                          }))
+                        }
+                      />
+                      <Label>Flow Control</Label>
+                    </label>
+                  </>
+                )}
 
                 <label className="space-y-1">
                   <Label>Ack Policy</Label>
@@ -658,17 +777,22 @@ export default function ConsumersPage() {
                   />
                 </label>
 
-                <label className="space-y-1">
-                  <Label>Max Waiting</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={formData.max_waiting ?? 512}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, max_waiting: Number(event.target.value) }))
-                    }
-                  />
-                </label>
+                {formData.deliver_subject === undefined && (
+                  <label className="space-y-1">
+                    <Label>Max Waiting</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={formData.max_waiting ?? 512}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          max_waiting: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                )}
 
                 <label className="space-y-1">
                   <Label>Rate Limit (bytes/sec)</Label>
@@ -700,16 +824,26 @@ export default function ConsumersPage() {
               </div>
 
               {formError && <p className="text-sm text-destructive">{formError}</p>}
-
-              <div className="flex justify-end">
-                <Button type="submit" disabled={createConsumer.isPending}>
-                  {createConsumer.isPending ? 'Creating...' : 'Create Consumer'}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+            </div>
+          </DialogContent>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowCreateForm(false);
+                setCloneMessage(null);
+                setFormData(DEFAULT_CONSUMER_FORM);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createConsumer.isPending}>
+              {createConsumer.isPending ? 'Creating...' : 'Create Consumer'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
 
       <Card>
         {!selectedStream ? (

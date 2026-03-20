@@ -69,13 +69,13 @@ const Select = React.forwardRef<HTMLSelectElement, NativeSelectProps>(
     const selected = options.find((opt) => opt.value === currentValue) ?? options[0];
 
     const emitChange = (nextValue: string) => {
+      setOpen(false);
       if (!isControlled) setInternalValue(nextValue);
       const syntheticEvent = {
         target: { value: nextValue },
         currentTarget: { value: nextValue },
       } as React.ChangeEvent<HTMLSelectElement>;
       onChange?.(syntheticEvent);
-      setOpen(false);
     };
 
     return (
@@ -103,7 +103,10 @@ const Select = React.forwardRef<HTMLSelectElement, NativeSelectProps>(
         </button>
 
         {open && !disabled && (
-          <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md">
+          <div
+            className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <ul role="listbox" className="max-h-64 overflow-auto p-1">
               {options.map((opt) => {
                 const isSelected = opt.value === currentValue;

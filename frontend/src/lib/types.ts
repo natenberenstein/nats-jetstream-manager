@@ -167,6 +167,10 @@ export interface ConsumerConfig {
   ack_wait?: number;
   max_deliver?: number;
   filter_subject?: string;
+  deliver_subject?: string;
+  deliver_group?: string;
+  flow_control?: boolean;
+  idle_heartbeat?: number;
   replay_policy?: 'instant' | 'original';
   sample_freq?: string;
   rate_limit_bps?: number;

@@ -51,6 +51,23 @@ export class ConsumerCreateDto {
   filter_subject?: string;
 
   @IsOptional()
+  @IsString()
+  deliver_subject?: string;
+
+  @IsOptional()
+  @IsString()
+  deliver_group?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  flow_control?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  idle_heartbeat?: number;
+
+  @IsOptional()
   @IsIn(['instant', 'original'])
   replay_policy?: 'instant' | 'original';
 

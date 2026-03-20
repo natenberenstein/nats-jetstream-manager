@@ -158,6 +158,11 @@ export class ConsumersService {
       }
     }
 
+    if (dto.deliver_subject) config.deliver_subject = dto.deliver_subject;
+    if (dto.deliver_group) config.deliver_group = dto.deliver_group;
+    if (dto.flow_control !== undefined) config.flow_control = dto.flow_control;
+    if (dto.idle_heartbeat !== undefined) config.idle_heartbeat = dto.idle_heartbeat;
+
     if (dto.opt_start_seq !== undefined) config.opt_start_seq = dto.opt_start_seq;
     if (dto.opt_start_time !== undefined) config.opt_start_time = dto.opt_start_time;
     if (dto.ack_wait !== undefined) config.ack_wait = dto.ack_wait;
@@ -333,6 +338,10 @@ export class ConsumersService {
         ack_wait: config.ack_wait,
         max_deliver: config.max_deliver,
         filter_subject: config.filter_subject,
+        deliver_subject: config.deliver_subject,
+        deliver_group: config.deliver_group,
+        flow_control: config.flow_control,
+        idle_heartbeat: config.idle_heartbeat,
         replay_policy: REPLAY_POLICY_REVERSE[config.replay_policy] ?? 'instant',
         sample_freq: config.sample_freq,
         rate_limit_bps: config.rate_limit_bps,
