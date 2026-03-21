@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { consumerApi } from '@/lib/api';
+import { consumerApi, metricsApi } from '@/lib/api';
 import { ConsumerConfig } from '@/lib/types';
 
 export function useConsumers(connectionId: string | null, streamName: string | null) {
@@ -72,6 +72,19 @@ export function useUpdateConsumer(connectionId: string | null, streamName: strin
       queryClient.invalidateQueries({ queryKey: ['consumers', connectionId, streamName] });
       queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
     },
+  });
+}
+
+export function useConsumerMetrics(
+  connectionId: string | null,
+  streamName: string | null,
+  window = 60,
+) {
+  return useQuery({
+    queryKey: ['consumer-metrics', connectionId, streamName, window],
+    queryFn: () => metricsApi.getAllConsumerMetrics(connectionId!, streamName!, window),
+    enabled: !!connectionId && !!streamName,
+    refetchInterval: 30_000,
   });
 }
 

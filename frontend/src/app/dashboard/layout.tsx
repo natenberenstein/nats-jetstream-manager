@@ -18,6 +18,8 @@ import {
   Shield,
   Key,
   HardDrive,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -25,12 +27,14 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { connectionId, url, connected, connections, switchConnection, disconnect } =
     useConnection();
+  const { theme, toggleTheme } = useTheme();
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
 
@@ -115,6 +119,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </option>
               ))}
             </Select>
+            <Button variant="outline" size="icon" onClick={toggleTheme} title="Toggle theme">
+              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </Button>
             <Button variant="outline" onClick={() => setCommandOpen(true)}>
               <Search className="w-4 h-4" />
               Command

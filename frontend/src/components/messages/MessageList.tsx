@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/pagination';
 import { Select } from '@/components/ui/select';
 import { downloadFile, formatPayload, maskSensitiveText, toCsv } from './utils';
+import { PayloadViewer } from './PayloadViewer';
 
 interface MessageListProps {
   selectedStream: string | null;
@@ -236,9 +237,7 @@ export function MessageList({
                   )}
                 </div>
 
-                <pre className="text-xs bg-muted/40 border rounded p-3 overflow-x-auto">
-                  {renderPayload(message)}
-                </pre>
+                <PayloadViewer payload={renderPayload(message)} maxHeight="300px" />
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs text-muted-foreground">

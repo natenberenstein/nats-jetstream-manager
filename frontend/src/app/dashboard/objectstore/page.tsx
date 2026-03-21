@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
 import {
@@ -16,6 +16,7 @@ import { ObjectStoreStatusInfo } from '@/lib/types';
 import { Plus, Trash2, RefreshCw, ArrowLeft, Download, Upload } from 'lucide-react';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -59,6 +60,61 @@ function ObjectBrowser({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedObjects, setSelectedObjects] = useState<Set<string>>(new Set());
+
+  const objects = useMemo(() => objectsData?.objects ?? [], [objectsData?.objects]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredObjects = useMemo(() => {
+    if (!searchQuery.trim()) return objects;
+    const q = searchQuery.toLowerCase();
+    return objects.filter(
+      (obj) =>
+        obj.name.toLowerCase().includes(q) ||
+        (obj.description && obj.description.toLowerCase().includes(q)),
+    );
+  }, [objects, searchQuery]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchQuery]);
+
+  const pagedObjects = filteredObjects.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+
+  const toggleSelectObject = (name: string) => {
+    setSelectedObjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const toggleSelectAllObjects = () => {
+    if (!objects.length) return;
+    setSelectedObjects((prev) =>
+      prev.size === objects.length ? new Set() : new Set(objects.map((o) => o.name)),
+    );
+  };
+
+  const handleBulkDeleteObjects = async () => {
+    if (selectedObjects.size === 0) return;
+    const names = Array.from(selectedObjects);
+    const confirmed = window.confirm(
+      `Dry run preview:\n${names.slice(0, 10).join('\n')}\n\nDelete ${names.length} object(s)?`,
+    );
+    if (!confirmed) return;
+    const guard = window.prompt('Type DELETE to confirm bulk deletion:');
+    if (guard !== 'DELETE') return;
+    for (const name of names) {
+      try {
+        await deleteObject.mutateAsync(name);
+      } catch (error) {
+        console.error('Bulk delete failed for', name, error);
+      }
+    }
+    setSelectedObjects(new Set());
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,9 +189,6 @@ function ObjectBrowser({
     }
   };
 
-  const objects = objectsData?.objects ?? [];
-  const pagedObjects = objects.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -167,6 +220,12 @@ function ObjectBrowser({
             <Upload className="w-4 h-4" />
             Upload Object
           </Button>
+          {selectedObjects.size > 0 && (
+            <Button variant="destructive" onClick={handleBulkDeleteObjects}>
+              <Trash2 className="w-4 h-4" />
+              Delete Selected ({selectedObjects.size})
+            </Button>
+          )}
         </div>
       </div>
 
@@ -215,16 +274,29 @@ function ObjectBrowser({
         </form>
       </Dialog>
 
+      <Input
+        placeholder="Filter objects..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="max-w-sm"
+      />
+
       <Card>
         {isLoading ? (
           <CardContent className="p-8 text-center text-muted-foreground">
             Loading objects...
           </CardContent>
-        ) : objects.length > 0 ? (
+        ) : filteredObjects.length > 0 ? (
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={objects.length > 0 && selectedObjects.size === objects.length}
+                      onChange={toggleSelectAllObjects}
+                    />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Size</TableHead>
@@ -236,6 +308,12 @@ function ObjectBrowser({
               <TableBody>
                 {pagedObjects.map((obj) => (
                   <TableRow key={obj.nuid}>
+                    <TableCell className="w-10">
+                      <Checkbox
+                        checked={selectedObjects.has(obj.name)}
+                        onChange={() => toggleSelectObject(obj.name)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{obj.name}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {obj.description || '-'}
@@ -270,11 +348,11 @@ function ObjectBrowser({
             </Table>
             <Pagination
               pageIndex={pageIndex}
-              pageCount={Math.ceil(objects.length / pageSize)}
+              pageCount={Math.ceil(filteredObjects.length / pageSize)}
               pageSize={pageSize}
               onPageChange={setPageIndex}
               onPageSizeChange={setPageSize}
-              totalItems={objects.length}
+              totalItems={filteredObjects.length}
             />
           </CardContent>
         ) : (
@@ -298,6 +376,23 @@ export default function ObjectStorePage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState<ObjectStoreStatusInfo | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredStores = useMemo(() => {
+    const items = storeData?.object_stores ?? [];
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(
+      (s) =>
+        s.bucket.toLowerCase().includes(q) ||
+        (s.description && s.description.toLowerCase().includes(q)),
+    );
+  }, [storeData?.object_stores, searchQuery]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchQuery]);
+
   const [createForm, setCreateForm] = useState({
     name: '',
     description: '',
@@ -438,12 +533,19 @@ export default function ObjectStorePage() {
         </form>
       </Dialog>
 
+      <Input
+        placeholder="Filter object stores..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="max-w-sm"
+      />
+
       <Card>
         {isLoading ? (
           <CardContent className="p-8 text-center text-muted-foreground">
             Loading object stores...
           </CardContent>
-        ) : storeData?.object_stores && storeData.object_stores.length > 0 ? (
+        ) : filteredStores.length > 0 ? (
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -458,7 +560,7 @@ export default function ObjectStorePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {storeData.object_stores
+                {filteredStores
                   .slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
                   .map((store) => (
                     <TableRow
@@ -507,11 +609,11 @@ export default function ObjectStorePage() {
             </Table>
             <Pagination
               pageIndex={pageIndex}
-              pageCount={Math.ceil(storeData.object_stores.length / pageSize)}
+              pageCount={Math.ceil(filteredStores.length / pageSize)}
               pageSize={pageSize}
               onPageChange={setPageIndex}
               onPageSizeChange={setPageSize}
-              totalItems={storeData.object_stores.length}
+              totalItems={filteredStores.length}
             />
           </CardContent>
         ) : (

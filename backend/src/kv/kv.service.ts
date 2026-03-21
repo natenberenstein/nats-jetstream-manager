@@ -190,6 +190,30 @@ export class KvService {
     }
   }
 
+  async watchHistory(
+    connectionId: string,
+    bucket: string,
+  ): Promise<{ entries: KvEntryResponse[]; total: number }> {
+    const { js } = this.connectionsService.getConnection(connectionId);
+
+    try {
+      const kv = await js.views.kv(bucket, { bindOnly: true });
+      const entries: KvEntryResponse[] = [];
+      const history = await kv.history();
+      for await (const entry of history) {
+        entries.push(this.convertKvEntry(entry));
+      }
+      // Return most recent entries (up to 100)
+      const recent = entries.slice(-100);
+      return { entries: recent, total: recent.length };
+    } catch (error: unknown) {
+      if ((error as Error).message?.includes('not found')) {
+        throw new NotFoundException(`KV bucket '${bucket}' not found`);
+      }
+      throw error;
+    }
+  }
+
   async purgeKey(connectionId: string, bucket: string, key: string): Promise<{ success: boolean }> {
     const { js } = this.connectionsService.getConnection(connectionId);
 

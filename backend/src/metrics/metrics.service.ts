@@ -4,6 +4,7 @@ import { Repository, MoreThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 import { StreamMetric } from '../database/entities/stream-metric.entity';
+import { ConsumerMetric } from '../database/entities/consumer-metric.entity';
 import { ConnectionsService } from '../connections/connections.service';
 
 export interface StreamMetricPoint {
@@ -28,6 +29,24 @@ export interface StreamMetricsSummaryResponse {
   window_minutes: number;
 }
 
+export interface ConsumerMetricPoint {
+  consumer_name: string;
+  stream_name: string;
+  collected_at: string;
+  num_pending: number;
+  num_ack_pending: number;
+  num_waiting: number;
+  delivered_stream_seq: number;
+  ack_floor_stream_seq: number;
+}
+
+export interface ConsumerMetricsResponse {
+  stream_name: string;
+  consumer_name: string;
+  points: ConsumerMetricPoint[];
+  window_minutes: number;
+}
+
 @Injectable()
 export class MetricsService {
   private readonly logger = new Logger(MetricsService.name);
@@ -36,6 +55,8 @@ export class MetricsService {
   constructor(
     @InjectRepository(StreamMetric)
     private readonly metricRepo: Repository<StreamMetric>,
+    @InjectRepository(ConsumerMetric)
+    private readonly consumerMetricRepo: Repository<ConsumerMetric>,
     private readonly configService: ConfigService,
     private readonly connectionsService: ConnectionsService,
   ) {
@@ -68,6 +89,28 @@ export class MetricsService {
 
           await this.metricRepo.save(metric);
         }
+        // Collect consumer metrics for each stream
+        for (const stream of streams) {
+          try {
+            const consumerLister = conn.jsm.consumers.list(stream.config.name);
+            for await (const ci of consumerLister) {
+              const consumerMetric = this.consumerMetricRepo.create({
+                connection_id: connItem.connection_id,
+                stream_name: stream.config.name,
+                consumer_name: ci.name,
+                num_pending: ci.num_pending,
+                num_ack_pending: ci.num_ack_pending,
+                num_waiting: ci.num_waiting,
+                delivered_stream_seq: ci.delivered.stream_seq,
+                ack_floor_stream_seq: ci.ack_floor.stream_seq,
+                collected_at: new Date(),
+              });
+              await this.consumerMetricRepo.save(consumerMetric);
+            }
+          } catch {
+            // Consumer list may fail for some streams, skip silently
+          }
+        }
       } catch (error: unknown) {
         this.logger.warn(
           `Failed to collect metrics for connection ${connItem.connection_id}: ${(error as Error).message}`,
@@ -87,8 +130,15 @@ export class MetricsService {
       .where('collected_at < :cutoff', { cutoff })
       .execute();
 
-    if (result.affected && result.affected > 0) {
-      this.logger.log(`Pruned ${result.affected} old metric records`);
+    const consumerResult = await this.consumerMetricRepo
+      .createQueryBuilder()
+      .delete()
+      .where('collected_at < :cutoff', { cutoff })
+      .execute();
+
+    const total = (result.affected ?? 0) + (consumerResult.affected ?? 0);
+    if (total > 0) {
+      this.logger.log(`Pruned ${total} old metric records`);
     }
   }
 
@@ -160,6 +210,88 @@ export class MetricsService {
       streams,
       window_minutes: windowMinutes,
     };
+  }
+
+  async getConsumerMetrics(
+    connectionId: string,
+    streamName: string,
+    consumerName: string,
+    windowMinutes: number,
+  ): Promise<ConsumerMetricsResponse> {
+    const since = new Date(Date.now() - windowMinutes * 60 * 1000);
+
+    const metrics = await this.consumerMetricRepo.find({
+      where: {
+        connection_id: connectionId,
+        stream_name: streamName,
+        consumer_name: consumerName,
+        collected_at: MoreThan(since),
+      },
+      order: { collected_at: 'ASC' },
+    });
+
+    const points: ConsumerMetricPoint[] = metrics.map((m) => ({
+      consumer_name: m.consumer_name,
+      stream_name: m.stream_name,
+      collected_at: new Date(m.collected_at).toISOString(),
+      num_pending: m.num_pending,
+      num_ack_pending: m.num_ack_pending,
+      num_waiting: m.num_waiting,
+      delivered_stream_seq: m.delivered_stream_seq,
+      ack_floor_stream_seq: m.ack_floor_stream_seq,
+    }));
+
+    return {
+      stream_name: streamName,
+      consumer_name: consumerName,
+      points,
+      window_minutes: windowMinutes,
+    };
+  }
+
+  async getAllConsumerMetrics(
+    connectionId: string,
+    streamName: string,
+    windowMinutes: number,
+  ): Promise<ConsumerMetricsResponse[]> {
+    const since = new Date(Date.now() - windowMinutes * 60 * 1000);
+
+    const metrics = await this.consumerMetricRepo.find({
+      where: {
+        connection_id: connectionId,
+        stream_name: streamName,
+        collected_at: MoreThan(since),
+      },
+      order: { collected_at: 'ASC' },
+    });
+
+    const grouped = new Map<string, ConsumerMetric[]>();
+    for (const m of metrics) {
+      const existing = grouped.get(m.consumer_name) ?? [];
+      existing.push(m);
+      grouped.set(m.consumer_name, existing);
+    }
+
+    const results: ConsumerMetricsResponse[] = [];
+    for (const [consumerName, consumerMetrics] of grouped) {
+      results.push({
+        stream_name: streamName,
+        consumer_name: consumerName,
+        points: consumerMetrics.map((m) => ({
+          consumer_name: m.consumer_name,
+          stream_name: m.stream_name,
+          collected_at: new Date(m.collected_at).toISOString(),
+          num_pending: m.num_pending,
+          num_ack_pending: m.num_ack_pending,
+          num_waiting: m.num_waiting,
+          delivered_stream_seq: m.delivered_stream_seq,
+          ack_floor_stream_seq: m.ack_floor_stream_seq,
+        })),
+        window_minutes: windowMinutes,
+      });
+    }
+
+    return results;
   }
 
   private computeRates(metrics: StreamMetric[]): StreamMetricPoint[] {

@@ -23,4 +23,23 @@ export class MetricsController {
   ) {
     return this.metricsService.getAllStreamRates(connectionId, window);
   }
+
+  @Get('consumers/:streamName')
+  getAllConsumerMetrics(
+    @Param('connectionId') connectionId: string,
+    @Param('streamName') streamName: string,
+    @Query('window', new DefaultValuePipe(60), ParseIntPipe) window: number,
+  ) {
+    return this.metricsService.getAllConsumerMetrics(connectionId, streamName, window);
+  }
+
+  @Get('consumers/:streamName/:consumerName')
+  getConsumerMetrics(
+    @Param('connectionId') connectionId: string,
+    @Param('streamName') streamName: string,
+    @Param('consumerName') consumerName: string,
+    @Query('window', new DefaultValuePipe(60), ParseIntPipe) window: number,
+  ) {
+    return this.metricsService.getConsumerMetrics(connectionId, streamName, consumerName, window);
+  }
 }

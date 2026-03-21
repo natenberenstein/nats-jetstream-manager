@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import { useConnection } from '@/contexts/ConnectionContext';
 import { useStreams, useDeleteStream, useCreateStream, useUpdateStream } from '@/hooks/useStreams';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { StreamInfo } from '@/lib/types';
+import Link from 'next/link';
 import { Plus, Trash2, RefreshCw, Pencil } from 'lucide-react';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -237,6 +238,22 @@ export default function StreamsPage() {
     description: '',
   });
   const [selectedStreams, setSelectedStreams] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredStreams = useMemo(() => {
+    const items = streamsData?.streams ?? [];
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(
+      (s) =>
+        s.config.name.toLowerCase().includes(q) ||
+        s.config.subjects.some((sub) => sub.toLowerCase().includes(q)),
+    );
+  }, [streamsData?.streams, searchQuery]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchQuery]);
 
   const handleDelete = async (streamName: string) => {
     if (confirm(`Are you sure you want to delete stream "${streamName}"?`)) {
@@ -421,13 +438,20 @@ export default function StreamsPage() {
         </form>
       </Dialog>
 
+      <Input
+        placeholder="Filter streams..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="max-w-sm"
+      />
+
       {/* Streams Table */}
       <Card>
         {isLoading ? (
           <CardContent className="p-8 text-center text-muted-foreground">
             Loading streams...
           </CardContent>
-        ) : streamsData?.streams && streamsData.streams.length > 0 ? (
+        ) : filteredStreams.length > 0 ? (
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -435,8 +459,7 @@ export default function StreamsPage() {
                   <TableHead>
                     <Checkbox
                       checked={
-                        !!streamsData?.streams?.length &&
-                        selectedStreams.size === streamsData.streams.length
+                        !!filteredStreams.length && selectedStreams.size === filteredStreams.length
                       }
                       onChange={toggleSelectAll}
                     />
@@ -451,7 +474,7 @@ export default function StreamsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {streamsData.streams
+                {filteredStreams
                   .slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
                   .map((stream) => (
                     <>
@@ -462,7 +485,23 @@ export default function StreamsPage() {
                             onChange={() => toggleSelectStream(stream.config.name)}
                           />
                         </TableCell>
-                        <TableCell className="font-medium">{stream.config.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/dashboard/streams/${encodeURIComponent(stream.config.name)}`}
+                            className="text-primary hover:underline"
+                          >
+                            {stream.config.name}
+                          </Link>
+                          {stream.config.mirror && (
+                            <span className="ml-2 text-xs text-muted-foreground">(mirror)</span>
+                          )}
+                          {stream.config.sources && stream.config.sources.length > 0 && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ({stream.config.sources.length} source
+                              {stream.config.sources.length > 1 ? 's' : ''})
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {stream.config.subjects.join(', ')}
                         </TableCell>
@@ -511,11 +550,11 @@ export default function StreamsPage() {
             </Table>
             <Pagination
               pageIndex={pageIndex}
-              pageCount={Math.ceil(streamsData.streams.length / pageSize)}
+              pageCount={Math.ceil(filteredStreams.length / pageSize)}
               pageSize={pageSize}
               onPageChange={setPageIndex}
               onPageSizeChange={setPageSize}
-              totalItems={streamsData.streams.length}
+              totalItems={filteredStreams.length}
             />
           </CardContent>
         ) : (

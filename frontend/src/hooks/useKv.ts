@@ -74,6 +74,19 @@ export function usePutKvEntry(connectionId: string | null, bucket: string | null
   });
 }
 
+export function useKvWatchHistory(
+  connectionId: string | null,
+  bucket: string | null,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['kv-watch', connectionId, bucket],
+    queryFn: () => kvApi.watchHistory(connectionId!, bucket!),
+    enabled: !!connectionId && !!bucket && enabled,
+    refetchInterval: enabled ? 2000 : false,
+  });
+}
+
 export function useDeleteKvEntry(connectionId: string | null, bucket: string | null) {
   const queryClient = useQueryClient();
 

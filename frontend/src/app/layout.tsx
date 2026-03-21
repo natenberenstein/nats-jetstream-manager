@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import { Toaster } from 'sonner';
 import './globals.css';
 import { ConnectionProvider } from '@/contexts/ConnectionContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { QueryProvider } from '@/components/QueryProvider';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -14,14 +15,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <QueryProvider>
-          <ConnectionProvider>
-            {children}
-            <Toaster position="bottom-right" richColors closeButton />
-          </ConnectionProvider>
-        </QueryProvider>
+        <ThemeProvider>
+          <QueryProvider>
+            <ConnectionProvider>
+              {children}
+              <Toaster position="bottom-right" richColors closeButton />
+            </ConnectionProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
@@ -12,8 +13,9 @@ import {
   useDeleteConsumer,
   useUpdateConsumer,
   useConsumerAnalytics,
+  useConsumerMetrics,
 } from '@/hooks/useConsumers';
-import { ConsumerConfig, ConsumerInfo } from '@/lib/types';
+import { ConsumerConfig, ConsumerInfo, ConsumerMetricsResponse } from '@/lib/types';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import { Plus, RefreshCw, Trash2, Pencil, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,6 +41,63 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Pagination } from '@/components/ui/pagination';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const CHART_COLORS = [
+  '#3b82f6',
+  '#ef4444',
+  '#10b981',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ec4899',
+  '#06b6d4',
+  '#84cc16',
+];
+
+function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
+  const chartData = useMemo(() => {
+    const timeMap = new Map<string, Record<string, string | number>>();
+    for (const consumer of metrics) {
+      for (const point of consumer.points) {
+        const time = new Date(point.collected_at).toLocaleTimeString();
+        const existing = timeMap.get(point.collected_at) ?? { time };
+        existing[`${consumer.consumer_name}_pending`] = point.num_pending;
+        existing[`${consumer.consumer_name}_ack`] = point.num_ack_pending;
+        timeMap.set(point.collected_at, existing);
+      }
+    }
+    return Array.from(timeMap.values());
+  }, [metrics]);
+
+  if (chartData.length === 0)
+    return (
+      <p className="text-sm text-muted-foreground">
+        No metric data yet. Data is collected every 30 seconds.
+      </p>
+    );
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={chartData}>
+        <XAxis dataKey="time" tick={{ fontSize: 11 }} />
+        <YAxis tick={{ fontSize: 11 }} />
+        <Tooltip />
+        <Legend />
+        {metrics.map((consumer, i) => (
+          <Line
+            key={`${consumer.consumer_name}_pending`}
+            type="monotone"
+            dataKey={`${consumer.consumer_name}_pending`}
+            name={`${consumer.consumer_name} pending`}
+            stroke={CHART_COLORS[i % CHART_COLORS.length]}
+            dot={false}
+            strokeWidth={2}
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
 
 const DEFAULT_CONSUMER_FORM: ConsumerConfig = {
   durable_name: '',
@@ -245,6 +304,7 @@ function ConsumerEditForm({
 }
 
 export default function ConsumersPage() {
+  const searchParams = useSearchParams();
   const { connectionId } = useConnection();
   const { data: streamsData } = useStreams(connectionId);
   const streamNames = useMemo(
@@ -254,13 +314,15 @@ export default function ConsumersPage() {
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [selectedStream, setSelectedStream] = useState<string | null>(null);
+  const streamFromParam = searchParams.get('stream');
+  const [selectedStream, setSelectedStream] = useState<string | null>(streamFromParam);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedConsumers, setSelectedConsumers] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState<ConsumerConfig>(DEFAULT_CONSUMER_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [editingConsumer, setEditingConsumer] = useState<string | null>(null);
   const [cloneMessage, setCloneMessage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const durableNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -276,6 +338,7 @@ export default function ConsumersPage() {
 
   const { data: consumersData, isLoading, refetch } = useConsumers(connectionId, selectedStream);
   const { data: analyticsData } = useConsumerAnalytics(connectionId, selectedStream);
+  const { data: consumerMetrics } = useConsumerMetrics(connectionId, selectedStream);
   const createConsumer = useCreateConsumer(connectionId, selectedStream || '');
   const deleteConsumer = useDeleteConsumer(connectionId, selectedStream || '');
 
@@ -395,6 +458,22 @@ export default function ConsumersPage() {
     }
     setSelectedConsumers(new Set());
   };
+
+  const filteredConsumers = useMemo(() => {
+    const items = consumersData?.consumers ?? [];
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.config.durable_name && c.config.durable_name.toLowerCase().includes(q)) ||
+        (c.config.filter_subject && c.config.filter_subject.toLowerCase().includes(q)),
+    );
+  }, [consumersData?.consumers, searchQuery]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchQuery]);
 
   const healthSummary = useMemo(() => {
     const consumers = consumersData?.consumers || [];
@@ -535,6 +614,19 @@ export default function ConsumersPage() {
           </div>
         </CardContent>
       </Card>
+
+      {consumerMetrics && consumerMetrics.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Consumer Lag Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ConsumerLagChart metrics={consumerMetrics} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog
         open={showCreateForm}
@@ -845,6 +937,13 @@ export default function ConsumersPage() {
         </form>
       </Dialog>
 
+      <Input
+        placeholder="Filter consumers..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="max-w-sm"
+      />
+
       <Card>
         {!selectedStream ? (
           <CardContent className="p-8 text-center text-muted-foreground">
@@ -854,7 +953,7 @@ export default function ConsumersPage() {
           <CardContent className="p-8 text-center text-muted-foreground">
             Loading consumers...
           </CardContent>
-        ) : consumersData?.consumers && consumersData.consumers.length > 0 ? (
+        ) : filteredConsumers.length > 0 ? (
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -862,8 +961,8 @@ export default function ConsumersPage() {
                   <TableHead>
                     <Checkbox
                       checked={
-                        !!consumersData?.consumers?.length &&
-                        selectedConsumers.size === consumersData.consumers.length
+                        !!filteredConsumers.length &&
+                        selectedConsumers.size === filteredConsumers.length
                       }
                       onChange={toggleSelectAllConsumers}
                     />
@@ -880,7 +979,7 @@ export default function ConsumersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {consumersData.consumers
+                {filteredConsumers
                   .slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
                   .map((consumer) => (
                     <>
@@ -946,11 +1045,11 @@ export default function ConsumersPage() {
             </Table>
             <Pagination
               pageIndex={pageIndex}
-              pageCount={Math.ceil(consumersData.consumers.length / pageSize)}
+              pageCount={Math.ceil(filteredConsumers.length / pageSize)}
               pageSize={pageSize}
               onPageChange={setPageIndex}
               onPageSizeChange={setPageSize}
-              totalItems={consumersData.consumers.length}
+              totalItems={filteredConsumers.length}
             />
           </CardContent>
         ) : (

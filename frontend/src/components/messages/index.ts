@@ -3,3 +3,4 @@ export { MessagePublishForm } from './MessagePublishForm';
 export { AdvancedTools } from './AdvancedTools';
 export { MessageList } from './MessageList';
 export { DiffCompareCard, DiffViewerModal } from './DiffViewer';
+export { PayloadViewer } from './PayloadViewer';

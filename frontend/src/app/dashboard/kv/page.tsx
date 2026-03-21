@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
 import {
@@ -11,11 +11,13 @@ import {
   useKvEntry,
   usePutKvEntry,
   useDeleteKvEntry,
+  useKvWatchHistory,
 } from '@/hooks/useKv';
 import { KvStoreStatus } from '@/lib/types';
-import { Plus, Trash2, RefreshCw, Eye, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Eye, ArrowLeft, Radio } from 'lucide-react';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -58,6 +60,59 @@ function KvKeyBrowser({
   const [putError, setPutError] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [watchMode, setWatchMode] = useState(false);
+  const { data: watchData } = useKvWatchHistory(connectionId, bucket.bucket, watchMode);
+
+  const keys = useMemo(() => keysData?.keys ?? [], [keysData?.keys]);
+
+  const filteredKeys = useMemo(() => {
+    if (!searchQuery.trim()) return keys;
+    const q = searchQuery.toLowerCase();
+    return keys.filter((key) => key.toLowerCase().includes(q));
+  }, [keys, searchQuery]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchQuery]);
+
+  const pagedKeys = filteredKeys.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+
+  const toggleSelectKey = (name: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const toggleSelectAllKeys = () => {
+    if (!filteredKeys.length) return;
+    setSelectedKeys((prev) =>
+      prev.size === filteredKeys.length ? new Set() : new Set(filteredKeys),
+    );
+  };
+
+  const handleBulkDeleteKeys = async () => {
+    if (selectedKeys.size === 0) return;
+    const names = Array.from(selectedKeys);
+    const confirmed = window.confirm(
+      `Dry run preview:\n${names.slice(0, 10).join('\n')}\n\nDelete ${names.length} key(s)?`,
+    );
+    if (!confirmed) return;
+    const guard = window.prompt('Type DELETE to confirm bulk deletion:');
+    if (guard !== 'DELETE') return;
+    for (const name of names) {
+      try {
+        await deleteEntry.mutateAsync(name);
+      } catch (error) {
+        console.error('Bulk delete failed for', name, error);
+      }
+    }
+    setSelectedKeys(new Set());
+  };
 
   const handlePut = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -89,9 +144,6 @@ function KvKeyBrowser({
     }
   };
 
-  const keys = keysData?.keys ?? [];
-  const pagedKeys = keys.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -111,6 +163,13 @@ function KvKeyBrowser({
           </div>
         </div>
         <div className="flex gap-3">
+          <Button
+            variant={watchMode ? 'default' : 'outline'}
+            onClick={() => setWatchMode(!watchMode)}
+          >
+            <Radio className="w-4 h-4" />
+            {watchMode ? 'Watching...' : 'Watch'}
+          </Button>
           <Button variant="outline" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -119,6 +178,12 @@ function KvKeyBrowser({
             <Plus className="w-4 h-4" />
             Put Key
           </Button>
+          {selectedKeys.size > 0 && (
+            <Button variant="destructive" onClick={handleBulkDeleteKeys}>
+              <Trash2 className="w-4 h-4" />
+              Delete Selected ({selectedKeys.size})
+            </Button>
+          )}
         </div>
       </div>
 
@@ -161,17 +226,32 @@ function KvKeyBrowser({
         </form>
       </Dialog>
 
+      <Input
+        placeholder="Filter keys..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="max-w-sm"
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           {isLoading ? (
             <CardContent className="p-8 text-center text-muted-foreground">
               Loading keys...
             </CardContent>
-          ) : keys.length > 0 ? (
+          ) : filteredKeys.length > 0 ? (
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          filteredKeys.length > 0 && selectedKeys.size === filteredKeys.length
+                        }
+                        onChange={toggleSelectAllKeys}
+                      />
+                    </TableHead>
                     <TableHead>Key</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -183,6 +263,12 @@ function KvKeyBrowser({
                       className={selectedKey === key ? 'bg-accent' : 'cursor-pointer'}
                       onClick={() => setSelectedKey(key)}
                     >
+                      <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedKeys.has(key)}
+                          onChange={() => toggleSelectKey(key)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium font-mono text-sm">{key}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button
@@ -212,11 +298,11 @@ function KvKeyBrowser({
               </Table>
               <Pagination
                 pageIndex={pageIndex}
-                pageCount={Math.ceil(keys.length / pageSize)}
+                pageCount={Math.ceil(filteredKeys.length / pageSize)}
                 pageSize={pageSize}
                 onPageChange={setPageIndex}
                 onPageSizeChange={setPageSize}
-                totalItems={keys.length}
+                totalItems={filteredKeys.length}
               />
             </CardContent>
           ) : (
@@ -246,6 +332,46 @@ function KvKeyBrowser({
           </Card>
         )}
       </div>
+
+      {watchMode && watchData && (
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Radio className="w-4 h-4 text-primary animate-pulse" />
+                Live History ({watchData.total} events)
+              </h3>
+            </div>
+            <div className="max-h-64 overflow-auto divide-y">
+              {watchData.entries
+                .slice()
+                .reverse()
+                .map((entry, i) => (
+                  <div key={`${entry.key}-${entry.revision}-${i}`} className="py-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-medium">{entry.key}</span>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge
+                          variant={entry.operation === 'PUT' ? 'default' : 'destructive'}
+                          className="rounded-md text-xs"
+                        >
+                          {entry.operation}
+                        </Badge>
+                        <span>rev {entry.revision}</span>
+                        <span>{new Date(entry.created).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                    {entry.operation === 'PUT' && entry.value && (
+                      <pre className="text-xs text-muted-foreground mt-1 truncate max-w-full">
+                        {entry.value.length > 200 ? entry.value.slice(0, 200) + '...' : entry.value}
+                      </pre>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -261,6 +387,23 @@ export default function KvPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [selectedBucket, setSelectedBucket] = useState<KvStoreStatus | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredKvStores = useMemo(() => {
+    const items = kvData?.kv_stores ?? [];
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(
+      (kv) =>
+        kv.bucket.toLowerCase().includes(q) ||
+        (kv.description && kv.description.toLowerCase().includes(q)),
+    );
+  }, [kvData?.kv_stores, searchQuery]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchQuery]);
+
   const [createForm, setCreateForm] = useState({
     name: '',
     description: '',
@@ -416,12 +559,19 @@ export default function KvPage() {
         </form>
       </Dialog>
 
+      <Input
+        placeholder="Filter KV stores..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="max-w-sm"
+      />
+
       <Card>
         {isLoading ? (
           <CardContent className="p-8 text-center text-muted-foreground">
             Loading KV stores...
           </CardContent>
-        ) : kvData?.kv_stores && kvData.kv_stores.length > 0 ? (
+        ) : filteredKvStores.length > 0 ? (
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -437,7 +587,7 @@ export default function KvPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {kvData.kv_stores
+                {filteredKvStores
                   .slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
                   .map((kv) => (
                     <TableRow
@@ -477,11 +627,11 @@ export default function KvPage() {
             </Table>
             <Pagination
               pageIndex={pageIndex}
-              pageCount={Math.ceil(kvData.kv_stores.length / pageSize)}
+              pageCount={Math.ceil(filteredKvStores.length / pageSize)}
               pageSize={pageSize}
               onPageChange={setPageIndex}
               onPageSizeChange={setPageSize}
-              totalItems={kvData.kv_stores.length}
+              totalItems={filteredKvStores.length}
             />
           </CardContent>
         ) : (

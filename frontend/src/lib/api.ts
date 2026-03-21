@@ -34,6 +34,7 @@ import {
   ObjectStoreStatusInfo,
   ObjectInfoData,
   ObjectStoreCreateConfig,
+  ConsumerMetricsResponse,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -307,6 +308,21 @@ export const metricsApi = {
     fetchApi<StreamMetricsSummaryResponse>(
       `/connections/${connectionId}/metrics/streams?window=${window}`,
     ),
+
+  getConsumerMetrics: (
+    connectionId: string,
+    streamName: string,
+    consumerName: string,
+    window = 60,
+  ) =>
+    fetchApi<ConsumerMetricsResponse>(
+      `/connections/${connectionId}/metrics/consumers/${encodeURIComponent(streamName)}/${encodeURIComponent(consumerName)}?window=${window}`,
+    ),
+
+  getAllConsumerMetrics: (connectionId: string, streamName: string, window = 60) =>
+    fetchApi<ConsumerMetricsResponse[]>(
+      `/connections/${connectionId}/metrics/consumers/${encodeURIComponent(streamName)}?window=${window}`,
+    ),
 };
 
 export const connectionHealthApi = {
@@ -389,6 +405,11 @@ export const kvApi = {
     fetchApi<{ success: boolean }>(
       `/connections/${connectionId}/kv/${encodeURIComponent(bucket)}/keys/${encodeURIComponent(key)}/purge`,
       { method: 'POST' },
+    ),
+
+  watchHistory: (connectionId: string, bucket: string) =>
+    fetchApi<{ entries: KvEntryInfo[]; total: number }>(
+      `/connections/${connectionId}/kv/${encodeURIComponent(bucket)}/history`,
     ),
 };
 

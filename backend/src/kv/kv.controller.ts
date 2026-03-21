@@ -50,6 +50,14 @@ export class KvController {
     return this.kvService.deleteKvStore(connectionId, bucket);
   }
 
+  @Get(':bucket/history')
+  async watchHistory(
+    @Param('connectionId') connectionId: string,
+    @Param('bucket') bucket: string,
+  ): Promise<{ entries: KvEntryResponse[]; total: number }> {
+    return this.kvService.watchHistory(connectionId, bucket);
+  }
+
   @Get(':bucket/keys')
   async listKeys(
     @Param('connectionId') connectionId: string,

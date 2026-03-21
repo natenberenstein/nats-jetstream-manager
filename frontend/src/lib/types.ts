@@ -131,6 +131,8 @@ export interface StreamConfig {
   replicas?: number;
   no_ack?: boolean;
   description?: string;
+  mirror?: { name: string; filter_subject?: string } | null;
+  sources?: Array<{ name: string; filter_subject?: string }>;
 }
 
 export interface StreamState {
@@ -443,6 +445,25 @@ export interface ObjectStoreCreateConfig {
   max_bytes?: number;
   replicas?: number;
   max_chunk_size?: number;
+}
+
+// Consumer Metrics types
+export interface ConsumerMetricPoint {
+  consumer_name: string;
+  stream_name: string;
+  collected_at: string;
+  num_pending: number;
+  num_ack_pending: number;
+  num_waiting: number;
+  delivered_stream_seq: number;
+  ack_floor_stream_seq: number;
+}
+
+export interface ConsumerMetricsResponse {
+  stream_name: string;
+  consumer_name: string;
+  points: ConsumerMetricPoint[];
+  window_minutes: number;
 }
 
 // API response types

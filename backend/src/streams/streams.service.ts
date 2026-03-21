@@ -59,6 +59,8 @@ export interface StreamInfoResponse {
     replicas?: number;
     no_ack?: boolean;
     description?: string;
+    mirror?: { name: string; filter_subject?: string } | null;
+    sources?: Array<{ name: string; filter_subject?: string }>;
   };
   state: {
     messages: number;
@@ -245,6 +247,11 @@ export class StreamsService {
         replicas: config.num_replicas,
         no_ack: config.no_ack,
         description: config.description,
+        mirror: config.mirror
+          ? { name: config.mirror.name, filter_subject: config.mirror.filter_subject }
+          : null,
+        sources:
+          config.sources?.map((s) => ({ name: s.name, filter_subject: s.filter_subject })) ?? [],
       },
       state: {
         messages: state.messages,
