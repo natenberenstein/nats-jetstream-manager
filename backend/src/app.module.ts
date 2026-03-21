@@ -13,6 +13,8 @@ import { MetricsModule } from './metrics/metrics.module';
 import { HealthHistoryModule } from './health-history/health-history.module';
 import { AuditModule } from './audit/audit.module';
 import { JobsModule } from './jobs/jobs.module';
+import { KvModule } from './kv/kv.module';
+import { ObjectStoreModule } from './objectstore/objectstore.module';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -82,6 +84,8 @@ import * as fs from 'fs';
     HealthHistoryModule,
     AuditModule,
     JobsModule,
+    KvModule,
+    ObjectStoreModule,
   ],
   providers: [],
 })

@@ -8,32 +8,43 @@ NATS JetStream Manager is a full-stack web application for managing and monitori
 
 ## Development Commands
 
+This is an npm workspaces monorepo. Install all dependencies from the repo root:
+
+```bash
+npm install              # Install all workspace dependencies
+```
+
+### Full Stack (from repo root)
+
+```bash
+npm run dev              # Start backend + frontend concurrently
+npm run build            # Build all workspaces
+npm run lint             # Lint all workspaces
+npm run format           # Format all files with Prettier
+npm run format:check     # Check formatting without writing
+docker-compose up -d     # Start 3-node NATS JetStream cluster
+```
+
 ### Backend (from `backend/` directory)
 
 ```bash
-npm install              # Install dependencies
 npm run start:dev        # Start dev server with hot reload at :8000
 npm run start:debug      # Start with debug mode
 npm run build            # Compile TypeScript to dist/
 npm run start:prod       # Run compiled production build
 npm run lint             # Run ESLint with auto-fix
 npm test                 # Run Jest tests
+npm run test:watch       # Run tests in watch mode
 npm run test:cov         # Run tests with coverage report
+npx jest <pattern>       # Run a single test file (e.g., npx jest connections)
 ```
 
 ### Frontend (from `frontend/` directory)
 
 ```bash
-npm install         # Install dependencies
 npm run dev         # Start dev server at :3000
 npm run build       # Production build
 npm run lint        # Run ESLint
-```
-
-### Full Stack (from repo root)
-
-```bash
-docker-compose up -d    # Start 3-node NATS JetStream cluster
 ```
 
 ### Environment Variables
@@ -51,6 +62,11 @@ Backend (`.env` in `backend/`, see `.env.example` for full list):
 Frontend (`.env.local` in `frontend/`):
 
 - `NEXT_PUBLIC_API_URL=http://localhost:8000`
+
+### Git Hooks
+
+- **pre-commit**: Runs `lint-staged` — auto-formats with Prettier and runs ESLint with `--fix` on staged files.
+- **commit-msg**: Enforces [Conventional Commits](https://www.conventionalcommits.org/) via commitlint (e.g., `feat:`, `fix:`, `refactor:`, `docs:`).
 
 ## Architecture
 
@@ -114,3 +130,7 @@ All routes under `/api/v1/`. Key resource groupings:
 - **Frontend Dockerfile**: Dev-mode container (`frontend/Dockerfile`)
 - **Helm charts**: `helm/nats-jetstream-manager/` for Kubernetes deployment. Supports both SQLite (with PVC) and PostgreSQL (external). HPA available for PostgreSQL deployments.
 - **Docker Compose**: 3-node NATS cluster for local development
+
+## Notes
+
+- The root `README.md` is outdated — it references FastAPI/Python, but the backend has been rewritten in NestJS/TypeScript. Do not rely on it for architecture guidance.

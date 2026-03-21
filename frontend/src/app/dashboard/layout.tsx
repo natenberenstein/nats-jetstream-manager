@@ -16,6 +16,8 @@ import {
   BarChart3,
   HeartPulse,
   Shield,
+  Key,
+  HardDrive,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -60,6 +62,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/streams', icon: Layers, label: 'Streams' },
     { href: '/dashboard/consumers', icon: Users, label: 'Consumers' },
     { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
+    { href: '/dashboard/kv', icon: Key, label: 'KV Stores' },
+    { href: '/dashboard/objectstore', icon: HardDrive, label: 'Object Store' },
   ];
 
   useEffect(() => {

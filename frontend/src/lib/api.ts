@@ -28,6 +28,12 @@ import {
   MessagesResponse,
   SchemaValidationResponse,
   SystemObservability,
+  KvStoreStatus,
+  KvEntryInfo,
+  KvCreateConfig,
+  ObjectStoreStatusInfo,
+  ObjectInfoData,
+  ObjectStoreCreateConfig,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -335,6 +341,116 @@ export const auditApi = {
 export const systemApi = {
   observability: (connectionId: string) =>
     fetchApi<SystemObservability>(`/connections/${connectionId}/system/observability`),
+};
+
+// KV Store API
+export const kvApi = {
+  list: (connectionId: string) =>
+    fetchApi<{ kv_stores: KvStoreStatus[]; total: number }>(`/connections/${connectionId}/kv`),
+
+  create: (connectionId: string, config: KvCreateConfig) =>
+    fetchApi<KvStoreStatus>(`/connections/${connectionId}/kv`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
+
+  getStatus: (connectionId: string, bucket: string) =>
+    fetchApi<KvStoreStatus>(`/connections/${connectionId}/kv/${encodeURIComponent(bucket)}`),
+
+  delete: (connectionId: string, bucket: string) =>
+    fetchApi<{ success: boolean; deleted_bucket: string }>(
+      `/connections/${connectionId}/kv/${encodeURIComponent(bucket)}`,
+      { method: 'DELETE' },
+    ),
+
+  listKeys: (connectionId: string, bucket: string) =>
+    fetchApi<{ keys: string[]; total: number }>(
+      `/connections/${connectionId}/kv/${encodeURIComponent(bucket)}/keys`,
+    ),
+
+  getKey: (connectionId: string, bucket: string, key: string) =>
+    fetchApi<KvEntryInfo>(
+      `/connections/${connectionId}/kv/${encodeURIComponent(bucket)}/keys/${encodeURIComponent(key)}`,
+    ),
+
+  putKey: (connectionId: string, bucket: string, key: string, value: string) =>
+    fetchApi<{ revision: number }>(
+      `/connections/${connectionId}/kv/${encodeURIComponent(bucket)}/keys/${encodeURIComponent(key)}`,
+      { method: 'PUT', body: JSON.stringify({ value }) },
+    ),
+
+  deleteKey: (connectionId: string, bucket: string, key: string) =>
+    fetchApi<{ success: boolean }>(
+      `/connections/${connectionId}/kv/${encodeURIComponent(bucket)}/keys/${encodeURIComponent(key)}`,
+      { method: 'DELETE' },
+    ),
+
+  purgeKey: (connectionId: string, bucket: string, key: string) =>
+    fetchApi<{ success: boolean }>(
+      `/connections/${connectionId}/kv/${encodeURIComponent(bucket)}/keys/${encodeURIComponent(key)}/purge`,
+      { method: 'POST' },
+    ),
+};
+
+// Object Store API
+export const objectStoreApi = {
+  list: (connectionId: string) =>
+    fetchApi<{ object_stores: ObjectStoreStatusInfo[]; total: number }>(
+      `/connections/${connectionId}/objectstore`,
+    ),
+
+  create: (connectionId: string, config: ObjectStoreCreateConfig) =>
+    fetchApi<ObjectStoreStatusInfo>(`/connections/${connectionId}/objectstore`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
+
+  getStatus: (connectionId: string, bucket: string) =>
+    fetchApi<ObjectStoreStatusInfo>(
+      `/connections/${connectionId}/objectstore/${encodeURIComponent(bucket)}`,
+    ),
+
+  delete: (connectionId: string, bucket: string) =>
+    fetchApi<{ success: boolean; deleted_bucket: string }>(
+      `/connections/${connectionId}/objectstore/${encodeURIComponent(bucket)}`,
+      { method: 'DELETE' },
+    ),
+
+  listObjects: (connectionId: string, bucket: string) =>
+    fetchApi<{ objects: ObjectInfoData[]; total: number }>(
+      `/connections/${connectionId}/objectstore/${encodeURIComponent(bucket)}/objects`,
+    ),
+
+  getObjectInfo: (connectionId: string, bucket: string, name: string) =>
+    fetchApi<ObjectInfoData>(
+      `/connections/${connectionId}/objectstore/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(name)}/info`,
+    ),
+
+  getObjectData: (connectionId: string, bucket: string, name: string) =>
+    fetchApi<{ name: string; data: string }>(
+      `/connections/${connectionId}/objectstore/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(name)}/data`,
+    ),
+
+  putObject: (
+    connectionId: string,
+    bucket: string,
+    name: string,
+    data: string,
+    description?: string,
+  ) =>
+    fetchApi<ObjectInfoData>(
+      `/connections/${connectionId}/objectstore/${encodeURIComponent(bucket)}/objects`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ name, data, description }),
+      },
+    ),
+
+  deleteObject: (connectionId: string, bucket: string, name: string) =>
+    fetchApi<{ success: boolean }>(
+      `/connections/${connectionId}/objectstore/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(name)}`,
+      { method: 'DELETE' },
+    ),
 };
 
 // Health API

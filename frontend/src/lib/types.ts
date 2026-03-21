@@ -378,6 +378,73 @@ export interface AuditLogResponse {
   total: number;
 }
 
+// KV Store types
+export interface KvStoreStatus {
+  bucket: string;
+  description: string;
+  storage: string;
+  replicas: number;
+  history: number;
+  max_bytes: number;
+  ttl: number;
+  values: number;
+  size: number;
+}
+
+export interface KvEntryInfo {
+  bucket: string;
+  key: string;
+  value: string;
+  revision: number;
+  created: string;
+  operation: 'PUT' | 'DEL' | 'PURGE';
+  length: number;
+}
+
+export interface KvCreateConfig {
+  name: string;
+  description?: string;
+  storage?: 'file' | 'memory';
+  history?: number;
+  max_bytes?: number;
+  ttl?: number;
+  replicas?: number;
+  max_value_size?: number;
+}
+
+// Object Store types
+export interface ObjectStoreStatusInfo {
+  bucket: string;
+  description: string;
+  storage: string;
+  replicas: number;
+  size: number;
+  sealed: boolean;
+  compression: boolean;
+}
+
+export interface ObjectInfoData {
+  bucket: string;
+  name: string;
+  description?: string;
+  size: number;
+  chunks: number;
+  digest: string;
+  deleted: boolean;
+  mtime: string;
+  revision: number;
+  nuid: string;
+}
+
+export interface ObjectStoreCreateConfig {
+  name: string;
+  description?: string;
+  storage?: 'file' | 'memory';
+  max_bytes?: number;
+  replicas?: number;
+  max_chunk_size?: number;
+}
+
 // API response types
 export interface ApiResponse<T> {
   data?: T;
