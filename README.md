@@ -104,18 +104,6 @@ npm install
 npm run dev
 ```
 
-## Architecture
-
-```
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│             │      │             │      │             │
-│  Next.js    │─────▶│  FastAPI    │─────▶│    NATS     │
-│  Frontend   │      │  Backend    │      │  JetStream  │
-│             │      │             │      │             │
-└─────────────┘      └─────────────┘      └─────────────┘
-     :3000               :8000                :4222
-```
-
 ## API Endpoints
 
 ### Authentication & Users
@@ -228,32 +216,6 @@ helm install nats-manager ./helm/nats-jetstream-manager -f values.yaml
 
 The Helm chart includes deployments for frontend and backend, services, ingress, HPA, PDB, network policies, and configmaps.
 
-## Tech Stack
-
-| Layer        | Technology                                |
-| ------------ | ----------------------------------------- |
-| Frontend     | Next.js 14, React 18, TypeScript 5.4      |
-| UI           | Tailwind CSS 3.4, Shadcn/ui, Lucide Icons |
-| State        | TanStack React Query 5, React Context     |
-| Forms        | React Hook Form 7, Zod                    |
-| Tables       | TanStack React Table 8                    |
-| Backend      | FastAPI 0.115, Python 3.11+               |
-| NATS Client  | nats-py 2.7                               |
-| ORM          | SQLAlchemy 2                              |
-| Database     | SQLite (default) or PostgreSQL            |
-| Validation   | Pydantic 2.9                              |
-| Package Mgmt | uv (Python), npm (Node)                   |
-| Deployment   | Docker, Docker Compose, Helm (Kubernetes) |
-
 ## License
 
 MIT
-
-## Acknowledgments
-
-- [NATS.io](https://nats.io/) - The messaging system
-- [FastAPI](https://fastapi.tiangolo.com/) - The backend framework
-- [Next.js](https://nextjs.org/) - The frontend framework
-- [Tailwind CSS](https://tailwindcss.com/) - The CSS framework
-- [Shadcn/ui](https://ui.shadcn.com/) - The UI component library
-- [TanStack](https://tanstack.com/) - React Query & React Table
