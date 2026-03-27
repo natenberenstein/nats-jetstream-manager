@@ -25,11 +25,9 @@ export class ConnectionsService implements OnModuleDestroy {
   private readonly logger = new Logger(ConnectionsService.name);
   private readonly connections = new Map<string, ConnectionInfo>();
 
-  private readonly maxConnections: number;
   private readonly connectionTimeoutMs: number;
 
   constructor() {
-    this.maxConnections = parseInt(process.env.MAX_CONNECTIONS ?? '10', 10);
     this.connectionTimeoutMs = parseInt(process.env.CONNECTION_TIMEOUT_SECONDS ?? '300', 10) * 1000;
   }
 
@@ -39,11 +37,18 @@ export class ConnectionsService implements OnModuleDestroy {
     password?: string,
     token?: string,
   ): Promise<{ connection_id: string; status: string; url: string }> {
-    if (this.connections.size >= this.maxConnections) {
-      throw new BadRequestException(
-        `Maximum number of connections (${this.maxConnections}) reached. ` +
-          'Disconnect an existing connection first.',
-      );
+    // Enforce single connection: disconnect any existing connection first
+    if (this.connections.size > 0) {
+      const existingIds = Array.from(this.connections.keys());
+      for (const existingId of existingIds) {
+        try {
+          await this.removeConnection(existingId);
+        } catch (error: unknown) {
+          this.logger.warn(
+            `Error removing existing connection ${existingId}: ${(error as Error).message}`,
+          );
+        }
+      }
     }
 
     const nc = await this.connectToNats(url, user, password, token);

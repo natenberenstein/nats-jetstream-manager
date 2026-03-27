@@ -1,15 +1,30 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
-import { useStream } from '@/hooks/useStreams';
+import { useStream, useUpdateStream } from '@/hooks/useStreams';
 import { useConsumers } from '@/hooks/useConsumers';
+import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { formatBytes, formatNumber } from '@/lib/utils';
-import { ArrowLeft, Users, MessageSquare, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Users, MessageSquare, RefreshCw, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -25,6 +40,7 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
   const { connectionId } = useConnection();
   const { data: stream, isLoading, refetch } = useStream(connectionId, streamName);
   const { data: consumersData } = useConsumers(connectionId, streamName);
+  const [editing, setEditing] = useState(false);
 
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Loading stream details...</div>;
@@ -56,6 +72,10 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
           </div>
         </div>
         <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setEditing(true)}>
+            <Pencil className="w-4 h-4" />
+            Edit
+          </Button>
           <Button variant="outline" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -74,6 +94,19 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
           </Link>
         </div>
       </div>
+
+      {connectionId && (
+        <StreamEditDialog
+          open={editing}
+          onOpenChange={setEditing}
+          stream={stream}
+          connectionId={connectionId}
+          onSuccess={() => {
+            refetch();
+            setEditing(false);
+          }}
+        />
+      )}
 
       {/* State Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -260,7 +293,14 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
               <TableBody>
                 {consumersData.consumers.slice(0, 10).map((consumer) => (
                   <TableRow key={consumer.name}>
-                    <TableCell className="font-medium">{consumer.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/dashboard/consumers/${encodeURIComponent(streamName)}/${encodeURIComponent(consumer.name)}`}
+                        className="text-primary hover:underline"
+                      >
+                        {consumer.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{consumer.config.ack_policy}</TableCell>
                     <TableCell>{consumer.num_pending}</TableCell>
                     <TableCell>{consumer.num_ack_pending}</TableCell>
@@ -275,5 +315,196 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
         </Card>
       )}
     </div>
+  );
+}
+
+function StreamEditDialog({
+  open,
+  onOpenChange,
+  stream,
+  connectionId,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  stream: { config: import('@/lib/types').StreamConfig; created: string };
+  connectionId: string;
+  onSuccess: () => void;
+}) {
+  const config = stream.config;
+  const updateStream = useUpdateStream(connectionId, config.name);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch,
+  } = useForm<StreamUpdateFormData>({
+    resolver: zodResolver(streamUpdateSchema),
+    defaultValues: {
+      subjects: config.subjects.join(', '),
+      description: config.description || '',
+      retention: config.retention || 'limits',
+      max_consumers: config.max_consumers ?? -1,
+      max_msgs: config.max_msgs ?? -1,
+      max_bytes: config.max_bytes ?? -1,
+      max_age: config.max_age ?? 0,
+      max_msg_size: config.max_msg_size ?? -1,
+      discard: config.discard || 'old',
+      replicas: config.replicas ?? 1,
+    },
+  });
+
+  const onSubmit = async (data: StreamUpdateFormData) => {
+    try {
+      await updateStream.mutateAsync({
+        subjects: data.subjects
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        description: data.description || undefined,
+        retention: data.retention,
+        max_consumers: data.max_consumers,
+        max_msgs: data.max_msgs,
+        max_bytes: data.max_bytes,
+        max_age: data.max_age,
+        max_msg_size: data.max_msg_size,
+        discard: data.discard,
+        replicas: data.replicas,
+      });
+      toast.success(`Stream "${config.name}" updated successfully.`);
+      onSuccess();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update stream');
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogHeader onClose={() => onOpenChange(false)}>
+        <DialogTitle>Edit Stream: {config.name}</DialogTitle>
+        <DialogDescription>Modify the mutable configuration for this stream.</DialogDescription>
+      </DialogHeader>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <DialogContent>
+          <div className="space-y-4">
+            {/* Immutable fields */}
+            <div className="rounded border border-muted p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Cannot be changed after creation
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <Label className="text-muted-foreground">Name</Label>
+                  <Input value={config.name} disabled />
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Storage</Label>
+                  <Input value={config.storage || 'file'} disabled />
+                </div>
+              </div>
+            </div>
+
+            {/* Mutable fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="space-y-1 md:col-span-2">
+                <Label>Subjects (comma-separated)</Label>
+                <Input {...register('subjects')} placeholder="orders.>" />
+                {errors.subjects && (
+                  <p className="text-xs text-destructive">{errors.subjects.message}</p>
+                )}
+              </label>
+
+              <label className="space-y-1 md:col-span-2">
+                <Label>Description</Label>
+                <Input {...register('description')} placeholder="Optional description" />
+              </label>
+
+              <label className="space-y-1">
+                <Label>Retention</Label>
+                <Select
+                  value={watch('retention')}
+                  onChange={(e) =>
+                    setValue('retention', e.target.value as 'limits' | 'interest' | 'workqueue')
+                  }
+                >
+                  <option value="limits">limits</option>
+                  <option value="interest">interest</option>
+                  <option value="workqueue">workqueue</option>
+                </Select>
+              </label>
+
+              <label className="space-y-1">
+                <Label>Discard Policy</Label>
+                <Select
+                  value={watch('discard')}
+                  onChange={(e) => setValue('discard', e.target.value as 'old' | 'new')}
+                >
+                  <option value="old">old</option>
+                  <option value="new">new</option>
+                </Select>
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Consumers (-1 = unlimited)</Label>
+                <Input type="number" {...register('max_consumers')} />
+                {errors.max_consumers && (
+                  <p className="text-xs text-destructive">{errors.max_consumers.message}</p>
+                )}
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Messages (-1 = unlimited)</Label>
+                <Input type="number" {...register('max_msgs')} />
+                {errors.max_msgs && (
+                  <p className="text-xs text-destructive">{errors.max_msgs.message}</p>
+                )}
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Bytes (-1 = unlimited)</Label>
+                <Input type="number" {...register('max_bytes')} />
+                {errors.max_bytes && (
+                  <p className="text-xs text-destructive">{errors.max_bytes.message}</p>
+                )}
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Age (seconds, 0 = unlimited)</Label>
+                <Input type="number" min={0} {...register('max_age')} />
+                {errors.max_age && (
+                  <p className="text-xs text-destructive">{errors.max_age.message}</p>
+                )}
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Message Size (-1 = unlimited)</Label>
+                <Input type="number" {...register('max_msg_size')} />
+                {errors.max_msg_size && (
+                  <p className="text-xs text-destructive">{errors.max_msg_size.message}</p>
+                )}
+              </label>
+
+              <label className="space-y-1">
+                <Label>Replicas</Label>
+                <Input type="number" min={1} {...register('replicas')} />
+                {errors.replicas && (
+                  <p className="text-xs text-destructive">{errors.replicas.message}</p>
+                )}
+              </label>
+            </div>
+          </div>
+        </DialogContent>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={updateStream.isPending}>
+            {updateStream.isPending ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
   );
 }

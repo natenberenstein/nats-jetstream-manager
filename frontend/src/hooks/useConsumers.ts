@@ -88,6 +88,20 @@ export function useConsumerMetrics(
   });
 }
 
+export function useConsumerMetric(
+  connectionId: string | null,
+  streamName: string | null,
+  consumerName: string | null,
+  window = 60,
+) {
+  return useQuery({
+    queryKey: ['consumer-metric', connectionId, streamName, consumerName, window],
+    queryFn: () => metricsApi.getConsumerMetrics(connectionId!, streamName!, consumerName!, window),
+    enabled: !!connectionId && !!streamName && !!consumerName,
+    refetchInterval: 30_000,
+  });
+}
+
 export function useDeleteConsumer(connectionId: string | null, streamName: string) {
   const queryClient = useQueryClient();
 

@@ -15,8 +15,14 @@ import {
   useConsumerAnalytics,
   useConsumerMetrics,
 } from '@/hooks/useConsumers';
-import { ConsumerConfig, ConsumerInfo, ConsumerMetricsResponse } from '@/lib/types';
+import {
+  ConsumerAnalytics,
+  ConsumerConfig,
+  ConsumerInfo,
+  ConsumerMetricsResponse,
+} from '@/lib/types';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
+import Link from 'next/link';
 import { Plus, RefreshCw, Trash2, Pencil, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,10 +60,22 @@ const CHART_COLORS = [
   '#84cc16',
 ];
 
+const DEFAULT_VISIBLE_COUNT = 5;
+
 function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
+  const [visibleNames, setVisibleNames] = useState<Set<string>>(() => {
+    const top = metrics.slice(0, DEFAULT_VISIBLE_COUNT).map((m) => m.consumer_name);
+    return new Set(top);
+  });
+
+  const visibleMetrics = useMemo(
+    () => metrics.filter((m) => visibleNames.has(m.consumer_name)),
+    [metrics, visibleNames],
+  );
+
   const chartData = useMemo(() => {
     const timeMap = new Map<string, Record<string, string | number>>();
-    for (const consumer of metrics) {
+    for (const consumer of visibleMetrics) {
       for (const point of consumer.points) {
         const time = new Date(point.collected_at).toLocaleTimeString();
         const existing = timeMap.get(point.collected_at) ?? { time };
@@ -67,9 +85,18 @@ function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
       }
     }
     return Array.from(timeMap.values());
-  }, [metrics]);
+  }, [visibleMetrics]);
 
-  if (chartData.length === 0)
+  const toggleConsumer = (name: string) => {
+    setVisibleNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  if (metrics.length === 0)
     return (
       <p className="text-sm text-muted-foreground">
         No metric data yet. Data is collected every 30 seconds.
@@ -77,25 +104,225 @@ function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
     );
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={chartData}>
-        <XAxis dataKey="time" tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip />
-        <Legend />
-        {metrics.map((consumer, i) => (
-          <Line
-            key={`${consumer.consumer_name}_pending`}
-            type="monotone"
-            dataKey={`${consumer.consumer_name}_pending`}
-            name={`${consumer.consumer_name} pending`}
-            stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            dot={false}
-            strokeWidth={2}
-          />
-        ))}
-      </LineChart>
-    </ResponsiveContainer>
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {metrics.map((m, i) => {
+          const active = visibleNames.has(m.consumer_name);
+          const color = CHART_COLORS[i % CHART_COLORS.length];
+          return (
+            <button
+              key={m.consumer_name}
+              type="button"
+              onClick={() => toggleConsumer(m.consumer_name)}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors ${
+                active
+                  ? 'border-primary/40 bg-primary/10 text-foreground'
+                  : 'border-border text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{
+                  backgroundColor: active ? color : 'transparent',
+                  border: `2px solid ${color}`,
+                }}
+              />
+              {m.consumer_name}
+            </button>
+          );
+        })}
+      </div>
+      {visibleMetrics.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Select consumers above to display the chart.
+        </p>
+      ) : (
+        <ResponsiveContainer width="100%" height={256}>
+          <LineChart data={chartData}>
+            <XAxis dataKey="time" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Legend />
+            {visibleMetrics.map((consumer) => {
+              const colorIndex = metrics.findIndex(
+                (m) => m.consumer_name === consumer.consumer_name,
+              );
+              return (
+                <Line
+                  key={`${consumer.consumer_name}_pending`}
+                  type="monotone"
+                  dataKey={`${consumer.consumer_name}_pending`}
+                  name={`${consumer.consumer_name} pending`}
+                  stroke={CHART_COLORS[colorIndex % CHART_COLORS.length]}
+                  dot={false}
+                  strokeWidth={2}
+                />
+              );
+            })}
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+type SortField = 'name' | 'stream_lag' | 'num_pending' | 'num_ack_pending';
+type SortDir = 'asc' | 'desc';
+
+function ConsumerLagAnalyticsCard({ analyticsData }: { analyticsData: ConsumerAnalytics | null }) {
+  const [sortField, setSortField] = useState<SortField>('stream_lag');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [lagPage, setLagPage] = useState(0);
+  const lagPageSize = 10;
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+    setLagPage(0);
+  };
+
+  const sortedConsumers = useMemo(() => {
+    const items = [...(analyticsData?.consumers || [])];
+    items.sort((a, b) => {
+      const aVal = sortField === 'name' ? a.name : a[sortField];
+      const bVal = sortField === 'name' ? b.name : b[sortField];
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return sortDir === 'asc'
+        ? (aVal as number) - (bVal as number)
+        : (bVal as number) - (aVal as number);
+    });
+    return items;
+  }, [analyticsData?.consumers, sortField, sortDir]);
+
+  const lagPageCount = Math.ceil(sortedConsumers.length / lagPageSize);
+  const pagedConsumers = sortedConsumers.slice(lagPage * lagPageSize, (lagPage + 1) * lagPageSize);
+
+  const sortIndicator = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortDir === 'asc' ? ' \u2191' : ' \u2193';
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Consumer Lag Analytics</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <p className="text-muted-foreground">Total Pending</p>
+            <p className="font-semibold">{analyticsData?.total_pending ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Ack Pending</p>
+            <p className="font-semibold">{analyticsData?.total_ack_pending ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Max Stream Lag</p>
+            <p className="font-semibold">{analyticsData?.max_stream_lag ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Consumers</p>
+            <p className="font-semibold">{analyticsData?.total_consumers ?? 0}</p>
+          </div>
+        </div>
+
+        {sortedConsumers.length > 0 ? (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className="font-medium hover:text-foreground"
+                      onClick={() => toggleSort('name')}
+                    >
+                      Consumer{sortIndicator('name')}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <button
+                      type="button"
+                      className="font-medium hover:text-foreground"
+                      onClick={() => toggleSort('stream_lag')}
+                    >
+                      Stream Lag{sortIndicator('stream_lag')}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <button
+                      type="button"
+                      className="font-medium hover:text-foreground"
+                      onClick={() => toggleSort('num_pending')}
+                    >
+                      Pending{sortIndicator('num_pending')}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <button
+                      type="button"
+                      className="font-medium hover:text-foreground"
+                      onClick={() => toggleSort('num_ack_pending')}
+                    >
+                      Ack Pending{sortIndicator('num_ack_pending')}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-32">Lag</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pagedConsumers.map((metric) => {
+                  const width = Math.max(
+                    2,
+                    Math.round(
+                      (metric.stream_lag / Math.max(1, analyticsData?.max_stream_lag || 1)) * 100,
+                    ),
+                  );
+                  return (
+                    <TableRow key={metric.name}>
+                      <TableCell className="font-medium text-sm">{metric.name}</TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">
+                        {metric.stream_lag}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">
+                        {metric.num_pending}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">
+                        {metric.num_ack_pending}
+                      </TableCell>
+                      <TableCell>
+                        <div className="h-2 bg-muted rounded overflow-hidden">
+                          <div className="h-full bg-primary" style={{ width: `${width}%` }} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {lagPageCount > 1 && (
+              <Pagination
+                pageIndex={lagPage}
+                pageCount={lagPageCount}
+                pageSize={lagPageSize}
+                onPageChange={setLagPage}
+                onPageSizeChange={() => {}}
+                totalItems={sortedConsumers.length}
+              />
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">No analytics data available.</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -562,58 +789,7 @@ export default function ConsumersPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Consumer Lag Analytics</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
-            <div>
-              <p className="text-muted-foreground">Total Pending</p>
-              <p className="font-semibold">{analyticsData?.total_pending ?? 0}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Ack Pending</p>
-              <p className="font-semibold">{analyticsData?.total_ack_pending ?? 0}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Max Stream Lag</p>
-              <p className="font-semibold">{analyticsData?.max_stream_lag ?? 0}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Consumers</p>
-              <p className="font-semibold">{analyticsData?.total_consumers ?? 0}</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {(analyticsData?.consumers || []).slice(0, 8).map((metric) => {
-              const width = Math.max(
-                2,
-                Math.round(
-                  (metric.stream_lag / Math.max(1, analyticsData?.max_stream_lag || 1)) * 100,
-                ),
-              );
-              return (
-                <div key={metric.name} className="rounded border p-2">
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-medium">{metric.name}</span>
-                    <span className="text-muted-foreground">
-                      lag {metric.stream_lag} | pending {metric.num_pending} | ack{' '}
-                      {metric.num_ack_pending}
-                    </span>
-                  </div>
-                  <div className="mt-1 h-2 bg-muted rounded overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: `${width}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-            {!analyticsData?.consumers?.length && (
-              <p className="text-sm text-muted-foreground">No analytics data available.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <ConsumerLagAnalyticsCard analyticsData={analyticsData ?? null} />
 
       {consumerMetrics && consumerMetrics.length > 0 && (
         <Card>
@@ -621,9 +797,7 @@ export default function ConsumersPage() {
             <CardTitle className="text-lg">Consumer Lag Over Time</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ConsumerLagChart metrics={consumerMetrics} />
-            </div>
+            <ConsumerLagChart metrics={consumerMetrics} />
           </CardContent>
         </Card>
       )}
@@ -990,7 +1164,14 @@ export default function ConsumersPage() {
                             onChange={() => toggleSelectConsumer(consumer.name)}
                           />
                         </TableCell>
-                        <TableCell className="font-medium">{consumer.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/dashboard/consumers/${encodeURIComponent(selectedStream!)}/${encodeURIComponent(consumer.name)}`}
+                            className="text-primary hover:underline"
+                          >
+                            {consumer.name}
+                          </Link>
+                        </TableCell>
                         <TableCell>{consumer.config.durable_name || '-'}</TableCell>
                         <TableCell>{consumer.config.filter_subject || '*'}</TableCell>
                         <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
