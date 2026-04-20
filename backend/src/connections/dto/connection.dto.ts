@@ -15,4 +15,16 @@ export class ConnectionRequestDto {
   @IsOptional()
   @IsString()
   token?: string;
+
+  @IsOptional()
+  @IsString()
+  monitoring_url?: string;
+
+  @IsOptional()
+  @IsString()
+  sys_user?: string;
+
+  @IsOptional()
+  @IsString()
+  sys_password?: string;
 }

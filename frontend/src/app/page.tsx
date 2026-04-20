@@ -19,7 +19,11 @@ export default function HomePage() {
     url: 'nats://localhost:4222',
     user: '',
     password: '',
+    monitoring_url: '',
+    sys_user: '',
+    sys_password: '',
   });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -116,6 +120,61 @@ export default function HomePage() {
                   placeholder="password"
                 />
               </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  className="text-sm text-muted-foreground hover:text-foreground underline"
+                >
+                  {showAdvanced ? 'Hide advanced options' : 'Show advanced options'}
+                </button>
+              </div>
+
+              {showAdvanced && (
+                <div className="space-y-4 rounded border p-4">
+                  <p className="text-xs text-muted-foreground">
+                    For full cluster visibility (all peer node names). Provide either a monitoring
+                    URL, or $SYS account credentials, or both.
+                  </p>
+                  <div>
+                    <Label htmlFor="monitoring_url" className="mb-2 block">
+                      Monitoring URL (Optional)
+                    </Label>
+                    <Input
+                      id="monitoring_url"
+                      type="text"
+                      value={formData.monitoring_url}
+                      onChange={(e) => setFormData({ ...formData, monitoring_url: e.target.value })}
+                      placeholder="http://localhost:8222"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="sys_user" className="mb-2 block">
+                      $SYS Username (Optional)
+                    </Label>
+                    <Input
+                      id="sys_user"
+                      type="text"
+                      value={formData.sys_user}
+                      onChange={(e) => setFormData({ ...formData, sys_user: e.target.value })}
+                      placeholder="sys"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="sys_password" className="mb-2 block">
+                      $SYS Password (Optional)
+                    </Label>
+                    <Input
+                      id="sys_password"
+                      type="password"
+                      value={formData.sys_password}
+                      onChange={(e) => setFormData({ ...formData, sys_password: e.target.value })}
+                      placeholder="password"
+                    />
+                  </div>
+                </div>
+              )}
 
               {testResult && (
                 <Alert

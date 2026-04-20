@@ -8,6 +8,9 @@ export interface ConnectionRequest {
   user?: string;
   password?: string;
   token?: string;
+  monitoring_url?: string;
+  sys_user?: string;
+  sys_password?: string;
 }
 
 export interface ConnectionResponse {
@@ -36,7 +39,7 @@ export interface ConnectionListItem {
 
 export interface ClusterNodeInfo {
   name: string;
-  role?: string;
+  role?: 'leader' | 'replica' | 'unknown';
   current?: boolean;
   offline?: boolean;
   lag?: number;
@@ -56,6 +59,7 @@ export interface ClusterLimits {
 
 export interface ClusterStreamHealth {
   stream: string;
+  cluster_name?: string;
   replicas: number;
   leader?: string;
   replicas_seen: number;
@@ -359,25 +363,6 @@ export interface UptimeSummary {
   last_status?: string | null;
   last_error?: string | null;
   last_checked_at?: string | null;
-}
-
-// Audit Log types
-export interface AuditLogEntry {
-  id: number;
-  user_id?: number | null;
-  user_email?: string | null;
-  action: string;
-  resource_type: string;
-  resource_name?: string | null;
-  connection_id?: string | null;
-  details?: Record<string, unknown> | null;
-  ip_address?: string | null;
-  created_at: string;
-}
-
-export interface AuditLogResponse {
-  entries: AuditLogEntry[];
-  total: number;
 }
 
 // KV Store types

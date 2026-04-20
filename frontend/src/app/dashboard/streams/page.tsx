@@ -9,10 +9,17 @@ import { useStreams, useDeleteStream, useCreateStream, useUpdateStream } from '@
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { StreamInfo } from '@/lib/types';
 import Link from 'next/link';
-import { Plus, Trash2, RefreshCw, Pencil } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import { formatBytes, formatNumber } from '@/lib/utils';
+import { focusFirstError } from '@/lib/form-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { Spinner } from '@/components/ui/spinner';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { BulkDeleteDialog } from '@/components/ui/bulk-delete-dialog';
 import {
   Dialog,
   DialogContent,
@@ -52,6 +59,7 @@ function StreamEditForm({
     handleSubmit,
     formState: { errors },
   } = useForm<StreamUpdateFormData>({
+    mode: 'onSubmit',
     resolver: zodResolver(streamUpdateSchema),
     defaultValues: {
       subjects: stream.config.subjects.join(', '),
@@ -110,7 +118,7 @@ function StreamEditForm({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit, focusFirstError)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="space-y-1">
                   <Label className="text-muted-foreground">Name (read-only)</Label>
@@ -209,7 +217,8 @@ function StreamEditForm({
                   Cancel
                 </Button>
                 <Button type="submit" disabled={updateStream.isPending}>
-                  {updateStream.isPending ? 'Saving...' : 'Save Changes'}
+                  {updateStream.isPending && <Spinner />}
+                  {updateStream.isPending ? 'Saving…' : 'Save Changes'}
                 </Button>
               </div>
             </form>
@@ -222,9 +231,16 @@ function StreamEditForm({
 
 export default function StreamsPage() {
   const { connectionId } = useConnection();
-  const { data: streamsData, isLoading, refetch } = useStreams(connectionId);
+  const {
+    data: streamsData,
+    isLoading,
+    isFetching,
+    dataUpdatedAt,
+    refetch,
+  } = useStreams(connectionId);
   const deleteStream = useDeleteStream(connectionId);
   const createStream = useCreateStream(connectionId);
+  const confirm = useConfirm();
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -239,6 +255,7 @@ export default function StreamsPage() {
   });
   const [selectedStreams, setSelectedStreams] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const filteredStreams = useMemo(() => {
     const items = streamsData?.streams ?? [];
@@ -256,13 +273,23 @@ export default function StreamsPage() {
   }, [searchQuery]);
 
   const handleDelete = async (streamName: string) => {
-    if (confirm(`Are you sure you want to delete stream "${streamName}"?`)) {
-      try {
-        await deleteStream.mutateAsync(streamName);
-        toast.success(`Stream "${streamName}" deleted.`);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to delete stream');
-      }
+    const ok = await confirm({
+      title: 'Delete stream',
+      description: (
+        <>
+          This permanently deletes stream{' '}
+          <span className="font-mono font-semibold">{streamName}</span> and all of its messages.
+        </>
+      ),
+      tone: 'destructive',
+      confirmLabel: 'Delete stream',
+    });
+    if (!ok) return;
+    try {
+      await deleteStream.mutateAsync(streamName);
+      toast.success(`Stream "${streamName}" deleted.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete stream');
     }
   };
 
@@ -284,23 +311,9 @@ export default function StreamsPage() {
     );
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedStreams.size === 0) return;
-    const names = Array.from(selectedStreams);
-    const confirmed = window.confirm(
-      `Dry run preview:\n${names.slice(0, 10).join('\n')}\n\nDelete ${names.length} streams?`,
-    );
-    if (!confirmed) return;
-    const guard = window.prompt('Type DELETE to confirm bulk stream deletion:');
-    if (guard !== 'DELETE') return;
-    for (const name of names) {
-      try {
-        await deleteStream.mutateAsync(name);
-      } catch (error) {
-        console.error('Bulk delete failed for stream', name, error);
-      }
-    }
-    setSelectedStreams(new Set());
+    setBulkOpen(true);
   };
 
   const handleCreateStream = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -344,30 +357,46 @@ export default function StreamsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">Streams</h1>
-          <p className="text-muted-foreground">Manage your JetStream streams</p>
-        </div>
+      <PageHeader
+        title="Streams"
+        description="Manage your JetStream streams"
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+        actions={
+          <>
+            <Button onClick={() => setShowCreateForm(true)}>
+              <Plus className="w-4 h-4" />
+              Create Stream
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={selectedStreams.size === 0 || deleteStream.isPending}
+              onClick={handleBulkDelete}
+            >
+              Delete Selected ({selectedStreams.size})
+            </Button>
+          </>
+        }
+      />
 
-        <div className="flex gap-3">
-          <Button onClick={() => refetch()} variant="outline">
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
-          <Button className="flex items-center gap-2" onClick={() => setShowCreateForm(true)}>
-            <Plus className="w-4 h-4" />
-            Create Stream
-          </Button>
-          <Button
-            variant="destructive"
-            disabled={selectedStreams.size === 0 || deleteStream.isPending}
-            onClick={handleBulkDelete}
-          >
-            Delete Selected ({selectedStreams.size})
-          </Button>
-        </div>
-      </div>
+      <BulkDeleteDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        title="Delete selected streams"
+        description="Deleting streams also removes their messages and consumers. This cannot be undone."
+        items={Array.from(selectedStreams)}
+        onDeleteItem={(name) => deleteStream.mutateAsync(name).then(() => undefined)}
+        onFinished={({ succeeded, failed }) => {
+          if (succeeded) toast.success(`Deleted ${succeeded} stream${succeeded === 1 ? '' : 's'}.`);
+          if (failed.length) toast.error(`${failed.length} failed: ${failed.join(', ')}`);
+          setSelectedStreams(new Set());
+        }}
+      />
 
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
         <DialogHeader onClose={() => setShowCreateForm(false)}>
@@ -432,7 +461,8 @@ export default function StreamsPage() {
               Cancel
             </Button>
             <Button type="submit" disabled={createStream.isPending}>
-              {createStream.isPending ? 'Creating...' : 'Create Stream'}
+              {createStream.isPending && <Spinner />}
+              {createStream.isPending ? 'Creating…' : 'Create Stream'}
             </Button>
           </DialogFooter>
         </form>
@@ -448,8 +478,8 @@ export default function StreamsPage() {
       {/* Streams Table */}
       <Card>
         {isLoading ? (
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Loading streams...
+          <CardContent className="p-0">
+            <TableSkeleton rows={6} columns={7} />
           </CardContent>
         ) : filteredStreams.length > 0 ? (
           <CardContent className="p-0">
@@ -559,10 +589,12 @@ export default function StreamsPage() {
           </CardContent>
         ) : (
           <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground mb-4">No streams found</p>
-            <Button disabled>
+            <p className="text-muted-foreground mb-4">
+              {searchQuery ? 'No streams match your filter.' : 'No streams yet.'}
+            </p>
+            <Button onClick={() => setShowCreateForm(true)}>
               <Plus className="w-4 h-4" />
-              Create Your First Stream
+              {searchQuery ? 'Create Stream' : 'Create Your First Stream'}
             </Button>
           </CardContent>
         )}

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { NatsConnection, RequestStrategy, StringCodec } from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
 import {
   ExtendedServerInfo,
@@ -7,13 +8,43 @@ import {
   ExtendedStreamInfo,
 } from '../common/types/nats-extended';
 
+interface SysPingResponse {
+  server?: {
+    name?: string;
+    id?: string;
+    ver?: string;
+    jetstream?: boolean;
+    cluster?: string;
+  };
+}
+
+interface VarzResponse {
+  server_name?: string;
+  version?: string;
+  jetstream?: {
+    meta?: {
+      leader?: string;
+      cluster_size?: number;
+    };
+  };
+}
+
+interface RoutezResponse {
+  routes?: Array<{
+    remote_name?: string;
+    ip?: string;
+    port?: number;
+  }>;
+}
+
 export interface ClusterNodeInfo {
   name: string;
-  is_leader?: boolean;
+  role?: 'leader' | 'replica' | 'unknown';
   current?: boolean;
   active?: number;
   offline?: boolean;
   lag?: number;
+  version?: string;
 }
 
 export interface ClusterLimits {
@@ -28,12 +59,16 @@ export interface ClusterLimits {
 }
 
 export interface ClusterStreamHealth {
-  stream_name: string;
+  stream: string;
   cluster_name?: string;
   leader?: string;
-  replicas: ClusterNodeInfo[];
-  quorum_degraded: boolean;
-  leaderless: boolean;
+  replicas: number;
+  replicas_seen: number;
+  online_replicas: number;
+  offline_replicas: number;
+  lagging_replicas: number;
+  has_quorum: boolean;
+  healthy: boolean;
 }
 
 export interface ClusterOverview {
@@ -150,6 +185,16 @@ export class ClusterService {
       versions.add(serverVersion);
     }
 
+    // Seed the connected server so it always shows, even with no replicated streams
+    if (connectedServer) {
+      nodesMap.set(connectedServer, {
+        name: connectedServer,
+        current: true,
+        role: 'unknown',
+        version: serverVersion,
+      });
+    }
+
     try {
       const streams = await jsm.streams.list().next();
       sources.push('stream_list');
@@ -161,30 +206,37 @@ export class ClusterService {
         }
 
         const leader = cluster.leader;
-        const replicas: ClusterNodeInfo[] = (cluster.replicas || []).map((r) => ({
-          name: r.name,
-          is_leader: false,
-          current: r.current,
-          active: r.active,
-          offline: r.offline,
-          lag: r.lag,
-        }));
+        const replicaList = cluster.replicas || [];
+        const totalReplicas = replicaList.length + (leader ? 1 : 0);
+        const onlineReplicas = replicaList.filter((r) => !r.offline).length + (leader ? 1 : 0);
+        const offlineReplicas = replicaList.filter((r) => r.offline).length;
+        const laggingReplicas = replicaList.filter((r) => (r.lag ?? 0) > 0).length;
+        const quorumCount = Math.floor(totalReplicas / 2) + 1;
+        const hasQuorum = !!leader && onlineReplicas >= quorumCount;
+        const isLeaderless = !leader;
+        const isQuorumDegraded = !hasQuorum;
+        const isHealthy = !!leader && hasQuorum && offlineReplicas === 0 && laggingReplicas === 0;
 
         if (leader) {
-          // Track leader node
-          if (!nodesMap.has(leader)) {
-            nodesMap.set(leader, { name: leader, is_leader: true });
-          }
+          const existing = nodesMap.get(leader);
+          nodesMap.set(leader, {
+            ...(existing || { name: leader }),
+            role: 'leader',
+          });
         }
 
-        for (const r of replicas) {
-          if (!nodesMap.has(r.name)) {
-            nodesMap.set(r.name, r);
-          }
+        for (const r of replicaList) {
+          const existing = nodesMap.get(r.name);
+          nodesMap.set(r.name, {
+            name: r.name,
+            role: existing?.role === 'leader' ? 'leader' : 'replica',
+            current: existing?.current ?? r.current,
+            active: r.active,
+            offline: r.offline,
+            lag: r.lag,
+            version: existing?.version,
+          });
         }
-
-        const isLeaderless = !leader;
-        const isQuorumDegraded = replicas.some((r) => r.offline) || isLeaderless;
 
         if (isLeaderless) {
           leaderlessStreams++;
@@ -195,12 +247,16 @@ export class ClusterService {
         }
 
         streamHealth.push({
-          stream_name: (si as ExtendedStreamInfo).config?.name ?? 'unknown',
+          stream: (si as ExtendedStreamInfo).config?.name ?? 'unknown',
           cluster_name: cluster.name,
           leader,
-          replicas,
-          quorum_degraded: isQuorumDegraded,
-          leaderless: isLeaderless,
+          replicas: totalReplicas,
+          replicas_seen: totalReplicas,
+          online_replicas: onlineReplicas,
+          offline_replicas: offlineReplicas,
+          lagging_replicas: laggingReplicas,
+          has_quorum: hasQuorum,
+          healthy: isHealthy,
         });
       }
     } catch (error: unknown) {
@@ -208,8 +264,69 @@ export class ClusterService {
       caveats.push('Stream health information unavailable');
     }
 
+    // Peer discovery: prefer sys-account ping, then monitoring HTTP, then caveat.
+    let metaLeader: string | undefined;
+    let expectedClusterSize: number | undefined;
+    let discoverySource: 'sys_ping' | 'monitoring_http' | undefined;
+
+    if (isClustered && conn.sysNc) {
+      try {
+        const peers = await this.pingSystemServers(conn.sysNc);
+        for (const p of peers) {
+          if (!p.name) continue;
+          const existing = nodesMap.get(p.name);
+          nodesMap.set(p.name, {
+            name: p.name,
+            role: existing?.role ?? 'unknown',
+            current: existing?.current ?? p.name === connectedServer,
+            version: p.version || existing?.version,
+          });
+          if (p.version) versions.add(p.version);
+        }
+        if (peers.length > 0) {
+          discoverySource = 'sys_ping';
+          sources.push('system_server_ping');
+        }
+      } catch (error: unknown) {
+        this.logger.warn(`System-account peer ping failed: ${(error as Error).message}`);
+      }
+    }
+
+    if (isClustered && !discoverySource && conn.monitoringUrl) {
+      try {
+        const scraped = await this.scrapeMonitoring(conn.monitoringUrl);
+        metaLeader = scraped.metaLeader;
+        expectedClusterSize = scraped.clusterSize;
+        for (const name of scraped.peerNames) {
+          if (!nodesMap.has(name)) {
+            nodesMap.set(name, {
+              name,
+              role: name === metaLeader ? 'leader' : 'replica',
+            });
+          }
+        }
+        if (metaLeader && nodesMap.has(metaLeader)) {
+          const existing = nodesMap.get(metaLeader)!;
+          nodesMap.set(metaLeader, { ...existing, role: 'leader' });
+        }
+        discoverySource = 'monitoring_http';
+        sources.push('monitoring_http');
+      } catch (error: unknown) {
+        this.logger.warn(`Monitoring scrape failed: ${(error as Error).message}`);
+        caveats.push(`Monitoring endpoint unreachable: ${(error as Error).message}`);
+      }
+    }
+
     const nodes = Array.from(nodesMap.values());
-    const nodeCount = isClustered ? Math.max(nodes.length, discoveredServers.length, 1) : 1;
+    const nodeCount = isClustered
+      ? Math.max(nodes.length, expectedClusterSize ?? 0, discoveredServers.length, 1)
+      : 1;
+
+    if (isClustered && nodes.length < nodeCount && !discoverySource) {
+      caveats.push(
+        `Only ${nodes.length} of ${nodeCount} peer node names are known. Provide $SYS account credentials or a monitoring URL on the connection to resolve peer names.`,
+      );
+    }
 
     const mixedVersions = versions.size > 1;
 
@@ -255,5 +372,61 @@ export class ClusterService {
       stream_health: streamHealth,
       generated_at: new Date().toISOString(),
     };
+  }
+
+  private async pingSystemServers(
+    sysNc: NatsConnection,
+  ): Promise<Array<{ name?: string; version?: string }>> {
+    const sc = StringCodec();
+    const results: Array<{ name?: string; version?: string }> = [];
+    const iter = await sysNc.requestMany('$SYS.REQ.SERVER.PING', sc.encode(''), {
+      strategy: RequestStrategy.Timer,
+      maxWait: 1500,
+    });
+    for await (const msg of iter) {
+      try {
+        const payload = JSON.parse(sc.decode(msg.data)) as SysPingResponse;
+        results.push({
+          name: payload.server?.name,
+          version: payload.server?.ver,
+        });
+      } catch {
+        // skip malformed
+      }
+    }
+    return results;
+  }
+
+  private async scrapeMonitoring(
+    monitoringUrl: string,
+  ): Promise<{ metaLeader?: string; clusterSize?: number; peerNames: string[] }> {
+    const base = monitoringUrl.replace(/\/+$/, '');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    try {
+      const [varzRes, routezRes] = await Promise.all([
+        fetch(`${base}/varz`, { signal: controller.signal }),
+        fetch(`${base}/routez`, { signal: controller.signal }),
+      ]);
+      if (!varzRes.ok) {
+        throw new Error(`/varz returned ${varzRes.status}`);
+      }
+      const varz = (await varzRes.json()) as VarzResponse;
+      const routez = routezRes.ok ? ((await routezRes.json()) as RoutezResponse) : { routes: [] };
+
+      const peerNames = new Set<string>();
+      if (varz.server_name) peerNames.add(varz.server_name);
+      for (const r of routez.routes || []) {
+        if (r.remote_name) peerNames.add(r.remote_name);
+      }
+
+      return {
+        metaLeader: varz.jetstream?.meta?.leader,
+        clusterSize: varz.jetstream?.meta?.cluster_size,
+        peerNames: Array.from(peerNames),
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

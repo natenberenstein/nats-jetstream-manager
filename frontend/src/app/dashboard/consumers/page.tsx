@@ -23,8 +23,15 @@ import {
 } from '@/lib/types';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import Link from 'next/link';
-import { Plus, RefreshCw, Trash2, Pencil, Copy } from 'lucide-react';
+import { Plus, Trash2, Pencil, Copy } from 'lucide-react';
+import { focusFirstError } from '@/lib/form-utils';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { Spinner } from '@/components/ui/spinner';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { BulkDeleteDialog } from '@/components/ui/bulk-delete-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,6 +54,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Pagination } from '@/components/ui/pagination';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const CHART_COLORS = [
@@ -169,7 +177,7 @@ function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
 type SortField = 'name' | 'stream_lag' | 'num_pending' | 'num_ack_pending';
 type SortDir = 'asc' | 'desc';
 
-function ConsumerLagAnalyticsCard({ analyticsData }: { analyticsData: ConsumerAnalytics | null }) {
+function ConsumerLagAnalyticsView({ analyticsData }: { analyticsData: ConsumerAnalytics | null }) {
   const [sortField, setSortField] = useState<SortField>('stream_lag');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [lagPage, setLagPage] = useState(0);
@@ -209,118 +217,184 @@ function ConsumerLagAnalyticsCard({ analyticsData }: { analyticsData: ConsumerAn
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Consumer Lag Analytics</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
-          <div>
-            <p className="text-muted-foreground">Total Pending</p>
-            <p className="font-semibold">{analyticsData?.total_pending ?? 0}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Ack Pending</p>
-            <p className="font-semibold">{analyticsData?.total_ack_pending ?? 0}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Max Stream Lag</p>
-            <p className="font-semibold">{analyticsData?.max_stream_lag ?? 0}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Consumers</p>
-            <p className="font-semibold">{analyticsData?.total_consumers ?? 0}</p>
-          </div>
-        </div>
+    <div className="space-y-3">
+      {sortedConsumers.length > 0 ? (
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <button
+                    type="button"
+                    className="font-medium hover:text-foreground"
+                    onClick={() => toggleSort('name')}
+                  >
+                    Consumer{sortIndicator('name')}
+                  </button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <button
+                    type="button"
+                    className="font-medium hover:text-foreground"
+                    onClick={() => toggleSort('stream_lag')}
+                  >
+                    Stream Lag{sortIndicator('stream_lag')}
+                  </button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <button
+                    type="button"
+                    className="font-medium hover:text-foreground"
+                    onClick={() => toggleSort('num_pending')}
+                  >
+                    Pending{sortIndicator('num_pending')}
+                  </button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <button
+                    type="button"
+                    className="font-medium hover:text-foreground"
+                    onClick={() => toggleSort('num_ack_pending')}
+                  >
+                    Ack Pending{sortIndicator('num_ack_pending')}
+                  </button>
+                </TableHead>
+                <TableHead className="w-32">Lag</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pagedConsumers.map((metric) => {
+                const width = Math.max(
+                  2,
+                  Math.round(
+                    (metric.stream_lag / Math.max(1, analyticsData?.max_stream_lag || 1)) * 100,
+                  ),
+                );
+                return (
+                  <TableRow key={metric.name}>
+                    <TableCell className="font-medium text-sm">{metric.name}</TableCell>
+                    <TableCell className="text-right tabular-nums text-sm">
+                      {metric.stream_lag}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-sm">
+                      {metric.num_pending}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-sm">
+                      {metric.num_ack_pending}
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-2 bg-muted rounded overflow-hidden">
+                        <div className="h-full bg-primary" style={{ width: `${width}%` }} />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          {lagPageCount > 1 && (
+            <Pagination
+              pageIndex={lagPage}
+              pageCount={lagPageCount}
+              pageSize={lagPageSize}
+              onPageChange={setLagPage}
+              onPageSizeChange={() => {}}
+              totalItems={sortedConsumers.length}
+            />
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">No analytics data available.</p>
+      )}
+    </div>
+  );
+}
 
-        {sortedConsumers.length > 0 ? (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <button
-                      type="button"
-                      className="font-medium hover:text-foreground"
-                      onClick={() => toggleSort('name')}
-                    >
-                      Consumer{sortIndicator('name')}
-                    </button>
-                  </TableHead>
-                  <TableHead className="text-right">
-                    <button
-                      type="button"
-                      className="font-medium hover:text-foreground"
-                      onClick={() => toggleSort('stream_lag')}
-                    >
-                      Stream Lag{sortIndicator('stream_lag')}
-                    </button>
-                  </TableHead>
-                  <TableHead className="text-right">
-                    <button
-                      type="button"
-                      className="font-medium hover:text-foreground"
-                      onClick={() => toggleSort('num_pending')}
-                    >
-                      Pending{sortIndicator('num_pending')}
-                    </button>
-                  </TableHead>
-                  <TableHead className="text-right">
-                    <button
-                      type="button"
-                      className="font-medium hover:text-foreground"
-                      onClick={() => toggleSort('num_ack_pending')}
-                    >
-                      Ack Pending{sortIndicator('num_ack_pending')}
-                    </button>
-                  </TableHead>
-                  <TableHead className="w-32">Lag</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagedConsumers.map((metric) => {
-                  const width = Math.max(
-                    2,
-                    Math.round(
-                      (metric.stream_lag / Math.max(1, analyticsData?.max_stream_lag || 1)) * 100,
-                    ),
-                  );
-                  return (
-                    <TableRow key={metric.name}>
-                      <TableCell className="font-medium text-sm">{metric.name}</TableCell>
-                      <TableCell className="text-right tabular-nums text-sm">
-                        {metric.stream_lag}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-sm">
-                        {metric.num_pending}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-sm">
-                        {metric.num_ack_pending}
-                      </TableCell>
-                      <TableCell>
-                        <div className="h-2 bg-muted rounded overflow-hidden">
-                          <div className="h-full bg-primary" style={{ width: `${width}%` }} />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            {lagPageCount > 1 && (
-              <Pagination
-                pageIndex={lagPage}
-                pageCount={lagPageCount}
-                pageSize={lagPageSize}
-                onPageChange={setLagPage}
-                onPageSizeChange={() => {}}
-                totalItems={sortedConsumers.length}
-              />
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">No analytics data available.</p>
+const COMPACT_THRESHOLD = 2;
+
+function ConsumerLagSection({
+  analyticsData,
+  consumerMetrics,
+}: {
+  analyticsData: ConsumerAnalytics | null;
+  consumerMetrics: ConsumerMetricsResponse[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [tab, setTab] = useState<'analytics' | 'chart'>(() => {
+    if (typeof window === 'undefined') return 'analytics';
+    return (sessionStorage.getItem('consumers:lagTab') as 'analytics' | 'chart') || 'analytics';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') sessionStorage.setItem('consumers:lagTab', tab);
+  }, [tab]);
+
+  const consumerCount = analyticsData?.consumers?.length ?? 0;
+  const isCompact = consumerCount > 0 && consumerCount <= COMPACT_THRESHOLD && !expanded;
+  const hasChart = consumerMetrics.length > 0;
+
+  if (isCompact) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-between gap-4 p-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+            <span className="font-medium">Consumer Lag</span>
+            <span className="text-muted-foreground">
+              Pending:{' '}
+              <span className="font-semibold text-foreground">
+                {analyticsData?.total_pending ?? 0}
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              Ack Pending:{' '}
+              <span className="font-semibold text-foreground">
+                {analyticsData?.total_ack_pending ?? 0}
+              </span>
+            </span>
+            <span className="text-muted-foreground">
+              Max Lag:{' '}
+              <span className="font-semibold text-foreground">
+                {analyticsData?.max_stream_lag ?? 0}
+              </span>
+            </span>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setExpanded(true)}>
+            Expand
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-lg">Consumer Lag</CardTitle>
+        {consumerCount <= COMPACT_THRESHOLD && consumerCount > 0 && (
+          <Button variant="ghost" size="sm" onClick={() => setExpanded(false)}>
+            Collapse
+          </Button>
         )}
+      </CardHeader>
+      <CardContent>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'analytics' | 'chart')}>
+          <TabsList>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="chart">Over Time</TabsTrigger>
+          </TabsList>
+          <TabsContent value="analytics">
+            <ConsumerLagAnalyticsView analyticsData={analyticsData} />
+          </TabsContent>
+          <TabsContent value="chart">
+            {hasChart ? (
+              <ConsumerLagChart metrics={consumerMetrics} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No metric data yet. Data is collected every 30 seconds.
+              </p>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
@@ -420,7 +494,7 @@ function ConsumerEditForm({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit, focusFirstError)} className="space-y-4">
               {/* Immutable fields - read-only */}
               <div className="rounded border border-muted p-3 space-y-2">
                 <p className="text-xs font-medium text-muted-foreground">
@@ -519,7 +593,8 @@ function ConsumerEditForm({
                   Cancel
                 </Button>
                 <Button type="submit" disabled={updateConsumer.isPending}>
-                  {updateConsumer.isPending ? 'Saving...' : 'Save Changes'}
+                  {updateConsumer.isPending && <Spinner />}
+                  {updateConsumer.isPending ? 'Saving…' : 'Save Changes'}
                 </Button>
               </div>
             </form>
@@ -563,7 +638,15 @@ export default function ConsumersPage() {
     }
   }, [selectedStream, streamNames]);
 
-  const { data: consumersData, isLoading, refetch } = useConsumers(connectionId, selectedStream);
+  const {
+    data: consumersData,
+    isLoading,
+    isFetching,
+    dataUpdatedAt,
+    refetch,
+  } = useConsumers(connectionId, selectedStream);
+  const confirm = useConfirm();
+  const [bulkOpen, setBulkOpen] = useState(false);
   const { data: analyticsData } = useConsumerAnalytics(connectionId, selectedStream);
   const { data: consumerMetrics } = useConsumerMetrics(connectionId, selectedStream);
   const createConsumer = useCreateConsumer(connectionId, selectedStream || '');
@@ -630,17 +713,20 @@ export default function ConsumersPage() {
   };
 
   const handleDeleteConsumer = async (consumerName: string) => {
-    if (!selectedStream) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Delete consumer "${consumerName}" from stream "${selectedStream}"?`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
+    if (!selectedStream) return;
+    const ok = await confirm({
+      title: 'Delete consumer',
+      description: (
+        <>
+          This permanently deletes consumer{' '}
+          <span className="font-mono font-semibold">{consumerName}</span> from stream{' '}
+          <span className="font-mono font-semibold">{selectedStream}</span>.
+        </>
+      ),
+      tone: 'destructive',
+      confirmLabel: 'Delete consumer',
+    });
+    if (!ok) return;
     try {
       await deleteConsumer.mutateAsync(consumerName);
       toast.success(`Consumer "${consumerName}" deleted.`);
@@ -667,23 +753,9 @@ export default function ConsumersPage() {
     );
   };
 
-  const handleBulkDeleteConsumers = async () => {
+  const handleBulkDeleteConsumers = () => {
     if (!selectedStream || selectedConsumers.size === 0) return;
-    const names = Array.from(selectedConsumers);
-    const confirmed = window.confirm(
-      `Dry run preview:\n${names.slice(0, 10).join('\n')}\n\nDelete ${names.length} consumers from ${selectedStream}?`,
-    );
-    if (!confirmed) return;
-    const guard = window.prompt('Type DELETE to confirm bulk consumer deletion:');
-    if (guard !== 'DELETE') return;
-    for (const name of names) {
-      try {
-        await deleteConsumer.mutateAsync(name);
-      } catch (error) {
-        console.error('Bulk delete failed for consumer', name, error);
-      }
-    }
-    setSelectedConsumers(new Set());
+    setBulkOpen(true);
   };
 
   const filteredConsumers = useMemo(() => {
@@ -713,50 +785,70 @@ export default function ConsumersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">Consumers</h1>
-          <p className="text-muted-foreground">Manage JetStream consumers by stream</p>
-        </div>
+      <PageHeader
+        title="Consumers"
+        description="Manage JetStream consumers by stream"
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+        actions={
+          <>
+            <Input
+              placeholder="Filter consumers..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-56"
+              disabled={!selectedStream}
+            />
+            <Select
+              value={selectedStream || ''}
+              onChange={(event) => {
+                setSelectedStream(event.target.value || null);
+                setPageIndex(0);
+              }}
+              disabled={streamNames.length === 0}
+            >
+              {streamNames.length === 0 ? (
+                <option value="">No streams available</option>
+              ) : (
+                streamNames.map((streamName) => (
+                  <option key={streamName} value={streamName}>
+                    {streamName}
+                  </option>
+                ))
+              )}
+            </Select>
+            <Button onClick={() => setShowCreateForm(true)} disabled={!selectedStream}>
+              <Plus className="w-4 h-4" />
+              Create Consumer
+            </Button>
+          </>
+        }
+      />
 
-        <div className="flex items-center gap-3">
-          <Select
-            value={selectedStream || ''}
-            onChange={(event) => {
-              setSelectedStream(event.target.value || null);
-              setPageIndex(0);
-            }}
-            disabled={streamNames.length === 0}
-          >
-            {streamNames.length === 0 ? (
-              <option value="">No streams available</option>
-            ) : (
-              streamNames.map((streamName) => (
-                <option key={streamName} value={streamName}>
-                  {streamName}
-                </option>
-              ))
-            )}
-          </Select>
-
-          <Button onClick={() => refetch()} disabled={!selectedStream} variant="outline">
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
-
-          <Button onClick={() => setShowCreateForm(true)} disabled={!selectedStream}>
-            <Plus className="w-4 h-4" />
-            Create Consumer
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleBulkDeleteConsumers}
-            disabled={selectedConsumers.size === 0 || deleteConsumer.isPending}
-          >
-            Delete Selected ({selectedConsumers.size})
-          </Button>
-        </div>
-      </div>
+      <BulkDeleteDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        title="Delete selected consumers"
+        description={
+          <>
+            From stream <span className="font-mono font-semibold">{selectedStream}</span>. This
+            cannot be undone.
+          </>
+        }
+        items={Array.from(selectedConsumers)}
+        onDeleteItem={(name) => deleteConsumer.mutateAsync(name).then(() => undefined)}
+        onFinished={({ succeeded, failed }) => {
+          if (succeeded)
+            toast.success(`Deleted ${succeeded} consumer${succeeded === 1 ? '' : 's'}.`);
+          if (failed.length) toast.error(`${failed.length} failed: ${failed.join(', ')}`);
+          setSelectedConsumers(new Set());
+        }}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -789,18 +881,10 @@ export default function ConsumersPage() {
         </Card>
       </div>
 
-      <ConsumerLagAnalyticsCard analyticsData={analyticsData ?? null} />
-
-      {consumerMetrics && consumerMetrics.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Consumer Lag Over Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ConsumerLagChart metrics={consumerMetrics} />
-          </CardContent>
-        </Card>
-      )}
+      <ConsumerLagSection
+        analyticsData={analyticsData ?? null}
+        consumerMetrics={consumerMetrics ?? []}
+      />
 
       <Dialog
         open={showCreateForm}
@@ -1105,18 +1189,33 @@ export default function ConsumersPage() {
               Cancel
             </Button>
             <Button type="submit" disabled={createConsumer.isPending}>
-              {createConsumer.isPending ? 'Creating...' : 'Create Consumer'}
+              {createConsumer.isPending && <Spinner />}
+              {createConsumer.isPending ? 'Creating…' : 'Create Consumer'}
             </Button>
           </DialogFooter>
         </form>
       </Dialog>
 
-      <Input
-        placeholder="Filter consumers..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="max-w-sm"
-      />
+      {selectedConsumers.size > 0 && (
+        <div className="flex items-center justify-between rounded-md border bg-muted/50 px-4 py-2">
+          <p className="text-sm">
+            <span className="font-medium">{selectedConsumers.size}</span> selected
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedConsumers(new Set())}>
+              Clear
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDeleteConsumers}
+              disabled={deleteConsumer.isPending}
+            >
+              Delete Selected
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Card>
         {!selectedStream ? (
@@ -1124,8 +1223,8 @@ export default function ConsumersPage() {
             Create a stream first to manage consumers.
           </CardContent>
         ) : isLoading ? (
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Loading consumers...
+          <CardContent className="p-0">
+            <TableSkeleton rows={6} columns={8} />
           </CardContent>
         ) : filteredConsumers.length > 0 ? (
           <CardContent className="p-0">

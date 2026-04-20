@@ -19,6 +19,7 @@ import {
   DiffViewerModal,
 } from '@/components/messages';
 import { SavedView } from '@/components/messages/types';
+import { usePrompt } from '@/components/ui/confirm-dialog';
 
 const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
 const FAVORITE_STREAMS_KEY = 'nats_favorite_streams_v1';
@@ -30,6 +31,7 @@ export default function MessagesPage() {
   const listContainerRef = useRef<HTMLDivElement>(null);
 
   const { connectionId } = useConnection();
+  const prompt = usePrompt();
   const { data: streamsData } = useStreams(connectionId);
   const streamNames = useMemo(
     () => (streamsData?.streams || []).map((stream) => stream.config.name),
@@ -441,8 +443,13 @@ export default function MessagesPage() {
     localStorage.setItem(FAVORITE_STREAMS_KEY, JSON.stringify(next));
   };
 
-  const saveCurrentView = () => {
-    const name = window.prompt('Save view as:');
+  const saveCurrentView = async () => {
+    const name = await prompt({
+      title: 'Save view',
+      label: 'View name',
+      placeholder: 'e.g. High-priority orders',
+      confirmLabel: 'Save view',
+    });
     if (!name) return;
     const params = new URLSearchParams();
     if (selectedStream) params.set('stream', selectedStream);

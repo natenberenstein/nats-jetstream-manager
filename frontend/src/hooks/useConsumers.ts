@@ -18,7 +18,7 @@ export function useConsumerAnalytics(connectionId: string | null, streamName: st
     queryKey: ['consumer-analytics', connectionId, streamName],
     queryFn: () => consumerApi.analytics(connectionId!, streamName!),
     enabled: !!connectionId && !!streamName,
-    refetchInterval: 5000,
+    refetchInterval: 30_000,
   });
 }
 

@@ -15,7 +15,6 @@ import {
   StreamMetricsSummaryResponse,
   HealthHistoryResponse,
   UptimeSummary,
-  AuditLogResponse,
   ConsumerConfig,
   ConsumerInfo,
   ConsumerAnalytics,
@@ -53,19 +52,24 @@ class ApiError extends Error {
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new ApiError(0, `Network error: ${message}. Is the backend reachable at ${API_URL}?`);
+  }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({
-      detail: response.statusText,
-    }));
-    throw new ApiError(response.status, error.detail || 'Request failed');
+    const body = await response.json().catch(() => null);
+    const detail = extractErrorMessage(body) || response.statusText || 'Request failed';
+    throw new ApiError(response.status, `${detail} (HTTP ${response.status})`);
   }
 
   // Handle 204 No Content
@@ -74,6 +78,27 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
   }
 
   return response.json();
+}
+
+function extractErrorMessage(body: unknown): string | null {
+  if (!body || typeof body !== 'object') return null;
+  const b = body as Record<string, unknown>;
+  if (typeof b.detail === 'string') return b.detail;
+  if (typeof b.message === 'string') return b.message;
+  if (Array.isArray(b.message)) return b.message.join('; ');
+  if (Array.isArray(b.detail)) {
+    return b.detail
+      .map((entry) => {
+        if (typeof entry === 'string') return entry;
+        if (entry && typeof entry === 'object' && 'msg' in entry) {
+          return String((entry as { msg: unknown }).msg);
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .join('; ');
+  }
+  return null;
 }
 
 // Connection API
@@ -331,27 +356,6 @@ export const connectionHealthApi = {
 
   getUptime: (connectionId: string, window = 24) =>
     fetchApi<UptimeSummary>(`/connections/${connectionId}/health/uptime?window=${window}`),
-};
-
-export const auditApi = {
-  list: (
-    params: {
-      limit?: number;
-      offset?: number;
-      action?: string;
-      resource_type?: string;
-      user_id?: number;
-    } = {},
-  ) => {
-    const searchParams = new URLSearchParams();
-    if (params.limit) searchParams.append('limit', params.limit.toString());
-    if (params.offset) searchParams.append('offset', params.offset.toString());
-    if (params.action) searchParams.append('action', params.action);
-    if (params.resource_type) searchParams.append('resource_type', params.resource_type);
-    if (params.user_id) searchParams.append('user_id', params.user_id.toString());
-    const qs = searchParams.toString();
-    return fetchApi<AuditLogResponse>(`/audit${qs ? `?${qs}` : ''}`);
-  },
 };
 
 export const systemApi = {

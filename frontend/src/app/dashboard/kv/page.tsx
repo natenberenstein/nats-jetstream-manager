@@ -14,9 +14,15 @@ import {
   useKvWatchHistory,
 } from '@/hooks/useKv';
 import { KvStoreStatus } from '@/lib/types';
-import { Plus, Trash2, RefreshCw, Eye, ArrowLeft, Radio } from 'lucide-react';
+import { Plus, Trash2, Eye, ArrowLeft, Radio } from 'lucide-react';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { Spinner } from '@/components/ui/spinner';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { BulkDeleteDialog } from '@/components/ui/bulk-delete-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -50,9 +56,17 @@ function KvKeyBrowser({
   bucket: KvStoreStatus;
   onBack: () => void;
 }) {
-  const { data: keysData, isLoading, refetch } = useKvKeys(connectionId, bucket.bucket);
+  const {
+    data: keysData,
+    isLoading,
+    isFetching,
+    dataUpdatedAt,
+    refetch,
+  } = useKvKeys(connectionId, bucket.bucket);
   const putEntry = usePutKvEntry(connectionId, bucket.bucket);
   const deleteEntry = useDeleteKvEntry(connectionId, bucket.bucket);
+  const confirm = useConfirm();
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const { data: entryData } = useKvEntry(connectionId, bucket.bucket, selectedKey);
   const [showPutForm, setShowPutForm] = useState(false);
@@ -95,23 +109,9 @@ function KvKeyBrowser({
     );
   };
 
-  const handleBulkDeleteKeys = async () => {
+  const handleBulkDeleteKeys = () => {
     if (selectedKeys.size === 0) return;
-    const names = Array.from(selectedKeys);
-    const confirmed = window.confirm(
-      `Dry run preview:\n${names.slice(0, 10).join('\n')}\n\nDelete ${names.length} key(s)?`,
-    );
-    if (!confirmed) return;
-    const guard = window.prompt('Type DELETE to confirm bulk deletion:');
-    if (guard !== 'DELETE') return;
-    for (const name of names) {
-      try {
-        await deleteEntry.mutateAsync(name);
-      } catch (error) {
-        console.error('Bulk delete failed for', name, error);
-      }
-    }
-    setSelectedKeys(new Set());
+    setBulkOpen(true);
   };
 
   const handlePut = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -133,59 +133,82 @@ function KvKeyBrowser({
   };
 
   const handleDelete = async (key: string) => {
-    if (confirm(`Delete key "${key}"?`)) {
-      try {
-        await deleteEntry.mutateAsync(key);
-        if (selectedKey === key) setSelectedKey(null);
-        toast.success(`Key "${key}" deleted.`);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to delete key');
-      }
+    const ok = await confirm({
+      title: 'Delete key',
+      description: (
+        <>
+          Delete key <span className="font-mono font-semibold">{key}</span> from bucket{' '}
+          <span className="font-mono font-semibold">{bucket.bucket}</span>?
+        </>
+      ),
+      tone: 'destructive',
+      confirmLabel: 'Delete key',
+    });
+    if (!ok) return;
+    try {
+      await deleteEntry.mutateAsync(key);
+      if (selectedKey === key) setSelectedKey(null);
+      toast.success(`Key "${key}" deleted.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete key');
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold mb-1">{bucket.bucket}</h1>
-            <p className="text-muted-foreground">
-              {formatNumber(bucket.values)} keys &middot; {formatBytes(bucket.size)} &middot;
-              History: {bucket.history} &middot;{' '}
-              <Badge variant="outline" className="rounded-md">
-                {bucket.storage}
-              </Badge>
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <Button
-            variant={watchMode ? 'default' : 'outline'}
-            onClick={() => setWatchMode(!watchMode)}
-          >
-            <Radio className="w-4 h-4" />
-            {watchMode ? 'Watching...' : 'Watch'}
-          </Button>
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
-          <Button onClick={() => setShowPutForm(true)}>
-            <Plus className="w-4 h-4" />
-            Put Key
-          </Button>
-          {selectedKeys.size > 0 && (
-            <Button variant="destructive" onClick={handleBulkDeleteKeys}>
-              <Trash2 className="w-4 h-4" />
-              Delete Selected ({selectedKeys.size})
+      <PageHeader
+        title={bucket.bucket}
+        description={`${formatNumber(bucket.values)} keys · ${formatBytes(bucket.size)} · history ${bucket.history} · ${bucket.storage}`}
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={onBack} title="Back">
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-          )}
-        </div>
-      </div>
+            <Button
+              variant={watchMode ? 'default' : 'outline'}
+              onClick={() => setWatchMode(!watchMode)}
+            >
+              <Radio className="w-4 h-4" />
+              {watchMode ? 'Watching' : 'Watch'}
+            </Button>
+            <Button onClick={() => setShowPutForm(true)}>
+              <Plus className="w-4 h-4" />
+              Put Key
+            </Button>
+            {selectedKeys.size > 0 && (
+              <Button variant="destructive" onClick={handleBulkDeleteKeys}>
+                <Trash2 className="w-4 h-4" />
+                Delete Selected ({selectedKeys.size})
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      <BulkDeleteDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        title="Delete selected keys"
+        description={
+          <>
+            From bucket <span className="font-mono font-semibold">{bucket.bucket}</span>.
+          </>
+        }
+        items={Array.from(selectedKeys)}
+        onDeleteItem={(name) => deleteEntry.mutateAsync(name).then(() => undefined)}
+        onFinished={({ succeeded, failed }) => {
+          if (succeeded) toast.success(`Deleted ${succeeded} key${succeeded === 1 ? '' : 's'}.`);
+          if (failed.length) toast.error(`${failed.length} failed: ${failed.join(', ')}`);
+          setSelectedKeys(new Set());
+        }}
+      />
 
       <Dialog open={showPutForm} onOpenChange={setShowPutForm}>
         <DialogHeader onClose={() => setShowPutForm(false)}>
@@ -220,7 +243,8 @@ function KvKeyBrowser({
               Cancel
             </Button>
             <Button type="submit" disabled={putEntry.isPending}>
-              {putEntry.isPending ? 'Saving...' : 'Put Key'}
+              {putEntry.isPending && <Spinner />}
+              {putEntry.isPending ? 'Saving…' : 'Put Key'}
             </Button>
           </DialogFooter>
         </form>
@@ -236,8 +260,8 @@ function KvKeyBrowser({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           {isLoading ? (
-            <CardContent className="p-8 text-center text-muted-foreground">
-              Loading keys...
+            <CardContent className="p-0">
+              <TableSkeleton rows={6} columns={3} />
             </CardContent>
           ) : filteredKeys.length > 0 ? (
             <CardContent className="p-0">
@@ -378,9 +402,10 @@ function KvKeyBrowser({
 
 export default function KvPage() {
   const { connectionId } = useConnection();
-  const { data: kvData, isLoading, refetch } = useKvStores(connectionId);
+  const { data: kvData, isLoading, isFetching, dataUpdatedAt, refetch } = useKvStores(connectionId);
   const createKv = useCreateKvStore(connectionId);
   const deleteKv = useDeleteKvStore(connectionId);
+  const confirm = useConfirm();
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -413,13 +438,23 @@ export default function KvPage() {
   });
 
   const handleDelete = async (bucket: string) => {
-    if (confirm(`Are you sure you want to destroy KV bucket "${bucket}"? This deletes all data.`)) {
-      try {
-        await deleteKv.mutateAsync(bucket);
-        toast.success(`KV bucket "${bucket}" destroyed.`);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to delete KV bucket');
-      }
+    const ok = await confirm({
+      title: 'Destroy KV bucket',
+      description: (
+        <>
+          Permanently destroy bucket <span className="font-mono font-semibold">{bucket}</span>? All
+          keys and history will be lost.
+        </>
+      ),
+      tone: 'destructive',
+      confirmLabel: 'Destroy bucket',
+    });
+    if (!ok) return;
+    try {
+      await deleteKv.mutateAsync(bucket);
+      toast.success(`KV bucket "${bucket}" destroyed.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete KV bucket');
     }
   };
 
@@ -461,22 +496,23 @@ export default function KvPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">KV Stores</h1>
-          <p className="text-muted-foreground">Manage JetStream Key-Value stores</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
+      <PageHeader
+        title="KV Stores"
+        description="Manage JetStream Key-Value stores"
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+        actions={
           <Button onClick={() => setShowCreateForm(true)}>
             <Plus className="w-4 h-4" />
             Create KV Store
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
         <DialogHeader onClose={() => setShowCreateForm(false)}>
@@ -553,7 +589,8 @@ export default function KvPage() {
               Cancel
             </Button>
             <Button type="submit" disabled={createKv.isPending}>
-              {createKv.isPending ? 'Creating...' : 'Create KV Store'}
+              {createKv.isPending && <Spinner />}
+              {createKv.isPending ? 'Creating…' : 'Create KV Store'}
             </Button>
           </DialogFooter>
         </form>
@@ -568,8 +605,8 @@ export default function KvPage() {
 
       <Card>
         {isLoading ? (
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Loading KV stores...
+          <CardContent className="p-0">
+            <TableSkeleton rows={5} columns={7} />
           </CardContent>
         ) : filteredKvStores.length > 0 ? (
           <CardContent className="p-0">

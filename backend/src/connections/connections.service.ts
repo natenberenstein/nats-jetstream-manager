@@ -8,8 +8,20 @@ export interface ConnectionInfo {
   jsm: JetStreamManager;
   js: JetStreamClient;
   url: string;
+  sysNc?: NatsConnection;
+  monitoringUrl?: string;
   createdAt: Date;
   lastAccessed: Date;
+}
+
+export interface CreateConnectionOptions {
+  url: string;
+  user?: string;
+  password?: string;
+  token?: string;
+  monitoringUrl?: string;
+  sysUser?: string;
+  sysPassword?: string;
 }
 
 export interface ConnectionListItem {
@@ -32,11 +44,10 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async createConnection(
-    url: string,
-    user?: string,
-    password?: string,
-    token?: string,
+    opts: CreateConnectionOptions,
   ): Promise<{ connection_id: string; status: string; url: string }> {
+    const { url, user, password, token, monitoringUrl, sysUser, sysPassword } = opts;
+
     // Enforce single connection: disconnect any existing connection first
     if (this.connections.size > 0) {
       const existingIds = Array.from(this.connections.keys());
@@ -55,6 +66,16 @@ export class ConnectionsService implements OnModuleDestroy {
     const jsm = await nc.jetstreamManager();
     const js = nc.jetstream();
 
+    let sysNc: NatsConnection | undefined;
+    if (sysUser && sysPassword) {
+      try {
+        sysNc = await this.connectToNats(url, sysUser, sysPassword);
+        this.logger.log('System-account connection established');
+      } catch (error: unknown) {
+        this.logger.warn(`Failed to open system-account connection: ${(error as Error).message}`);
+      }
+    }
+
     const connectionId = uuidv4();
     const now = new Date();
 
@@ -63,6 +84,8 @@ export class ConnectionsService implements OnModuleDestroy {
       jsm,
       js,
       url,
+      sysNc,
+      monitoringUrl: monitoringUrl || undefined,
       createdAt: now,
       lastAccessed: now,
     });
@@ -96,6 +119,16 @@ export class ConnectionsService implements OnModuleDestroy {
       await conn.nc.drain();
     } catch (error: unknown) {
       this.logger.warn(`Error draining connection ${connectionId}: ${(error as Error).message}`);
+    }
+
+    if (conn.sysNc) {
+      try {
+        await conn.sysNc.drain();
+      } catch (error: unknown) {
+        this.logger.warn(
+          `Error draining sys connection ${connectionId}: ${(error as Error).message}`,
+        );
+      }
     }
 
     this.connections.delete(connectionId);

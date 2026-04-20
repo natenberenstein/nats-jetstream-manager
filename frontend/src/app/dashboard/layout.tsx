@@ -15,7 +15,6 @@ import {
   LineChart,
   BarChart3,
   HeartPulse,
-  Shield,
   Key,
   HardDrive,
   Moon,
@@ -47,23 +46,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/');
   };
 
-  const navItems = [
-    { href: '/dashboard', icon: Activity, label: 'Overview' },
-    { href: '/dashboard/cluster', icon: Network, label: 'Cluster' },
+  const navSections = [
     {
-      href: '/dashboard/observability',
-      icon: LineChart,
-      label: 'Observability',
+      items: [{ href: '/dashboard', icon: Activity, label: 'Overview' }],
     },
-    { href: '/dashboard/metrics', icon: BarChart3, label: 'Metrics' },
-    { href: '/dashboard/health', icon: HeartPulse, label: 'Health' },
-    { href: '/dashboard/audit', icon: Shield, label: 'Audit Log' },
-    { href: '/dashboard/streams', icon: Layers, label: 'Streams' },
-    { href: '/dashboard/consumers', icon: Users, label: 'Consumers' },
-    { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
-    { href: '/dashboard/kv', icon: Key, label: 'KV Stores' },
-    { href: '/dashboard/objectstore', icon: HardDrive, label: 'Object Store' },
+    {
+      label: 'Cluster',
+      items: [
+        { href: '/dashboard/cluster', icon: Network, label: 'Cluster' },
+        { href: '/dashboard/observability', icon: LineChart, label: 'Observability' },
+        { href: '/dashboard/metrics', icon: BarChart3, label: 'Metrics' },
+        { href: '/dashboard/health', icon: HeartPulse, label: 'Health' },
+      ],
+    },
+    {
+      label: 'Streaming',
+      items: [
+        { href: '/dashboard/streams', icon: Layers, label: 'Streams' },
+        { href: '/dashboard/consumers', icon: Users, label: 'Consumers' },
+        { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
+      ],
+    },
+    {
+      label: 'Storage',
+      items: [
+        { href: '/dashboard/kv', icon: Key, label: 'KV Stores' },
+        { href: '/dashboard/objectstore', icon: HardDrive, label: 'Object Store' },
+      ],
+    },
   ];
+
+  const navItems = navSections.flatMap((section) => section.items);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -121,23 +134,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex">
         {/* Sidebar */}
         <aside className="w-64 bg-background border-r min-h-[calc(100vh-73px)] flex flex-col">
-          <nav className="p-4 space-y-1 flex-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 px-4 py-3 rounded-md transition-colors',
-                    isActive ? 'bg-primary/10 text-primary' : 'hover:bg-accent',
-                  )}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              );
-            })}
+          <nav className="p-4 flex-1 space-y-4">
+            {navSections.map((section, sectionIndex) => (
+              <div key={section.label ?? `section-${sectionIndex}`} className="space-y-1">
+                {section.label && (
+                  <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {section.label}
+                  </p>
+                )}
+                {section.items.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-4 py-3 rounded-md transition-colors',
+                        isActive ? 'bg-primary/10 text-primary' : 'hover:bg-accent',
+                      )}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
         </aside>
 

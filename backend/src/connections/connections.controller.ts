@@ -22,7 +22,15 @@ export class ConnectionsController {
   @Post('connect')
   @HttpCode(HttpStatus.OK)
   createConnection(@Body() dto: ConnectionRequestDto) {
-    return this.connectionsService.createConnection(dto.url, dto.user, dto.password, dto.token);
+    return this.connectionsService.createConnection({
+      url: dto.url,
+      user: dto.user,
+      password: dto.password,
+      token: dto.token,
+      monitoringUrl: dto.monitoring_url,
+      sysUser: dto.sys_user,
+      sysPassword: dto.sys_password,
+    });
   }
 
   @Get(':id/status')

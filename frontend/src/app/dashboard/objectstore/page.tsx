@@ -13,9 +13,15 @@ import {
 } from '@/hooks/useObjectStore';
 import { objectStoreApi } from '@/lib/api';
 import { ObjectStoreStatusInfo } from '@/lib/types';
-import { Plus, Trash2, RefreshCw, ArrowLeft, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Download, Upload } from 'lucide-react';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { Spinner } from '@/components/ui/spinner';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { BulkDeleteDialog } from '@/components/ui/bulk-delete-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -49,9 +55,17 @@ function ObjectBrowser({
   store: ObjectStoreStatusInfo;
   onBack: () => void;
 }) {
-  const { data: objectsData, isLoading, refetch } = useObjectList(connectionId, store.bucket);
+  const {
+    data: objectsData,
+    isLoading,
+    isFetching,
+    dataUpdatedAt,
+    refetch,
+  } = useObjectList(connectionId, store.bucket);
   const putObject = usePutObject(connectionId, store.bucket);
   const deleteObject = useDeleteObject(connectionId, store.bucket);
+  const confirm = useConfirm();
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadForm, setUploadForm] = useState({ name: '', description: '' });
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -97,23 +111,9 @@ function ObjectBrowser({
     );
   };
 
-  const handleBulkDeleteObjects = async () => {
+  const handleBulkDeleteObjects = () => {
     if (selectedObjects.size === 0) return;
-    const names = Array.from(selectedObjects);
-    const confirmed = window.confirm(
-      `Dry run preview:\n${names.slice(0, 10).join('\n')}\n\nDelete ${names.length} object(s)?`,
-    );
-    if (!confirmed) return;
-    const guard = window.prompt('Type DELETE to confirm bulk deletion:');
-    if (guard !== 'DELETE') return;
-    for (const name of names) {
-      try {
-        await deleteObject.mutateAsync(name);
-      } catch (error) {
-        console.error('Bulk delete failed for', name, error);
-      }
-    }
-    setSelectedObjects(new Set());
+    setBulkOpen(true);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -179,55 +179,74 @@ function ObjectBrowser({
   };
 
   const handleDelete = async (name: string) => {
-    if (confirm(`Delete object "${name}"?`)) {
-      try {
-        await deleteObject.mutateAsync(name);
-        toast.success(`Object "${name}" deleted.`);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to delete object');
-      }
+    const ok = await confirm({
+      title: 'Delete object',
+      description: (
+        <>
+          Delete object <span className="font-mono font-semibold">{name}</span> from{' '}
+          <span className="font-mono font-semibold">{store.bucket}</span>?
+        </>
+      ),
+      tone: 'destructive',
+      confirmLabel: 'Delete object',
+    });
+    if (!ok) return;
+    try {
+      await deleteObject.mutateAsync(name);
+      toast.success(`Object "${name}" deleted.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete object');
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold mb-1">{store.bucket}</h1>
-            <p className="text-muted-foreground">
-              {formatBytes(store.size)} &middot;{' '}
-              <Badge variant="outline" className="rounded-md">
-                {store.storage}
-              </Badge>
-              {store.sealed && (
-                <Badge variant="secondary" className="ml-2 rounded-md">
-                  Sealed
-                </Badge>
-              )}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
-          <Button onClick={() => setShowUploadForm(true)} disabled={store.sealed}>
-            <Upload className="w-4 h-4" />
-            Upload Object
-          </Button>
-          {selectedObjects.size > 0 && (
-            <Button variant="destructive" onClick={handleBulkDeleteObjects}>
-              <Trash2 className="w-4 h-4" />
-              Delete Selected ({selectedObjects.size})
+      <PageHeader
+        title={store.bucket}
+        description={`${formatBytes(store.size)} · ${store.storage}${store.sealed ? ' · sealed' : ''}`}
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={onBack} title="Back">
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-          )}
-        </div>
-      </div>
+            <Button onClick={() => setShowUploadForm(true)} disabled={store.sealed}>
+              <Upload className="w-4 h-4" />
+              Upload Object
+            </Button>
+            {selectedObjects.size > 0 && (
+              <Button variant="destructive" onClick={handleBulkDeleteObjects}>
+                <Trash2 className="w-4 h-4" />
+                Delete Selected ({selectedObjects.size})
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      <BulkDeleteDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        title="Delete selected objects"
+        description={
+          <>
+            From object store <span className="font-mono font-semibold">{store.bucket}</span>.
+          </>
+        }
+        items={Array.from(selectedObjects)}
+        onDeleteItem={(name) => deleteObject.mutateAsync(name).then(() => undefined)}
+        onFinished={({ succeeded, failed }) => {
+          if (succeeded) toast.success(`Deleted ${succeeded} object${succeeded === 1 ? '' : 's'}.`);
+          if (failed.length) toast.error(`${failed.length} failed: ${failed.join(', ')}`);
+          setSelectedObjects(new Set());
+        }}
+      />
 
       <Dialog open={showUploadForm} onOpenChange={setShowUploadForm}>
         <DialogHeader onClose={() => setShowUploadForm(false)}>
@@ -268,7 +287,8 @@ function ObjectBrowser({
               Cancel
             </Button>
             <Button type="submit" disabled={putObject.isPending}>
-              {putObject.isPending ? 'Uploading...' : 'Upload'}
+              {putObject.isPending && <Spinner />}
+              {putObject.isPending ? 'Uploading…' : 'Upload'}
             </Button>
           </DialogFooter>
         </form>
@@ -283,8 +303,8 @@ function ObjectBrowser({
 
       <Card>
         {isLoading ? (
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Loading objects...
+          <CardContent className="p-0">
+            <TableSkeleton rows={5} columns={6} />
           </CardContent>
         ) : filteredObjects.length > 0 ? (
           <CardContent className="p-0">
@@ -367,9 +387,16 @@ function ObjectBrowser({
 
 export default function ObjectStorePage() {
   const { connectionId } = useConnection();
-  const { data: storeData, isLoading, refetch } = useObjectStores(connectionId);
+  const {
+    data: storeData,
+    isLoading,
+    isFetching,
+    dataUpdatedAt,
+    refetch,
+  } = useObjectStores(connectionId);
   const createStore = useCreateObjectStore(connectionId);
   const deleteStore = useDeleteObjectStore(connectionId);
+  const confirm = useConfirm();
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -401,15 +428,18 @@ export default function ObjectStorePage() {
   });
 
   const handleDelete = async (bucket: string) => {
-    if (
-      confirm(`Are you sure you want to destroy object store "${bucket}"? This deletes all data.`)
-    ) {
-      try {
-        await deleteStore.mutateAsync(bucket);
-        toast.success(`Object store "${bucket}" destroyed.`);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to delete object store');
-      }
+    const ok = await confirm({
+      title: `Destroy object store "${bucket}"?`,
+      description: 'This permanently deletes the bucket and all objects within it.',
+      confirmLabel: 'Destroy',
+      tone: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      await deleteStore.mutateAsync(bucket);
+      toast.success(`Object store "${bucket}" destroyed.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete object store');
     }
   };
 
@@ -450,22 +480,23 @@ export default function ObjectStorePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">Object Stores</h1>
-          <p className="text-muted-foreground">Manage JetStream Object stores</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
+      <PageHeader
+        title="Object Stores"
+        description="Manage JetStream Object stores"
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+        actions={
           <Button onClick={() => setShowCreateForm(true)}>
             <Plus className="w-4 h-4" />
             Create Object Store
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
         <DialogHeader onClose={() => setShowCreateForm(false)}>
@@ -527,7 +558,8 @@ export default function ObjectStorePage() {
               Cancel
             </Button>
             <Button type="submit" disabled={createStore.isPending}>
-              {createStore.isPending ? 'Creating...' : 'Create Object Store'}
+              {createStore.isPending && <Spinner />}
+              {createStore.isPending ? 'Creating…' : 'Create Object Store'}
             </Button>
           </DialogFooter>
         </form>
@@ -542,8 +574,8 @@ export default function ObjectStorePage() {
 
       <Card>
         {isLoading ? (
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Loading object stores...
+          <CardContent className="p-0">
+            <TableSkeleton rows={5} columns={7} />
           </CardContent>
         ) : filteredStores.length > 0 ? (
           <CardContent className="p-0">
