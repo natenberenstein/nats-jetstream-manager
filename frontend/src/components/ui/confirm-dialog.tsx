@@ -3,6 +3,7 @@
 import {
   ReactNode,
   useEffect,
+  useMemo,
   useState,
   createContext,
   useContext,
@@ -21,7 +22,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
 
 export type ConfirmTone = 'default' | 'destructive';
 
@@ -59,7 +59,6 @@ const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const [typed, setTyped] = useState('');
-  const [busy, setBusy] = useState(false);
   const resolverRef = useRef<Resolver | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -71,7 +70,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const confirm = useCallback<ConfirmContextValue['confirm']>((opts) => {
     setOptions(opts);
     setTyped('');
-    setBusy(false);
     return new Promise<boolean>((resolve) => {
       resolverRef.current = resolve;
     });
@@ -114,7 +112,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     resolverRef.current = null;
     setOptions(null);
     setTyped('');
-    setBusy(false);
   };
 
   useEffect(() => {
@@ -128,21 +125,20 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const needsTyped = !!options?.requireTypedConfirmation;
   const typedOk = !needsTyped || typed === options?.requireTypedConfirmation;
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     if (!typedOk) return;
-    setBusy(true);
-    // Small defer so the spinner can appear before the caller's async work starts.
-    await Promise.resolve();
     close(true);
   };
 
+  const contextValue = useMemo(() => ({ confirm, prompt }), [confirm, prompt]);
+
   return (
-    <ConfirmContext.Provider value={{ confirm, prompt }}>
+    <ConfirmContext.Provider value={contextValue}>
       {children}
-      <Dialog open={!!options} onOpenChange={(o) => !o && !busy && close(false)}>
+      <Dialog open={!!options} onOpenChange={(o) => !o && close(false)}>
         {options && (
           <>
-            <DialogHeader onClose={busy ? undefined : () => close(false)}>
+            <DialogHeader onClose={() => close(false)}>
               <DialogTitle>
                 <span className="flex items-center gap-2">
                   {tone === 'destructive' && (
@@ -180,7 +176,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               </div>
             </DialogContent>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => close(false)} disabled={busy}>
+              <Button type="button" variant="outline" onClick={() => close(false)}>
                 {options.cancelLabel ?? 'Cancel'}
               </Button>
               <Button
@@ -188,9 +184,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 type="button"
                 variant={tone === 'destructive' ? 'destructive' : 'default'}
                 onClick={handleConfirm}
-                disabled={!typedOk || busy}
+                disabled={!typedOk}
               >
-                {busy && <Spinner className="mr-1" />}
                 {options.confirmLabel ?? (tone === 'destructive' ? 'Delete' : 'Confirm')}
               </Button>
             </DialogFooter>

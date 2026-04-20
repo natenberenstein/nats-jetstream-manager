@@ -29,9 +29,19 @@ export function LastUpdated({ timestamp, isFetching, onRefresh, className }: Las
   const [, force] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => force((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
+    if (!timestamp) return;
+    let id: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const age = Date.now() - timestamp;
+      const delay = age < 60_000 ? 1000 : 60_000;
+      id = setTimeout(() => {
+        force((n) => n + 1);
+        tick();
+      }, delay);
+    };
+    tick();
+    return () => clearTimeout(id);
+  }, [timestamp]);
 
   const label = timestamp ? `Updated ${formatAge(Date.now() - timestamp)}` : 'Never updated';
 

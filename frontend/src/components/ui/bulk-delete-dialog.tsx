@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import {
   Dialog,
   DialogHeader,
@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 type ItemStatus = 'pending' | 'running' | 'success' | 'error';
@@ -47,15 +48,18 @@ export function BulkDeleteDialog({
   const [states, setStates] = useState<ItemState[]>([]);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
   useEffect(() => {
     if (open) {
       setRunning(false);
       setFinished(false);
-      setStates(items.map((name) => ({ name, status: 'pending' })));
+      setStates(itemsRef.current.map((name) => ({ name, status: 'pending' })));
       const t = setTimeout(() => confirmButtonRef.current?.focus(), 10);
       return () => clearTimeout(t);
     }
-  }, [open, items]);
+  }, [open]);
 
   const summary = useMemo(() => {
     const succeeded = states.filter((s) => s.status === 'success').length;
@@ -65,14 +69,18 @@ export function BulkDeleteDialog({
 
   const run = async () => {
     setRunning(true);
+    let succeeded = 0;
+    const failed: string[] = [];
     for (let i = 0; i < items.length; i++) {
       const name = items[i];
       setStates((prev) => prev.map((s, idx) => (idx === i ? { ...s, status: 'running' } : s)));
       try {
         await onDeleteItem(name);
+        succeeded++;
         setStates((prev) => prev.map((s, idx) => (idx === i ? { ...s, status: 'success' } : s)));
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed';
+        failed.push(name);
         setStates((prev) =>
           prev.map((s, idx) => (idx === i ? { ...s, status: 'error', error: msg } : s)),
         );
@@ -80,12 +88,7 @@ export function BulkDeleteDialog({
     }
     setRunning(false);
     setFinished(true);
-    setStates((prev) => {
-      const succeeded = prev.filter((s) => s.status === 'success').length;
-      const failed = prev.filter((s) => s.status === 'error').map((s) => s.name);
-      onFinished?.({ succeeded, failed });
-      return prev;
-    });
+    onFinished?.({ succeeded, failed });
   };
 
   const handleClose = () => {
@@ -135,7 +138,7 @@ export function BulkDeleteDialog({
               Cancel
             </Button>
             <Button ref={confirmButtonRef} variant="destructive" onClick={run} disabled={running}>
-              {running && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {running && <Spinner className="mr-1" />}
               Delete {items.length}
             </Button>
           </>
@@ -148,8 +151,7 @@ export function BulkDeleteDialog({
 function StatusIcon({ status }: { status: ItemStatus }) {
   if (status === 'pending')
     return <span className={cn('h-3.5 w-3.5 rounded-full border border-muted-foreground/40')} />;
-  if (status === 'running')
-    return <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-label="Running" />;
+  if (status === 'running') return <Spinner className="h-3.5 w-3.5 text-primary" label="Running" />;
   if (status === 'success')
     return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-label="Success" />;
   return <XCircle className="h-3.5 w-3.5 text-destructive" aria-label="Failed" />;

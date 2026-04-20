@@ -40,7 +40,7 @@ export class ConnectionsService implements OnModuleDestroy {
   private readonly connectionTimeoutMs: number;
 
   constructor() {
-    this.connectionTimeoutMs = parseInt(process.env.CONNECTION_TIMEOUT_SECONDS ?? '300', 10) * 1000;
+    this.connectionTimeoutMs = parseInt(process.env.CONNECTION_TIMEOUT ?? '300', 10) * 1000;
   }
 
   async createConnection(
@@ -62,18 +62,24 @@ export class ConnectionsService implements OnModuleDestroy {
       }
     }
 
-    const nc = await this.connectToNats(url, user, password, token);
+    const sysPromise: Promise<NatsConnection | undefined> =
+      sysUser && sysPassword
+        ? this.connectToNats(url, sysUser, sysPassword).catch((error: unknown) => {
+            this.logger.warn(
+              `Failed to open system-account connection: ${(error as Error).message}`,
+            );
+            return undefined;
+          })
+        : Promise.resolve(undefined);
+
+    const [nc, sysNc] = await Promise.all([
+      this.connectToNats(url, user, password, token),
+      sysPromise,
+    ]);
     const jsm = await nc.jetstreamManager();
     const js = nc.jetstream();
-
-    let sysNc: NatsConnection | undefined;
-    if (sysUser && sysPassword) {
-      try {
-        sysNc = await this.connectToNats(url, sysUser, sysPassword);
-        this.logger.log('System-account connection established');
-      } catch (error: unknown) {
-        this.logger.warn(`Failed to open system-account connection: ${(error as Error).message}`);
-      }
+    if (sysNc) {
+      this.logger.log('System-account connection established');
     }
 
     const connectionId = uuidv4();
