@@ -122,13 +122,15 @@ export default function HomePage() {
               </div>
 
               <div>
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => setShowAdvanced((v) => !v)}
-                  className="text-sm text-muted-foreground hover:text-foreground underline"
+                  className="h-auto p-0 text-muted-foreground hover:text-foreground"
                 >
                   {showAdvanced ? 'Hide advanced options' : 'Show advanced options'}
-                </button>
+                </Button>
               </div>
 
               {showAdvanced && (

@@ -9,7 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/pagination';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { downloadFile, formatPayload, maskSensitiveText, toCsv } from './utils';
 import { PayloadViewer } from './PayloadViewer';
 
@@ -130,12 +136,16 @@ export function MessageList({
           <div className="flex flex-wrap items-center gap-2">
             <Select
               value={String(liveIntervalMs)}
-              onChange={(e) => onLiveIntervalChange(Number(e.target.value))}
-              className="w-24"
+              onValueChange={(value) => onLiveIntervalChange(Number(value))}
             >
-              <option value={1000}>1s</option>
-              <option value={2000}>2s</option>
-              <option value={5000}>5s</option>
+              <SelectTrigger className="h-9 w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1000">1s</SelectItem>
+                <SelectItem value="2000">2s</SelectItem>
+                <SelectItem value="5000">5s</SelectItem>
+              </SelectContent>
             </Select>
             <Button onClick={onRefetch} disabled={!selectedStream} variant="outline" size="sm">
               <RefreshCw className="w-4 h-4" />
@@ -185,21 +195,21 @@ export function MessageList({
           <label className="flex items-center gap-2">
             <Checkbox
               checked={showHeadersCol}
-              onChange={(e) => onShowHeadersColChange(e.target.checked)}
+              onCheckedChange={(checked) => onShowHeadersColChange(checked === true)}
             />
             Headers
           </label>
           <label className="flex items-center gap-2">
             <Checkbox
               checked={showSizeCol}
-              onChange={(e) => onShowSizeColChange(e.target.checked)}
+              onCheckedChange={(checked) => onShowSizeColChange(checked === true)}
             />
             Size
           </label>
           <label className="flex items-center gap-2">
             <Checkbox
               checked={showTimeCol}
-              onChange={(e) => onShowTimeColChange(e.target.checked)}
+              onCheckedChange={(checked) => onShowTimeColChange(checked === true)}
             />
             Time
           </label>
@@ -225,7 +235,7 @@ export function MessageList({
                   <div className="flex items-center gap-2">
                     <Checkbox
                       checked={compareSelection.includes(message.seq)}
-                      onChange={() => onToggleCompare(message.seq)}
+                      onCheckedChange={() => onToggleCompare(message.seq)}
                     />
                     <span className="font-medium">{message.subject}</span>
                     <span className="text-xs text-muted-foreground">seq {message.seq}</span>

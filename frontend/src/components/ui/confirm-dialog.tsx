@@ -137,8 +137,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       <Dialog open={!!options} onOpenChange={(o) => !o && close(false)}>
         {options && (
-          <>
-            <DialogHeader onClose={() => close(false)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
               <DialogTitle>
                 <span className="flex items-center gap-2">
                   {tone === 'destructive' && (
@@ -149,32 +149,30 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               </DialogTitle>
               {options.description && <DialogDescription>{options.description}</DialogDescription>}
             </DialogHeader>
-            <DialogContent>
-              <div className="space-y-3">
-                {options.body}
-                {needsTyped && (
-                  <div className="space-y-1">
-                    <Label htmlFor="confirm-typed">
-                      Type{' '}
-                      <span className="font-mono font-semibold">
-                        {options.requireTypedConfirmation}
-                      </span>{' '}
-                      to confirm
-                    </Label>
-                    <Input
-                      id="confirm-typed"
-                      autoFocus
-                      value={typed}
-                      onChange={(e) => setTyped(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && typedOk) void handleConfirm();
-                      }}
-                      placeholder={options.requireTypedConfirmation}
-                    />
-                  </div>
-                )}
-              </div>
-            </DialogContent>
+            <div className="space-y-3">
+              {options.body}
+              {needsTyped && (
+                <div className="space-y-1">
+                  <Label htmlFor="confirm-typed">
+                    Type{' '}
+                    <span className="font-mono font-semibold">
+                      {options.requireTypedConfirmation}
+                    </span>{' '}
+                    to confirm
+                  </Label>
+                  <Input
+                    id="confirm-typed"
+                    autoFocus
+                    value={typed}
+                    onChange={(e) => setTyped(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && typedOk) void handleConfirm();
+                    }}
+                    placeholder={options.requireTypedConfirmation}
+                  />
+                </div>
+              )}
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => close(false)}>
                 {options.cancelLabel ?? 'Cancel'}
@@ -189,40 +187,38 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 {options.confirmLabel ?? (tone === 'destructive' ? 'Delete' : 'Confirm')}
               </Button>
             </DialogFooter>
-          </>
+          </DialogContent>
         )}
       </Dialog>
       <Dialog open={!!promptOptions} onOpenChange={(o) => !o && closePrompt(null)}>
         {promptOptions && (
-          <>
-            <DialogHeader onClose={() => closePrompt(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
               <DialogTitle>{promptOptions.title}</DialogTitle>
               {promptOptions.description && (
                 <DialogDescription>{promptOptions.description}</DialogDescription>
               )}
             </DialogHeader>
-            <DialogContent>
-              <div className="space-y-1">
-                {promptOptions.label && <Label htmlFor="prompt-value">{promptOptions.label}</Label>}
-                <Input
-                  id="prompt-value"
-                  autoFocus
-                  value={promptValue}
-                  onChange={(e) => {
-                    setPromptValue(e.target.value);
-                    if (promptError) setPromptError(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      submitPrompt();
-                    }
-                  }}
-                  placeholder={promptOptions.placeholder}
-                />
-                {promptError && <p className="text-sm text-destructive">{promptError}</p>}
-              </div>
-            </DialogContent>
+            <div className="space-y-1">
+              {promptOptions.label && <Label htmlFor="prompt-value">{promptOptions.label}</Label>}
+              <Input
+                id="prompt-value"
+                autoFocus
+                value={promptValue}
+                onChange={(e) => {
+                  setPromptValue(e.target.value);
+                  if (promptError) setPromptError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitPrompt();
+                  }
+                }}
+                placeholder={promptOptions.placeholder}
+              />
+              {promptError && <p className="text-sm text-destructive">{promptError}</p>}
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => closePrompt(null)}>
                 {promptOptions.cancelLabel ?? 'Cancel'}
@@ -231,7 +227,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 {promptOptions.confirmLabel ?? 'Save'}
               </Button>
             </DialogFooter>
-          </>
+          </DialogContent>
         )}
       </Dialog>
     </ConfirmContext.Provider>

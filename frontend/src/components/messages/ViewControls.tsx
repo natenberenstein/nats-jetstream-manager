@@ -6,7 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { SavedView } from './types';
 
 interface ViewControlsProps {
@@ -41,13 +47,17 @@ export function ViewControls({
         <div className="space-y-1 lg:col-span-2">
           <Label>Saved Views</Label>
           <div className="flex gap-2">
-            <Select defaultValue="" onChange={(e) => e.target.value && onApplyView(e.target.value)}>
-              <option value="">Select a saved view</option>
-              {savedViews.map((view) => (
-                <option key={view.name} value={view.name}>
-                  {view.name}
-                </option>
-              ))}
+            <Select onValueChange={(value) => value && onApplyView(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a saved view" />
+              </SelectTrigger>
+              <SelectContent>
+                {savedViews.map((view) => (
+                  <SelectItem key={view.name} value={view.name}>
+                    {view.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
             <Button variant="outline" onClick={onSaveView} aria-label="Save current view">
               <Save className="w-4 h-4" />
@@ -58,20 +68,23 @@ export function ViewControls({
           <Label>Quick Toggles</Label>
           <div className="flex items-center gap-4 pt-2">
             <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={liveMode} onChange={(e) => onLiveModeChange(e.target.checked)} />
+              <Checkbox
+                checked={liveMode}
+                onCheckedChange={(checked) => onLiveModeChange(checked === true)}
+              />
               Live tail
             </label>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
                 checked={autoScroll}
-                onChange={(e) => onAutoScrollChange(e.target.checked)}
+                onCheckedChange={(checked) => onAutoScrollChange(checked === true)}
               />
               Auto-scroll
             </label>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
                 checked={maskSensitive}
-                onChange={(e) => onMaskSensitiveChange(e.target.checked)}
+                onCheckedChange={(checked) => onMaskSensitiveChange(checked === true)}
               />
               Mask sensitive
             </label>

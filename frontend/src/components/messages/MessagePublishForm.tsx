@@ -10,7 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { parseHeaders, parsePayload } from './utils';
 
@@ -99,18 +105,23 @@ export function MessagePublishForm({
             <div className="flex gap-2">
               <Select
                 value={selectedStream || ''}
-                onChange={(event) => onSelectStream(event.target.value)}
+                onValueChange={onSelectStream}
                 disabled={streamNames.length === 0}
               >
-                {streamNames.length === 0 ? (
-                  <option value="">No streams available</option>
-                ) : (
-                  streamNames.map((streamName) => (
-                    <option key={streamName} value={streamName}>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      streamNames.length === 0 ? 'No streams available' : 'Select a stream'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {streamNames.map((streamName) => (
+                    <SelectItem key={streamName} value={streamName}>
                       {streamName}
-                    </option>
-                  ))
-                )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
               <Button
                 variant="outline"
@@ -171,7 +182,7 @@ export function MessagePublishForm({
             <Checkbox
               id="batchMode"
               checked={batchMode}
-              onChange={(event) => setBatchMode(event.target.checked)}
+              onCheckedChange={(checked) => setBatchMode(checked === true)}
             />
             <Label htmlFor="batchMode" className="text-sm font-normal">
               Batch mode (one message per line)

@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import { Toaster } from 'sonner';
 import './globals.css';
 import { ConnectionProvider } from '@/contexts/ConnectionContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { QueryProvider } from '@/components/QueryProvider';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
+import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,10 +22,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <QueryProvider>
             <ConnectionProvider>
-              <ConfirmProvider>
-                {children}
-                <Toaster position="bottom-right" richColors closeButton />
-              </ConfirmProvider>
+              <TooltipProvider>
+                <ConfirmProvider>
+                  {children}
+                  <Toaster position="bottom-right" richColors closeButton />
+                </ConfirmProvider>
+              </TooltipProvider>
             </ConnectionProvider>
           </QueryProvider>
         </ThemeProvider>

@@ -16,7 +16,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -382,129 +388,141 @@ function StreamEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogHeader onClose={() => onOpenChange(false)}>
-        <DialogTitle>Edit Stream: {config.name}</DialogTitle>
-        <DialogDescription>Modify the mutable configuration for this stream.</DialogDescription>
-      </DialogHeader>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <DialogContent>
-          <div className="space-y-4">
-            {/* Immutable fields */}
-            <div className="rounded border border-muted p-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                Cannot be changed after creation
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div>
-                  <Label className="text-muted-foreground">Name</Label>
-                  <Input value={config.name} disabled />
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Storage</Label>
-                  <Input value={config.storage || 'file'} disabled />
-                </div>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Stream: {config.name}</DialogTitle>
+          <DialogDescription>Modify the mutable configuration for this stream.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Immutable fields */}
+          <div className="rounded border border-muted p-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Cannot be changed after creation
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Name</Label>
+                <Input value={config.name} disabled />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Storage</Label>
+                <Input value={config.storage || 'file'} disabled />
               </div>
             </div>
+          </div>
 
-            {/* Mutable fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="space-y-1 md:col-span-2">
-                <Label>Subjects (comma-separated)</Label>
-                <Input {...register('subjects')} placeholder="orders.>" />
-                {errors.subjects && (
-                  <p className="text-xs text-destructive">{errors.subjects.message}</p>
-                )}
-              </label>
+          {/* Mutable fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="edit-subjects">Subjects (comma-separated)</Label>
+              <Input id="edit-subjects" {...register('subjects')} placeholder="orders.>" />
+              {errors.subjects && (
+                <p className="text-xs text-destructive">{errors.subjects.message}</p>
+              )}
+            </div>
 
-              <label className="space-y-1 md:col-span-2">
-                <Label>Description</Label>
-                <Input {...register('description')} placeholder="Optional description" />
-              </label>
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                {...register('description')}
+                placeholder="Optional description"
+              />
+            </div>
 
-              <label className="space-y-1">
-                <Label>Retention</Label>
-                <Select
-                  value={watch('retention')}
-                  onChange={(e) =>
-                    setValue('retention', e.target.value as 'limits' | 'interest' | 'workqueue')
-                  }
-                >
-                  <option value="limits">limits</option>
-                  <option value="interest">interest</option>
-                  <option value="workqueue">workqueue</option>
-                </Select>
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="edit-retention">Retention</Label>
+              <Select
+                value={watch('retention')}
+                onValueChange={(value) =>
+                  setValue('retention', value as 'limits' | 'interest' | 'workqueue')
+                }
+              >
+                <SelectTrigger id="edit-retention">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="limits">limits</SelectItem>
+                  <SelectItem value="interest">interest</SelectItem>
+                  <SelectItem value="workqueue">workqueue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <label className="space-y-1">
-                <Label>Discard Policy</Label>
-                <Select
-                  value={watch('discard')}
-                  onChange={(e) => setValue('discard', e.target.value as 'old' | 'new')}
-                >
-                  <option value="old">old</option>
-                  <option value="new">new</option>
-                </Select>
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="edit-discard">Discard Policy</Label>
+              <Select
+                value={watch('discard')}
+                onValueChange={(value) => setValue('discard', value as 'old' | 'new')}
+              >
+                <SelectTrigger id="edit-discard">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="old">old</SelectItem>
+                  <SelectItem value="new">new</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <label className="space-y-1">
-                <Label>Max Consumers (-1 = unlimited)</Label>
-                <Input type="number" {...register('max_consumers')} />
-                {errors.max_consumers && (
-                  <p className="text-xs text-destructive">{errors.max_consumers.message}</p>
-                )}
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="edit-max-consumers">Max Consumers (-1 = unlimited)</Label>
+              <Input id="edit-max-consumers" type="number" {...register('max_consumers')} />
+              {errors.max_consumers && (
+                <p className="text-xs text-destructive">{errors.max_consumers.message}</p>
+              )}
+            </div>
 
-              <label className="space-y-1">
-                <Label>Max Messages (-1 = unlimited)</Label>
-                <Input type="number" {...register('max_msgs')} />
-                {errors.max_msgs && (
-                  <p className="text-xs text-destructive">{errors.max_msgs.message}</p>
-                )}
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="edit-max-msgs">Max Messages (-1 = unlimited)</Label>
+              <Input id="edit-max-msgs" type="number" {...register('max_msgs')} />
+              {errors.max_msgs && (
+                <p className="text-xs text-destructive">{errors.max_msgs.message}</p>
+              )}
+            </div>
 
-              <label className="space-y-1">
-                <Label>Max Bytes (-1 = unlimited)</Label>
-                <Input type="number" {...register('max_bytes')} />
-                {errors.max_bytes && (
-                  <p className="text-xs text-destructive">{errors.max_bytes.message}</p>
-                )}
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="edit-max-bytes">Max Bytes (-1 = unlimited)</Label>
+              <Input id="edit-max-bytes" type="number" {...register('max_bytes')} />
+              {errors.max_bytes && (
+                <p className="text-xs text-destructive">{errors.max_bytes.message}</p>
+              )}
+            </div>
 
-              <label className="space-y-1">
-                <Label>Max Age (seconds, 0 = unlimited)</Label>
-                <Input type="number" min={0} {...register('max_age')} />
-                {errors.max_age && (
-                  <p className="text-xs text-destructive">{errors.max_age.message}</p>
-                )}
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="edit-max-age">Max Age (seconds, 0 = unlimited)</Label>
+              <Input id="edit-max-age" type="number" min={0} {...register('max_age')} />
+              {errors.max_age && (
+                <p className="text-xs text-destructive">{errors.max_age.message}</p>
+              )}
+            </div>
 
-              <label className="space-y-1">
-                <Label>Max Message Size (-1 = unlimited)</Label>
-                <Input type="number" {...register('max_msg_size')} />
-                {errors.max_msg_size && (
-                  <p className="text-xs text-destructive">{errors.max_msg_size.message}</p>
-                )}
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="edit-max-msg-size">Max Message Size (-1 = unlimited)</Label>
+              <Input id="edit-max-msg-size" type="number" {...register('max_msg_size')} />
+              {errors.max_msg_size && (
+                <p className="text-xs text-destructive">{errors.max_msg_size.message}</p>
+              )}
+            </div>
 
-              <label className="space-y-1">
-                <Label>Replicas</Label>
-                <Input type="number" min={1} {...register('replicas')} />
-                {errors.replicas && (
-                  <p className="text-xs text-destructive">{errors.replicas.message}</p>
-                )}
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="edit-replicas">Replicas</Label>
+              <Input id="edit-replicas" type="number" min={1} {...register('replicas')} />
+              {errors.replicas && (
+                <p className="text-xs text-destructive">{errors.replicas.message}</p>
+              )}
             </div>
           </div>
-        </DialogContent>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={updateStream.isPending}>
-            {updateStream.isPending ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
-      </form>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateStream.isPending}>
+              {updateStream.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
     </Dialog>
   );
 }

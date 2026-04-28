@@ -184,9 +184,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
             <div className="max-h-72 overflow-auto space-y-1">
               {filteredCommands.map((item) => (
-                <button
+                <Button
                   key={item.href}
-                  className="w-full text-left px-3 py-2 rounded-md hover:bg-accent flex items-center gap-2"
+                  variant="ghost"
+                  className="w-full justify-start gap-2 px-3"
                   onClick={() => {
                     router.push(item.href);
                     setCommandOpen(false);
@@ -195,7 +196,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 >
                   <item.icon className="w-4 h-4" />
                   {item.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

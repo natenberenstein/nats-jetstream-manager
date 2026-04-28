@@ -7,7 +7,13 @@ import { MessageData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { DiffRow, DiffSummary, DiffWorkerRequest, DiffWorkerResponse } from './types';
 import { collapseEqualRows, diffCellClass, formatPayload, maskSensitiveText } from './utils';
 
@@ -231,16 +237,20 @@ export function DiffViewerModal({
             </Button>
             <Select
               value={diffMode}
-              onChange={(event) => setDiffMode(event.target.value as 'line' | 'json')}
-              className="w-28"
+              onValueChange={(value) => setDiffMode(value as 'line' | 'json')}
             >
-              <option value="line">Line</option>
-              <option value="json">JSON path</option>
+              <SelectTrigger className="h-9 w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="line">Line</SelectItem>
+                <SelectItem value="json">JSON path</SelectItem>
+              </SelectContent>
             </Select>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
                 checked={showChangedOnly}
-                onChange={(e) => setShowChangedOnly(e.target.checked)}
+                onCheckedChange={(checked) => setShowChangedOnly(checked === true)}
               />
               Changed only
             </label>

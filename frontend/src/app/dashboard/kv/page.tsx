@@ -44,7 +44,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Pagination } from '@/components/ui/pagination';
 
 function KvKeyBrowser({
@@ -211,43 +218,43 @@ function KvKeyBrowser({
       />
 
       <Dialog open={showPutForm} onOpenChange={setShowPutForm}>
-        <DialogHeader onClose={() => setShowPutForm(false)}>
-          <DialogTitle>Put Key</DialogTitle>
-          <DialogDescription>Set a key-value pair in this KV store.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handlePut}>
-          <DialogContent>
-            <div className="space-y-4">
-              <label className="space-y-1 block">
-                <Label>Key</Label>
-                <Input
-                  value={putForm.key}
-                  onChange={(e) => setPutForm((prev) => ({ ...prev, key: e.target.value }))}
-                  placeholder="my.key"
-                />
-              </label>
-              <label className="space-y-1 block">
-                <Label>Value</Label>
-                <textarea
-                  className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={putForm.value}
-                  onChange={(e) => setPutForm((prev) => ({ ...prev, value: e.target.value }))}
-                  placeholder='{"example": "value"}'
-                />
-              </label>
-              {putError && <p className="text-sm text-destructive">{putError}</p>}
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Put Key</DialogTitle>
+            <DialogDescription>Set a key-value pair in this KV store.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handlePut} className="space-y-4">
+            <div className="space-y-1">
+              <Label htmlFor="put-key">Key</Label>
+              <Input
+                id="put-key"
+                value={putForm.key}
+                onChange={(e) => setPutForm((prev) => ({ ...prev, key: e.target.value }))}
+                placeholder="my.key"
+              />
             </div>
-          </DialogContent>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowPutForm(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={putEntry.isPending}>
-              {putEntry.isPending && <Spinner />}
-              {putEntry.isPending ? 'Saving…' : 'Put Key'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <div className="space-y-1">
+              <Label htmlFor="put-value">Value</Label>
+              <Textarea
+                id="put-value"
+                className="min-h-[120px]"
+                value={putForm.value}
+                onChange={(e) => setPutForm((prev) => ({ ...prev, value: e.target.value }))}
+                placeholder='{"example": "value"}'
+              />
+            </div>
+            {putError && <p className="text-sm text-destructive">{putError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowPutForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={putEntry.isPending}>
+                {putEntry.isPending && <Spinner />}
+                {putEntry.isPending ? 'Saving…' : 'Put Key'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
 
       <Input
@@ -273,7 +280,7 @@ function KvKeyBrowser({
                         checked={
                           filteredKeys.length > 0 && selectedKeys.size === filteredKeys.length
                         }
-                        onChange={toggleSelectAllKeys}
+                        onCheckedChange={toggleSelectAllKeys}
                       />
                     </TableHead>
                     <TableHead>Key</TableHead>
@@ -290,7 +297,7 @@ function KvKeyBrowser({
                       <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedKeys.has(key)}
-                          onChange={() => toggleSelectKey(key)}
+                          onCheckedChange={() => toggleSelectKey(key)}
                         />
                       </TableCell>
                       <TableCell className="font-medium font-mono text-sm">{key}</TableCell>
@@ -515,85 +522,88 @@ export default function KvPage() {
       />
 
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
-        <DialogHeader onClose={() => setShowCreateForm(false)}>
-          <DialogTitle>Create KV Store</DialogTitle>
-          <DialogDescription>Create a new JetStream Key-Value store.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleCreate}>
-          <DialogContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="space-y-1">
-                  <Label>Name</Label>
-                  <Input
-                    value={createForm.name}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="my-config"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <Label>Storage</Label>
-                  <Select
-                    value={createForm.storage}
-                    onChange={(e) =>
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        storage: e.target.value as 'file' | 'memory',
-                      }))
-                    }
-                  >
-                    <option value="file">file</option>
-                    <option value="memory">memory</option>
-                  </Select>
-                </label>
-              </div>
-              <label className="space-y-1 block">
-                <Label>Description (optional)</Label>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create KV Store</DialogTitle>
+            <DialogDescription>Create a new JetStream Key-Value store.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="kv-name">Name</Label>
                 <Input
-                  value={createForm.description}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  placeholder="Application configuration"
+                  id="kv-name"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="my-config"
                 />
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="space-y-1">
-                  <Label>History (versions per key)</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={createForm.history}
-                    onChange={(e) =>
-                      setCreateForm((prev) => ({ ...prev, history: e.target.value }))
-                    }
-                  />
-                </label>
-                <label className="space-y-1">
-                  <Label>Replicas</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={createForm.replicas}
-                    onChange={(e) =>
-                      setCreateForm((prev) => ({ ...prev, replicas: e.target.value }))
-                    }
-                  />
-                </label>
               </div>
-              {createError && <p className="text-sm text-destructive">{createError}</p>}
+              <div className="space-y-1">
+                <Label htmlFor="kv-storage">Storage</Label>
+                <Select
+                  value={createForm.storage}
+                  onValueChange={(value) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      storage: value as 'file' | 'memory',
+                    }))
+                  }
+                >
+                  <SelectTrigger id="kv-storage">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="file">file</SelectItem>
+                    <SelectItem value="memory">memory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </DialogContent>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createKv.isPending}>
-              {createKv.isPending && <Spinner />}
-              {createKv.isPending ? 'Creating…' : 'Create KV Store'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <div className="space-y-1">
+              <Label htmlFor="kv-description">Description (optional)</Label>
+              <Input
+                id="kv-description"
+                value={createForm.description}
+                onChange={(e) =>
+                  setCreateForm((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="Application configuration"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="kv-history">History (versions per key)</Label>
+                <Input
+                  id="kv-history"
+                  type="number"
+                  min={1}
+                  value={createForm.history}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, history: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="kv-replicas">Replicas</Label>
+                <Input
+                  id="kv-replicas"
+                  type="number"
+                  min={1}
+                  value={createForm.replicas}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, replicas: e.target.value }))}
+                />
+              </div>
+            </div>
+            {createError && <p className="text-sm text-destructive">{createError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createKv.isPending}>
+                {createKv.isPending && <Spinner />}
+                {createKv.isPending ? 'Creating…' : 'Create KV Store'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
 
       <Input

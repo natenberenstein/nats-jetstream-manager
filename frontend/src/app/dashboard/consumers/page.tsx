@@ -35,7 +35,13 @@ import { BulkDeleteDialog } from '@/components/ui/bulk-delete-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -118,14 +124,14 @@ function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
           const active = visibleNames.has(m.consumer_name);
           const color = CHART_COLORS[i % CHART_COLORS.length];
           return (
-            <button
+            <Button
               key={m.consumer_name}
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => toggleConsumer(m.consumer_name)}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors ${
-                active
-                  ? 'border-primary/40 bg-primary/10 text-foreground'
-                  : 'border-border text-muted-foreground hover:bg-accent'
+              className={`h-auto gap-1.5 px-2 py-1 text-xs ${
+                active ? 'border-primary/40 bg-primary/10 text-foreground' : 'text-muted-foreground'
               }`}
             >
               <span
@@ -136,7 +142,7 @@ function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
                 }}
               />
               {m.consumer_name}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -224,40 +230,48 @@ function ConsumerLagAnalyticsView({ analyticsData }: { analyticsData: ConsumerAn
             <TableHeader>
               <TableRow>
                 <TableHead>
-                  <button
+                  <Button
                     type="button"
-                    className="font-medium hover:text-foreground"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 font-medium hover:bg-transparent hover:text-foreground"
                     onClick={() => toggleSort('name')}
                   >
                     Consumer{sortIndicator('name')}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead className="text-right">
-                  <button
+                  <Button
                     type="button"
-                    className="font-medium hover:text-foreground"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 font-medium hover:bg-transparent hover:text-foreground"
                     onClick={() => toggleSort('stream_lag')}
                   >
                     Stream Lag{sortIndicator('stream_lag')}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead className="text-right">
-                  <button
+                  <Button
                     type="button"
-                    className="font-medium hover:text-foreground"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 font-medium hover:bg-transparent hover:text-foreground"
                     onClick={() => toggleSort('num_pending')}
                   >
                     Pending{sortIndicator('num_pending')}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead className="text-right">
-                  <button
+                  <Button
                     type="button"
-                    className="font-medium hover:text-foreground"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 font-medium hover:bg-transparent hover:text-foreground"
                     onClick={() => toggleSort('num_ack_pending')}
                   >
                     Ack Pending{sortIndicator('num_ack_pending')}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead className="w-32">Lag</TableHead>
               </TableRow>
@@ -577,15 +591,14 @@ function ConsumerEditForm({
                   )}
                 </label>
 
-                <label className="flex items-center gap-2 pt-6">
+                <div className="flex items-center gap-2 pt-6">
                   <Checkbox
+                    id="edit-headers-only"
                     checked={headersOnly}
-                    onChange={(e) =>
-                      setValue('headers_only', (e.target as HTMLInputElement).checked)
-                    }
+                    onCheckedChange={(checked) => setValue('headers_only', checked === true)}
                   />
-                  <Label>Headers Only</Label>
-                </label>
+                  <Label htmlFor="edit-headers-only">Headers Only</Label>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2">
@@ -806,21 +819,26 @@ export default function ConsumersPage() {
             />
             <Select
               value={selectedStream || ''}
-              onChange={(event) => {
-                setSelectedStream(event.target.value || null);
+              onValueChange={(value) => {
+                setSelectedStream(value || null);
                 setPageIndex(0);
               }}
               disabled={streamNames.length === 0}
             >
-              {streamNames.length === 0 ? (
-                <option value="">No streams available</option>
-              ) : (
-                streamNames.map((streamName) => (
-                  <option key={streamName} value={streamName}>
+              <SelectTrigger className="w-56">
+                <SelectValue
+                  placeholder={
+                    streamNames.length === 0 ? 'No streams available' : 'Select a stream'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {streamNames.map((streamName) => (
+                  <SelectItem key={streamName} value={streamName}>
                     {streamName}
-                  </option>
-                ))
-              )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
             <Button onClick={() => setShowCreateForm(true)} disabled={!selectedStream}>
               <Plus className="w-4 h-4" />
@@ -896,304 +914,326 @@ export default function ConsumersPage() {
           }
         }}
       >
-        <DialogHeader
-          onClose={() => {
-            setShowCreateForm(false);
-            setCloneMessage(null);
-            setFormData(DEFAULT_CONSUMER_FORM);
-          }}
-        >
-          <DialogTitle>Create Consumer</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleCreateConsumer}>
-          <DialogContent>
-            <div className="space-y-4">
-              {cloneMessage && (
-                <Alert>
-                  <AlertDescription>{cloneMessage}</AlertDescription>
-                </Alert>
-              )}
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Create Consumer</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateConsumer} className="space-y-4">
+            {cloneMessage && (
+              <Alert>
+                <AlertDescription>{cloneMessage}</AlertDescription>
+              </Alert>
+            )}
 
-              <label className="space-y-1 block">
-                <Label>Consumer Type</Label>
-                <Select
-                  value={formData.deliver_subject !== undefined ? 'push' : 'pull'}
-                  onChange={(event) => {
-                    if (event.target.value === 'pull') {
-                      setFormData((prev) => ({
-                        ...prev,
-                        deliver_subject: undefined,
-                        deliver_group: undefined,
-                        flow_control: undefined,
-                        idle_heartbeat: undefined,
-                      }));
-                    } else {
-                      setFormData((prev) => ({
-                        ...prev,
-                        deliver_subject: '',
-                        max_waiting: undefined,
-                      }));
-                    }
-                  }}
-                >
-                  <option value="pull">Pull</option>
-                  <option value="push">Push</option>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formData.deliver_subject !== undefined
-                    ? 'Push: server delivers messages to a subject'
-                    : 'Pull: clients request messages on demand'}
-                </p>
-              </label>
+            <div className="space-y-1">
+              <Label htmlFor="consumer-type">Consumer Type</Label>
+              <Select
+                value={formData.deliver_subject !== undefined ? 'push' : 'pull'}
+                onValueChange={(value) => {
+                  if (value === 'pull') {
+                    setFormData((prev) => ({
+                      ...prev,
+                      deliver_subject: undefined,
+                      deliver_group: undefined,
+                      flow_control: undefined,
+                      idle_heartbeat: undefined,
+                    }));
+                  } else {
+                    setFormData((prev) => ({
+                      ...prev,
+                      deliver_subject: '',
+                      max_waiting: undefined,
+                    }));
+                  }
+                }}
+              >
+                <SelectTrigger id="consumer-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pull">Pull</SelectItem>
+                  <SelectItem value="push">Push</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {formData.deliver_subject !== undefined
+                  ? 'Push: server delivers messages to a subject'
+                  : 'Pull: clients request messages on demand'}
+              </p>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="space-y-1">
-                  <Label>Durable Name</Label>
-                  <Input
-                    ref={durableNameRef}
-                    type="text"
-                    value={formData.durable_name || ''}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, durable_name: event.target.value }))
-                    }
-                    placeholder="order-worker"
-                  />
-                </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="durable-name">Durable Name</Label>
+                <Input
+                  id="durable-name"
+                  ref={durableNameRef}
+                  type="text"
+                  value={formData.durable_name || ''}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, durable_name: event.target.value }))
+                  }
+                  placeholder="order-worker"
+                />
+              </div>
 
-                <label className="space-y-1">
-                  <Label>Consumer Name (optional)</Label>
-                  <Input
-                    type="text"
-                    value={formData.name || ''}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, name: event.target.value }))
-                    }
-                    placeholder="consumer-name"
-                  />
-                </label>
+              <div className="space-y-1">
+                <Label htmlFor="consumer-name">Consumer Name (optional)</Label>
+                <Input
+                  id="consumer-name"
+                  type="text"
+                  value={formData.name || ''}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  placeholder="consumer-name"
+                />
+              </div>
 
-                <label className="space-y-1">
-                  <Label>Filter Subject</Label>
-                  <Input
-                    type="text"
-                    value={formData.filter_subject || ''}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, filter_subject: event.target.value }))
-                    }
-                    placeholder="orders.created"
-                  />
-                </label>
+              <div className="space-y-1">
+                <Label htmlFor="filter-subject">Filter Subject</Label>
+                <Input
+                  id="filter-subject"
+                  type="text"
+                  value={formData.filter_subject || ''}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, filter_subject: event.target.value }))
+                  }
+                  placeholder="orders.created"
+                />
+              </div>
 
-                <label className="space-y-1">
-                  <Label>Description</Label>
-                  <Input
-                    type="text"
-                    value={formData.description || ''}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, description: event.target.value }))
-                    }
-                    placeholder="Processes order events"
-                  />
-                </label>
+              <div className="space-y-1">
+                <Label htmlFor="consumer-description">Description</Label>
+                <Input
+                  id="consumer-description"
+                  type="text"
+                  value={formData.description || ''}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, description: event.target.value }))
+                  }
+                  placeholder="Processes order events"
+                />
+              </div>
 
-                {formData.deliver_subject !== undefined && (
-                  <>
-                    <label className="space-y-1">
-                      <Label>Deliver Subject</Label>
-                      <Input
-                        type="text"
-                        value={formData.deliver_subject || ''}
-                        onChange={(event) =>
-                          setFormData((prev) => ({ ...prev, deliver_subject: event.target.value }))
-                        }
-                        placeholder="deliver.orders"
-                      />
-                    </label>
-
-                    <label className="space-y-1">
-                      <Label>Deliver Group (optional)</Label>
-                      <Input
-                        type="text"
-                        value={formData.deliver_group || ''}
-                        onChange={(event) =>
-                          setFormData((prev) => ({ ...prev, deliver_group: event.target.value }))
-                        }
-                        placeholder="worker-group"
-                      />
-                    </label>
-
-                    <label className="space-y-1">
-                      <Label>Idle Heartbeat (nanoseconds, 0 = off)</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={formData.idle_heartbeat ?? 0}
-                        onChange={(event) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            idle_heartbeat: Number(event.target.value),
-                          }))
-                        }
-                      />
-                    </label>
-
-                    <label className="flex items-center gap-2 pt-6">
-                      <Checkbox
-                        checked={formData.flow_control ?? false}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            flow_control: (e.target as HTMLInputElement).checked,
-                          }))
-                        }
-                      />
-                      <Label>Flow Control</Label>
-                    </label>
-                  </>
-                )}
-
-                <label className="space-y-1">
-                  <Label>Ack Policy</Label>
-                  <Select
-                    value={formData.ack_policy}
-                    onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        ack_policy: event.target.value as ConsumerConfig['ack_policy'],
-                      }))
-                    }
-                  >
-                    <option value="explicit">explicit</option>
-                    <option value="all">all</option>
-                    <option value="none">none</option>
-                  </Select>
-                </label>
-
-                <label className="space-y-1">
-                  <Label>Deliver Policy</Label>
-                  <Select
-                    value={formData.deliver_policy}
-                    onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        deliver_policy: event.target.value as ConsumerConfig['deliver_policy'],
-                      }))
-                    }
-                  >
-                    <option value="all">all</option>
-                    <option value="last">last</option>
-                    <option value="new">new</option>
-                    <option value="by_start_sequence">by_start_sequence</option>
-                    <option value="by_start_time">by_start_time</option>
-                    <option value="last_per_subject">last_per_subject</option>
-                  </Select>
-                </label>
-
-                <label className="space-y-1">
-                  <Label>Ack Wait (nanoseconds)</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={formData.ack_wait ?? 30_000_000_000}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, ack_wait: Number(event.target.value) }))
-                    }
-                  />
-                </label>
-
-                <label className="space-y-1">
-                  <Label>Max Deliver</Label>
-                  <Input
-                    type="number"
-                    value={formData.max_deliver ?? -1}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, max_deliver: Number(event.target.value) }))
-                    }
-                  />
-                </label>
-
-                <label className="space-y-1">
-                  <Label>Max Ack Pending</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={formData.max_ack_pending ?? 1000}
-                    onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        max_ack_pending: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-
-                {formData.deliver_subject === undefined && (
-                  <label className="space-y-1">
-                    <Label>Max Waiting</Label>
+              {formData.deliver_subject !== undefined && (
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="deliver-subject">Deliver Subject</Label>
                     <Input
-                      type="number"
-                      min={0}
-                      value={formData.max_waiting ?? 512}
+                      id="deliver-subject"
+                      type="text"
+                      value={formData.deliver_subject || ''}
                       onChange={(event) =>
                         setFormData((prev) => ({
                           ...prev,
-                          max_waiting: Number(event.target.value),
+                          deliver_subject: event.target.value,
+                        }))
+                      }
+                      placeholder="deliver.orders"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="deliver-group">Deliver Group (optional)</Label>
+                    <Input
+                      id="deliver-group"
+                      type="text"
+                      value={formData.deliver_group || ''}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          deliver_group: event.target.value,
+                        }))
+                      }
+                      placeholder="worker-group"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="idle-heartbeat">Idle Heartbeat (nanoseconds, 0 = off)</Label>
+                    <Input
+                      id="idle-heartbeat"
+                      type="number"
+                      min={0}
+                      value={formData.idle_heartbeat ?? 0}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          idle_heartbeat: Number(event.target.value),
                         }))
                       }
                     />
-                  </label>
-                )}
+                  </div>
 
-                <label className="space-y-1">
-                  <Label>Rate Limit (bytes/sec)</Label>
+                  <div className="flex items-center gap-2 pt-6">
+                    <Checkbox
+                      id="flow-control"
+                      checked={formData.flow_control ?? false}
+                      onCheckedChange={(checked) =>
+                        setFormData((prev) => ({ ...prev, flow_control: checked === true }))
+                      }
+                    />
+                    <Label htmlFor="flow-control">Flow Control</Label>
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-1">
+                <Label htmlFor="ack-policy">Ack Policy</Label>
+                <Select
+                  value={formData.ack_policy}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      ack_policy: value as ConsumerConfig['ack_policy'],
+                    }))
+                  }
+                >
+                  <SelectTrigger id="ack-policy">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="explicit">explicit</SelectItem>
+                    <SelectItem value="all">all</SelectItem>
+                    <SelectItem value="none">none</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="deliver-policy">Deliver Policy</Label>
+                <Select
+                  value={formData.deliver_policy}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      deliver_policy: value as ConsumerConfig['deliver_policy'],
+                    }))
+                  }
+                >
+                  <SelectTrigger id="deliver-policy">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">all</SelectItem>
+                    <SelectItem value="last">last</SelectItem>
+                    <SelectItem value="new">new</SelectItem>
+                    <SelectItem value="by_start_sequence">by_start_sequence</SelectItem>
+                    <SelectItem value="by_start_time">by_start_time</SelectItem>
+                    <SelectItem value="last_per_subject">last_per_subject</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="ack-wait-ns">Ack Wait (nanoseconds)</Label>
+                <Input
+                  id="ack-wait-ns"
+                  type="number"
+                  min={1}
+                  value={formData.ack_wait ?? 30_000_000_000}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, ack_wait: Number(event.target.value) }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="max-deliver">Max Deliver</Label>
+                <Input
+                  id="max-deliver"
+                  type="number"
+                  value={formData.max_deliver ?? -1}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, max_deliver: Number(event.target.value) }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="max-ack-pending">Max Ack Pending</Label>
+                <Input
+                  id="max-ack-pending"
+                  type="number"
+                  min={0}
+                  value={formData.max_ack_pending ?? 1000}
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      max_ack_pending: Number(event.target.value),
+                    }))
+                  }
+                />
+              </div>
+
+              {formData.deliver_subject === undefined && (
+                <div className="space-y-1">
+                  <Label htmlFor="max-waiting">Max Waiting</Label>
                   <Input
+                    id="max-waiting"
                     type="number"
                     min={0}
-                    value={formData.rate_limit_bps ?? 0}
+                    value={formData.max_waiting ?? 512}
                     onChange={(event) =>
                       setFormData((prev) => ({
                         ...prev,
-                        rate_limit_bps: Number(event.target.value),
+                        max_waiting: Number(event.target.value),
                       }))
                     }
                   />
-                </label>
+                </div>
+              )}
 
-                <label className="flex items-center gap-2 pt-6">
-                  <Checkbox
-                    checked={formData.headers_only ?? false}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        headers_only: (e.target as HTMLInputElement).checked,
-                      }))
-                    }
-                  />
-                  <Label>Headers Only</Label>
-                </label>
+              <div className="space-y-1">
+                <Label htmlFor="rate-limit">Rate Limit (bytes/sec)</Label>
+                <Input
+                  id="rate-limit"
+                  type="number"
+                  min={0}
+                  value={formData.rate_limit_bps ?? 0}
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      rate_limit_bps: Number(event.target.value),
+                    }))
+                  }
+                />
               </div>
 
-              {formError && <p className="text-sm text-destructive">{formError}</p>}
+              <div className="flex items-center gap-2 pt-6">
+                <Checkbox
+                  id="headers-only"
+                  checked={formData.headers_only ?? false}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, headers_only: checked === true }))
+                  }
+                />
+                <Label htmlFor="headers-only">Headers Only</Label>
+              </div>
             </div>
-          </DialogContent>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowCreateForm(false);
-                setCloneMessage(null);
-                setFormData(DEFAULT_CONSUMER_FORM);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createConsumer.isPending}>
-              {createConsumer.isPending && <Spinner />}
-              {createConsumer.isPending ? 'Creating…' : 'Create Consumer'}
-            </Button>
-          </DialogFooter>
-        </form>
+
+            {formError && <p className="text-sm text-destructive">{formError}</p>}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setCloneMessage(null);
+                  setFormData(DEFAULT_CONSUMER_FORM);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createConsumer.isPending}>
+                {createConsumer.isPending && <Spinner />}
+                {createConsumer.isPending ? 'Creating…' : 'Create Consumer'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
 
       {selectedConsumers.size > 0 && (
@@ -1237,7 +1277,7 @@ export default function ConsumersPage() {
                         !!filteredConsumers.length &&
                         selectedConsumers.size === filteredConsumers.length
                       }
-                      onChange={toggleSelectAllConsumers}
+                      onCheckedChange={toggleSelectAllConsumers}
                     />
                   </TableHead>
                   <TableHead>Name</TableHead>
@@ -1260,7 +1300,7 @@ export default function ConsumersPage() {
                         <TableCell>
                           <Checkbox
                             checked={selectedConsumers.has(consumer.name)}
-                            onChange={() => toggleSelectConsumer(consumer.name)}
+                            onCheckedChange={() => toggleSelectConsumer(consumer.name)}
                           />
                         </TableCell>
                         <TableCell className="font-medium">

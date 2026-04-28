@@ -2,7 +2,13 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface PaginationProps {
   pageIndex: number;
@@ -29,15 +35,20 @@ export function Pagination({
         <span>Rows per page</span>
         <Select
           value={String(pageSize)}
-          onChange={(e) => {
-            onPageSizeChange(Number(e.target.value));
+          onValueChange={(value) => {
+            onPageSizeChange(Number(value));
             onPageChange(0);
           }}
         >
-          <option value="10">10</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
+          <SelectTrigger className="h-8 w-[80px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10</SelectItem>
+            <SelectItem value="25">25</SelectItem>
+            <SelectItem value="50">50</SelectItem>
+            <SelectItem value="100">100</SelectItem>
+          </SelectContent>
         </Select>
       </div>
 

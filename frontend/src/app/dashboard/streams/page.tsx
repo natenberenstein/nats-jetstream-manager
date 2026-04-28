@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
@@ -40,7 +40,13 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
 
 function StreamEditForm({
@@ -57,6 +63,7 @@ function StreamEditForm({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<StreamUpdateFormData>({
     mode: 'onSubmit',
@@ -143,25 +150,47 @@ function StreamEditForm({
                   <Input {...register('description')} placeholder="Optional description" />
                 </label>
 
-                <label className="space-y-1">
-                  <Label>Retention</Label>
-                  <Select {...register('retention')}>
-                    <option value="limits">limits</option>
-                    <option value="interest">interest</option>
-                    <option value="workqueue">workqueue</option>
-                  </Select>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-retention">Retention</Label>
+                  <Controller
+                    control={control}
+                    name="retention"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="edit-retention">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="limits">limits</SelectItem>
+                          <SelectItem value="interest">interest</SelectItem>
+                          <SelectItem value="workqueue">workqueue</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   {errors.retention && (
                     <p className="text-xs text-destructive">{errors.retention.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Discard Policy</Label>
-                  <Select {...register('discard')}>
-                    <option value="old">old</option>
-                    <option value="new">new</option>
-                  </Select>
-                </label>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-discard">Discard Policy</Label>
+                  <Controller
+                    control={control}
+                    name="discard"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="edit-discard">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="old">old</SelectItem>
+                          <SelectItem value="new">new</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
 
                 <label className="space-y-1">
                   <Label>Max Consumers (-1 = unlimited)</Label>
@@ -399,73 +428,80 @@ export default function StreamsPage() {
       />
 
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
-        <DialogHeader onClose={() => setShowCreateForm(false)}>
-          <DialogTitle>Create Stream</DialogTitle>
-          <DialogDescription>Define stream name and subject patterns.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleCreateStream}>
-          <DialogContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="space-y-1">
-                  <Label>Name</Label>
-                  <Input
-                    value={createForm.name}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="orders"
-                  />
-                </label>
-
-                <label className="space-y-1">
-                  <Label>Storage</Label>
-                  <Select
-                    value={createForm.storage}
-                    onChange={(e) =>
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        storage: e.target.value as 'file' | 'memory',
-                      }))
-                    }
-                  >
-                    <option value="file">file</option>
-                    <option value="memory">memory</option>
-                  </Select>
-                </label>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Stream</DialogTitle>
+            <DialogDescription>Define stream name and subject patterns.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateStream} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="create-name">Name</Label>
+                <Input
+                  id="create-name"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="orders"
+                />
               </div>
 
-              <label className="space-y-1 block">
-                <Label>Subjects (comma-separated)</Label>
-                <Input
-                  value={createForm.subjects}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, subjects: e.target.value }))}
-                  placeholder="orders.created, orders.updated"
-                />
-              </label>
-
-              <label className="space-y-1 block">
-                <Label>Description (optional)</Label>
-                <Input
-                  value={createForm.description}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({ ...prev, description: e.target.value }))
+              <div className="space-y-1">
+                <Label htmlFor="create-storage">Storage</Label>
+                <Select
+                  value={createForm.storage}
+                  onValueChange={(value) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      storage: value as 'file' | 'memory',
+                    }))
                   }
-                  placeholder="Order domain events"
-                />
-              </label>
-
-              {createError && <p className="text-sm text-destructive">{createError}</p>}
+                >
+                  <SelectTrigger id="create-storage">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="file">file</SelectItem>
+                    <SelectItem value="memory">memory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </DialogContent>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createStream.isPending}>
-              {createStream.isPending && <Spinner />}
-              {createStream.isPending ? 'Creating…' : 'Create Stream'}
-            </Button>
-          </DialogFooter>
-        </form>
+
+            <div className="space-y-1">
+              <Label htmlFor="create-subjects">Subjects (comma-separated)</Label>
+              <Input
+                id="create-subjects"
+                value={createForm.subjects}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, subjects: e.target.value }))}
+                placeholder="orders.created, orders.updated"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="create-description">Description (optional)</Label>
+              <Input
+                id="create-description"
+                value={createForm.description}
+                onChange={(e) =>
+                  setCreateForm((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="Order domain events"
+              />
+            </div>
+
+            {createError && <p className="text-sm text-destructive">{createError}</p>}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createStream.isPending}>
+                {createStream.isPending && <Spinner />}
+                {createStream.isPending ? 'Creating…' : 'Create Stream'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
 
       <Input
@@ -491,7 +527,7 @@ export default function StreamsPage() {
                       checked={
                         !!filteredStreams.length && selectedStreams.size === filteredStreams.length
                       }
-                      onChange={toggleSelectAll}
+                      onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
                   <TableHead>Name</TableHead>
@@ -512,7 +548,7 @@ export default function StreamsPage() {
                         <TableCell>
                           <Checkbox
                             checked={selectedStreams.has(stream.config.name)}
-                            onChange={() => toggleSelectStream(stream.config.name)}
+                            onCheckedChange={() => toggleSelectStream(stream.config.name)}
                           />
                         </TableCell>
                         <TableCell className="font-medium">

@@ -98,16 +98,16 @@ export function BulkDeleteDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogHeader onClose={running ? undefined : handleClose}>
-        <DialogTitle>
-          <span className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden />
-            {title}
-          </span>
-        </DialogTitle>
-        {description && <DialogDescription>{description}</DialogDescription>}
-      </DialogHeader>
-      <DialogContent>
+      <DialogContent showCloseButton={!running}>
+        <DialogHeader>
+          <DialogTitle>
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden />
+              {title}
+            </span>
+          </DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
+        </DialogHeader>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
             {finished
@@ -128,22 +128,22 @@ export function BulkDeleteDialog({
             ))}
           </div>
         </div>
+        <DialogFooter>
+          {finished ? (
+            <Button onClick={handleClose}>Close</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleClose} disabled={running}>
+                Cancel
+              </Button>
+              <Button ref={confirmButtonRef} variant="destructive" onClick={run} disabled={running}>
+                {running && <Spinner className="mr-1" />}
+                Delete {items.length}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
       </DialogContent>
-      <DialogFooter>
-        {finished ? (
-          <Button onClick={handleClose}>Close</Button>
-        ) : (
-          <>
-            <Button variant="outline" onClick={handleClose} disabled={running}>
-              Cancel
-            </Button>
-            <Button ref={confirmButtonRef} variant="destructive" onClick={run} disabled={running}>
-              {running && <Spinner className="mr-1" />}
-              Delete {items.length}
-            </Button>
-          </>
-        )}
-      </DialogFooter>
     </Dialog>
   );
 }

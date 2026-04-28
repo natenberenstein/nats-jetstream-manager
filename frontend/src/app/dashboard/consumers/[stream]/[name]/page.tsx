@@ -425,114 +425,128 @@ function ConsumerEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogHeader onClose={() => onOpenChange(false)}>
-        <DialogTitle>Edit Consumer: {consumer.name}</DialogTitle>
-        <DialogDescription>Modify the mutable configuration for this consumer.</DialogDescription>
-      </DialogHeader>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <DialogContent>
-          <div className="space-y-4">
-            {/* Immutable fields */}
-            <div className="rounded border border-muted p-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                Cannot be changed after creation
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
-                <div>
-                  <Label className="text-muted-foreground">Name / Durable</Label>
-                  <Input value={consumer.config.durable_name || consumer.name} disabled />
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Type</Label>
-                  <Input value={consumer.config.deliver_subject ? 'Push' : 'Pull'} disabled />
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Filter Subject</Label>
-                  <Input value={consumer.config.filter_subject || '*'} disabled />
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Deliver Policy</Label>
-                  <Input value={consumer.config.deliver_policy || 'all'} disabled />
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Ack Policy</Label>
-                  <Input value={consumer.config.ack_policy || 'explicit'} disabled />
-                </div>
-                {consumer.config.deliver_subject && (
-                  <div>
-                    <Label className="text-muted-foreground">Deliver Subject</Label>
-                    <Input value={consumer.config.deliver_subject} disabled />
-                  </div>
-                )}
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Edit Consumer: {consumer.name}</DialogTitle>
+          <DialogDescription>Modify the mutable configuration for this consumer.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Immutable fields */}
+          <div className="rounded border border-muted p-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Cannot be changed after creation
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Name / Durable</Label>
+                <Input value={consumer.config.durable_name || consumer.name} disabled />
               </div>
-            </div>
-
-            {/* Mutable fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="space-y-1 md:col-span-2">
-                <Label>Description</Label>
-                <Input {...register('description')} placeholder="Optional description" />
-              </label>
-
-              <label className="space-y-1">
-                <Label>Ack Wait (seconds)</Label>
-                <Input type="number" step="0.1" min={0} {...register('ack_wait_seconds')} />
-                {errors.ack_wait_seconds && (
-                  <p className="text-xs text-destructive">{errors.ack_wait_seconds.message}</p>
-                )}
-              </label>
-
-              <label className="space-y-1">
-                <Label>Max Deliver (-1 = unlimited)</Label>
-                <Input type="number" {...register('max_deliver')} />
-                {errors.max_deliver && (
-                  <p className="text-xs text-destructive">{errors.max_deliver.message}</p>
-                )}
-              </label>
-
-              <label className="space-y-1">
-                <Label>Max Ack Pending</Label>
-                <Input type="number" min={0} {...register('max_ack_pending')} />
-                {errors.max_ack_pending && (
-                  <p className="text-xs text-destructive">{errors.max_ack_pending.message}</p>
-                )}
-              </label>
-
-              <label className="space-y-1">
-                <Label>Max Waiting</Label>
-                <Input type="number" min={0} {...register('max_waiting')} />
-                {errors.max_waiting && (
-                  <p className="text-xs text-destructive">{errors.max_waiting.message}</p>
-                )}
-              </label>
-
-              <label className="space-y-1">
-                <Label>Rate Limit (bytes/sec, 0 = unlimited)</Label>
-                <Input type="number" min={0} {...register('rate_limit_bps')} />
-                {errors.rate_limit_bps && (
-                  <p className="text-xs text-destructive">{errors.rate_limit_bps.message}</p>
-                )}
-              </label>
-
-              <label className="flex items-center gap-2 pt-6">
-                <Checkbox
-                  checked={headersOnly}
-                  onChange={(e) => setValue('headers_only', (e.target as HTMLInputElement).checked)}
-                />
-                <Label>Headers Only</Label>
-              </label>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Type</Label>
+                <Input value={consumer.config.deliver_subject ? 'Push' : 'Pull'} disabled />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Filter Subject</Label>
+                <Input value={consumer.config.filter_subject || '*'} disabled />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Deliver Policy</Label>
+                <Input value={consumer.config.deliver_policy || 'all'} disabled />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Ack Policy</Label>
+                <Input value={consumer.config.ack_policy || 'explicit'} disabled />
+              </div>
+              {consumer.config.deliver_subject && (
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground">Deliver Subject</Label>
+                  <Input value={consumer.config.deliver_subject} disabled />
+                </div>
+              )}
             </div>
           </div>
-        </DialogContent>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={updateConsumer.isPending}>
-            {updateConsumer.isPending ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
-      </form>
+
+          {/* Mutable fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="detail-description">Description</Label>
+              <Input
+                id="detail-description"
+                {...register('description')}
+                placeholder="Optional description"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="detail-ack-wait">Ack Wait (seconds)</Label>
+              <Input
+                id="detail-ack-wait"
+                type="number"
+                step="0.1"
+                min={0}
+                {...register('ack_wait_seconds')}
+              />
+              {errors.ack_wait_seconds && (
+                <p className="text-xs text-destructive">{errors.ack_wait_seconds.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="detail-max-deliver">Max Deliver (-1 = unlimited)</Label>
+              <Input id="detail-max-deliver" type="number" {...register('max_deliver')} />
+              {errors.max_deliver && (
+                <p className="text-xs text-destructive">{errors.max_deliver.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="detail-max-ack-pending">Max Ack Pending</Label>
+              <Input
+                id="detail-max-ack-pending"
+                type="number"
+                min={0}
+                {...register('max_ack_pending')}
+              />
+              {errors.max_ack_pending && (
+                <p className="text-xs text-destructive">{errors.max_ack_pending.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="detail-max-waiting">Max Waiting</Label>
+              <Input id="detail-max-waiting" type="number" min={0} {...register('max_waiting')} />
+              {errors.max_waiting && (
+                <p className="text-xs text-destructive">{errors.max_waiting.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="detail-rate-limit">Rate Limit (bytes/sec, 0 = unlimited)</Label>
+              <Input id="detail-rate-limit" type="number" min={0} {...register('rate_limit_bps')} />
+              {errors.rate_limit_bps && (
+                <p className="text-xs text-destructive">{errors.rate_limit_bps.message}</p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 pt-6">
+              <Checkbox
+                id="detail-headers-only"
+                checked={headersOnly}
+                onCheckedChange={(checked) => setValue('headers_only', checked === true)}
+              />
+              <Label htmlFor="detail-headers-only">Headers Only</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateConsumer.isPending}>
+              {updateConsumer.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
     </Dialog>
   );
 }

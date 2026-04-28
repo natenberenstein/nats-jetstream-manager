@@ -43,7 +43,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
 
 function ObjectBrowser({
@@ -249,49 +255,49 @@ function ObjectBrowser({
       />
 
       <Dialog open={showUploadForm} onOpenChange={setShowUploadForm}>
-        <DialogHeader onClose={() => setShowUploadForm(false)}>
-          <DialogTitle>Upload Object</DialogTitle>
-          <DialogDescription>Upload a file to this object store.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleUpload}>
-          <DialogContent>
-            <div className="space-y-4">
-              <label className="space-y-1 block">
-                <Label>File</Label>
-                <Input ref={fileInputRef} type="file" onChange={handleFileSelect} />
-                {fileName && <p className="text-xs text-muted-foreground">Selected: {fileName}</p>}
-              </label>
-              <label className="space-y-1 block">
-                <Label>Object Name</Label>
-                <Input
-                  value={uploadForm.name}
-                  onChange={(e) => setUploadForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="report.pdf"
-                />
-              </label>
-              <label className="space-y-1 block">
-                <Label>Description (optional)</Label>
-                <Input
-                  value={uploadForm.description}
-                  onChange={(e) =>
-                    setUploadForm((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  placeholder="Monthly report"
-                />
-              </label>
-              {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Object</DialogTitle>
+            <DialogDescription>Upload a file to this object store.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpload} className="space-y-4">
+            <div className="space-y-1">
+              <Label htmlFor="upload-file">File</Label>
+              <Input id="upload-file" ref={fileInputRef} type="file" onChange={handleFileSelect} />
+              {fileName && <p className="text-xs text-muted-foreground">Selected: {fileName}</p>}
             </div>
-          </DialogContent>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowUploadForm(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={putObject.isPending}>
-              {putObject.isPending && <Spinner />}
-              {putObject.isPending ? 'Uploading…' : 'Upload'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <div className="space-y-1">
+              <Label htmlFor="upload-name">Object Name</Label>
+              <Input
+                id="upload-name"
+                value={uploadForm.name}
+                onChange={(e) => setUploadForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="report.pdf"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="upload-description">Description (optional)</Label>
+              <Input
+                id="upload-description"
+                value={uploadForm.description}
+                onChange={(e) =>
+                  setUploadForm((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="Monthly report"
+              />
+            </div>
+            {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowUploadForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={putObject.isPending}>
+                {putObject.isPending && <Spinner />}
+                {putObject.isPending ? 'Uploading…' : 'Upload'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
 
       <Input
@@ -314,7 +320,7 @@ function ObjectBrowser({
                   <TableHead className="w-10">
                     <Checkbox
                       checked={objects.length > 0 && selectedObjects.size === objects.length}
-                      onChange={toggleSelectAllObjects}
+                      onCheckedChange={toggleSelectAllObjects}
                     />
                   </TableHead>
                   <TableHead>Name</TableHead>
@@ -331,7 +337,7 @@ function ObjectBrowser({
                     <TableCell className="w-10">
                       <Checkbox
                         checked={selectedObjects.has(obj.name)}
-                        onChange={() => toggleSelectObject(obj.name)}
+                        onCheckedChange={() => toggleSelectObject(obj.name)}
                       />
                     </TableCell>
                     <TableCell className="font-medium">{obj.name}</TableCell>
@@ -499,70 +505,76 @@ export default function ObjectStorePage() {
       />
 
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
-        <DialogHeader onClose={() => setShowCreateForm(false)}>
-          <DialogTitle>Create Object Store</DialogTitle>
-          <DialogDescription>Create a new JetStream Object store.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleCreate}>
-          <DialogContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="space-y-1">
-                  <Label>Name</Label>
-                  <Input
-                    value={createForm.name}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="documents"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <Label>Storage</Label>
-                  <Select
-                    value={createForm.storage}
-                    onChange={(e) =>
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        storage: e.target.value as 'file' | 'memory',
-                      }))
-                    }
-                  >
-                    <option value="file">file</option>
-                    <option value="memory">memory</option>
-                  </Select>
-                </label>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Object Store</DialogTitle>
+            <DialogDescription>Create a new JetStream Object store.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="os-name">Name</Label>
+                <Input
+                  id="os-name"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="documents"
+                />
               </div>
-              <label className="space-y-1 block">
-                <Label>Description (optional)</Label>
-                <Input
-                  value={createForm.description}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({ ...prev, description: e.target.value }))
+              <div className="space-y-1">
+                <Label htmlFor="os-storage">Storage</Label>
+                <Select
+                  value={createForm.storage}
+                  onValueChange={(value) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      storage: value as 'file' | 'memory',
+                    }))
                   }
-                  placeholder="Document storage"
-                />
-              </label>
-              <label className="space-y-1 block">
-                <Label>Replicas</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={createForm.replicas}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, replicas: e.target.value }))}
-                />
-              </label>
-              {createError && <p className="text-sm text-destructive">{createError}</p>}
+                >
+                  <SelectTrigger id="os-storage">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="file">file</SelectItem>
+                    <SelectItem value="memory">memory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </DialogContent>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createStore.isPending}>
-              {createStore.isPending && <Spinner />}
-              {createStore.isPending ? 'Creating…' : 'Create Object Store'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <div className="space-y-1">
+              <Label htmlFor="os-description">Description (optional)</Label>
+              <Input
+                id="os-description"
+                value={createForm.description}
+                onChange={(e) =>
+                  setCreateForm((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="Document storage"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="os-replicas">Replicas</Label>
+              <Input
+                id="os-replicas"
+                type="number"
+                min={1}
+                value={createForm.replicas}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, replicas: e.target.value }))}
+              />
+            </div>
+            {createError && <p className="text-sm text-destructive">{createError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createStore.isPending}>
+                {createStore.isPending && <Spinner />}
+                {createStore.isPending ? 'Creating…' : 'Create Object Store'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
       </Dialog>
 
       <Input
