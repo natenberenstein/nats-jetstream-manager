@@ -23,13 +23,11 @@ export default function HealthPage() {
   const { data: history } = useHealthHistory(connectionId, timeWindow);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Connection Health</h2>
-          <p className="text-muted-foreground">
-            Uptime tracking and health check history
-          </p>
+          <h2 className="text-xl font-bold sm:text-2xl">Connection Health</h2>
+          <p className="text-muted-foreground">Uptime tracking and health check history</p>
         </div>
         <div className="flex gap-1">
           {WINDOWS.map((w) => (
@@ -50,21 +48,26 @@ export default function HealthPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="p-4">
             <p className="text-sm text-muted-foreground">Uptime</p>
-            <p className={cn(
-              'text-3xl font-bold',
-              uptime.uptime_pct >= 99 ? 'text-green-600' :
-              uptime.uptime_pct >= 95 ? 'text-yellow-600' : 'text-red-600'
-            )}>
+            <p
+              className={cn(
+                'text-2xl font-bold',
+                uptime.uptime_pct >= 99
+                  ? 'text-green-600'
+                  : uptime.uptime_pct >= 95
+                    ? 'text-yellow-600'
+                    : 'text-red-600',
+              )}
+            >
               {uptime.uptime_pct}%
             </p>
           </Card>
           <Card className="p-4">
             <p className="text-sm text-muted-foreground">Total Checks</p>
-            <p className="text-3xl font-bold">{uptime.total_checks}</p>
+            <p className="text-2xl font-bold">{uptime.total_checks}</p>
           </Card>
           <Card className="p-4">
             <p className="text-sm text-muted-foreground">Up / Down</p>
-            <p className="text-3xl font-bold">
+            <p className="text-2xl font-bold">
               <span className="text-green-600">{uptime.up_checks}</span>
               {' / '}
               <span className="text-red-600">{uptime.down_checks}</span>
@@ -72,7 +75,10 @@ export default function HealthPage() {
           </Card>
           <Card className="p-4">
             <p className="text-sm text-muted-foreground">Current Status</p>
-            <Badge variant={uptime.last_status === 'up' ? 'default' : 'destructive'} className="mt-1">
+            <Badge
+              variant={uptime.last_status === 'up' ? 'default' : 'destructive'}
+              className="mt-1"
+            >
               {uptime.last_status?.toUpperCase() || 'UNKNOWN'}
             </Badge>
             {uptime.last_error && (
@@ -104,28 +110,34 @@ export default function HealthPage() {
                 </tr>
               </thead>
               <tbody>
-                {[...history.checks].reverse().slice(0, 50).map((check, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">
-                      {new Date(check.checked_at).toLocaleString()}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <Badge variant={check.status === 'up' ? 'default' : 'destructive'} className="text-xs">
-                        {check.status.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td className="py-2 pr-4">
-                      {check.jetstream_ok ? (
-                        <span className="text-green-600">OK</span>
-                      ) : (
-                        <span className="text-yellow-600">Degraded</span>
-                      )}
-                    </td>
-                    <td className="py-2 text-muted-foreground truncate max-w-xs">
-                      {check.error || '-'}
-                    </td>
-                  </tr>
-                ))}
+                {[...history.checks]
+                  .reverse()
+                  .slice(0, 50)
+                  .map((check, i) => (
+                    <tr key={i} className="border-b last:border-0">
+                      <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">
+                        {new Date(check.checked_at).toLocaleString()}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <Badge
+                          variant={check.status === 'up' ? 'default' : 'destructive'}
+                          className="text-xs"
+                        >
+                          {check.status.toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td className="py-2 pr-4">
+                        {check.jetstream_ok ? (
+                          <span className="text-green-600">OK</span>
+                        ) : (
+                          <span className="text-yellow-600">Degraded</span>
+                        )}
+                      </td>
+                      <td className="py-2 text-muted-foreground truncate max-w-xs">
+                        {check.error || '-'}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

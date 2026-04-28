@@ -206,7 +206,7 @@ function ObjectBrowser({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title={store.bucket}
         description={`${formatBytes(store.size)} · ${store.storage}${store.sealed ? ' · sealed' : ''}`}
@@ -485,7 +485,7 @@ export default function ObjectStorePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="Object Stores"
         description="Manage JetStream Object stores"

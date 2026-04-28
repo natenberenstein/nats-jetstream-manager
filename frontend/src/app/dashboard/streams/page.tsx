@@ -385,7 +385,7 @@ export default function StreamsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="Streams"
         description="Manage your JetStream streams"

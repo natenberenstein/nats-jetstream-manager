@@ -64,7 +64,7 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
   const state = stream.state;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/streams">
@@ -73,7 +73,7 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">{config.name}</h1>
+            <h1 className="text-xl font-bold sm:text-2xl">{config.name}</h1>
             {config.description && <p className="text-muted-foreground">{config.description}</p>}
           </div>
         </div>
@@ -119,25 +119,25 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Messages</p>
-            <p className="text-2xl font-semibold">{formatNumber(state.messages)}</p>
+            <p className="text-xl font-semibold">{formatNumber(state.messages)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Size</p>
-            <p className="text-2xl font-semibold">{formatBytes(state.bytes)}</p>
+            <p className="text-xl font-semibold">{formatBytes(state.bytes)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Consumers</p>
-            <p className="text-2xl font-semibold">{state.consumer_count}</p>
+            <p className="text-xl font-semibold">{state.consumer_count}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Sequence Range</p>
-            <p className="text-2xl font-semibold">
+            <p className="text-xl font-semibold">
               {state.first_seq} - {state.last_seq}
             </p>
           </CardContent>

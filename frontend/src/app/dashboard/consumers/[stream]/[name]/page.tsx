@@ -83,7 +83,7 @@ export default function ConsumerDetailPage({
   const isPush = !!config.deliver_subject;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
@@ -92,7 +92,7 @@ export default function ConsumerDetailPage({
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">{consumer.name}</h1>
+            <h1 className="text-xl font-bold sm:text-2xl">{consumer.name}</h1>
             <div className="flex items-center gap-2 mt-1">
               {config.description && <p className="text-muted-foreground">{config.description}</p>}
             </div>
@@ -135,31 +135,31 @@ export default function ConsumerDetailPage({
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Pending</p>
-            <p className="text-2xl font-semibold">{formatNumber(consumer.num_pending)}</p>
+            <p className="text-xl font-semibold">{formatNumber(consumer.num_pending)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Ack Pending</p>
-            <p className="text-2xl font-semibold">{formatNumber(consumer.num_ack_pending)}</p>
+            <p className="text-xl font-semibold">{formatNumber(consumer.num_ack_pending)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Waiting</p>
-            <p className="text-2xl font-semibold">{formatNumber(consumer.num_waiting)}</p>
+            <p className="text-xl font-semibold">{formatNumber(consumer.num_waiting)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Delivered Seq</p>
-            <p className="text-2xl font-semibold">{formatNumber(consumer.delivered.stream_seq)}</p>
+            <p className="text-xl font-semibold">{formatNumber(consumer.delivered.stream_seq)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Ack Floor Seq</p>
-            <p className="text-2xl font-semibold">{formatNumber(consumer.ack_floor.stream_seq)}</p>
+            <p className="text-xl font-semibold">{formatNumber(consumer.ack_floor.stream_seq)}</p>
           </CardContent>
         </Card>
       </div>

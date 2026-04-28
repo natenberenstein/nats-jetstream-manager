@@ -162,7 +162,7 @@ function KvKeyBrowser({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title={bucket.bucket}
         description={`${formatNumber(bucket.values)} keys · ${formatBytes(bucket.size)} · history ${bucket.history} · ${bucket.storage}`}
@@ -502,7 +502,7 @@ export default function KvPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="KV Stores"
         description="Manage JetStream Key-Value stores"

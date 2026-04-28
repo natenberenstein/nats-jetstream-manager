@@ -12,9 +12,11 @@ export default function DashboardPage() {
   const { data: streamsData, isLoading } = useStreams(connectionId);
 
   const totalStreams = streamsData?.total || 0;
-  const totalMessages = streamsData?.streams.reduce((sum, s) => sum + (s.state?.messages || 0), 0) || 0;
+  const totalMessages =
+    streamsData?.streams.reduce((sum, s) => sum + (s.state?.messages || 0), 0) || 0;
   const totalBytes = streamsData?.streams.reduce((sum, s) => sum + (s.state?.bytes || 0), 0) || 0;
-  const totalConsumers = streamsData?.streams.reduce((sum, s) => sum + (s.state?.consumer_count || 0), 0) || 0;
+  const totalConsumers =
+    streamsData?.streams.reduce((sum, s) => sum + (s.state?.consumer_count || 0), 0) || 0;
 
   const stats = [
     {
@@ -48,30 +50,26 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-          <h1 className="text-2xl font-bold mb-2">
-            Dashboard Overview
-          </h1>
-          <p className="text-muted-foreground">
-            Monitor your NATS JetStream cluster
-          </p>
-        </div>
+        <h1 className="text-xl font-bold sm:text-2xl mb-2">Dashboard Overview</h1>
+        <p className="text-muted-foreground">Monitor your NATS JetStream cluster</p>
+      </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <Card key={stat.label}>
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <Badge variant="outline" className={cn("rounded-md px-2 py-1", stat.badgeClass)}>
+                  <Badge variant="outline" className={cn('rounded-md px-2 py-1', stat.badgeClass)}>
                     {stat.label}
                   </Badge>
-                  <Icon className={cn("w-6 h-6", stat.iconClass)} />
+                  <Icon className={cn('w-6 h-6', stat.iconClass)} />
                 </div>
-                <p className="text-3xl font-bold">{isLoading ? '...' : stat.value}</p>
+                <p className="text-2xl font-bold">{isLoading ? '...' : stat.value}</p>
               </CardContent>
             </Card>
           );
@@ -81,9 +79,7 @@ export default function DashboardPage() {
       {/* Recent Streams */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">
-            Recent Streams
-          </CardTitle>
+          <CardTitle className="text-lg">Recent Streams</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -96,9 +92,7 @@ export default function DashboardPage() {
                   className="flex items-center justify-between p-4 bg-muted/40 rounded-lg"
                 >
                   <div>
-                    <h3 className="font-medium">
-                      {stream.config.name}
-                    </h3>
+                    <h3 className="font-medium">{stream.config.name}</h3>
                     <p className="text-sm text-muted-foreground">
                       {stream.config.subjects.join(', ')}
                     </p>

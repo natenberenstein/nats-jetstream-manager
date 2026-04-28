@@ -503,9 +503,9 @@ export default function MessagesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold mb-2">Messages</h1>
+        <h1 className="text-xl font-bold mb-2 sm:text-2xl">Messages</h1>
         <p className="text-muted-foreground">
           Publish, filter, compare, replay, and monitor messages
         </p>

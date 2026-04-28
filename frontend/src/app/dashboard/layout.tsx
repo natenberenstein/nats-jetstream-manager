@@ -104,14 +104,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-muted/40">
       {/* Header */}
       <header className="bg-background border-b">
-        <div className="px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Database className="w-6 h-6 text-primary-foreground" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
+              <Database className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold">NATS JetStream Manager</h1>
-              <p className="text-sm text-muted-foreground">{url}</p>
+              <h1 className="text-sm font-semibold leading-tight sm:text-base">
+                NATS JetStream Manager
+              </h1>
+              <p className="text-xs text-muted-foreground">{url}</p>
             </div>
           </div>
 
@@ -119,11 +121,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Button variant="outline" size="icon" onClick={toggleTheme} title="Toggle theme">
               {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </Button>
-            <Button variant="outline" onClick={() => setCommandOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => setCommandOpen(true)}>
               <Search className="w-4 h-4" />
               Command
             </Button>
-            <Button onClick={handleDisconnect} variant="outline">
+            <Button onClick={handleDisconnect} variant="outline" size="sm">
               <LogOut className="w-4 h-4" />
               Disconnect
             </Button>
@@ -133,12 +135,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="w-64 bg-background border-r min-h-[calc(100vh-73px)] flex flex-col">
-          <nav className="p-4 flex-1 space-y-4">
+        <aside className="hidden w-56 flex-col border-r bg-background min-h-[calc(100vh-57px)] md:flex">
+          <nav className="flex-1 space-y-3 p-3">
             {navSections.map((section, sectionIndex) => (
-              <div key={section.label ?? `section-${sectionIndex}`} className="space-y-1">
+              <div key={section.label ?? `section-${sectionIndex}`} className="space-y-0.5">
                 {section.label && (
-                  <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {section.label}
                   </p>
                 )}
@@ -149,11 +151,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        'flex items-center gap-3 px-4 py-3 rounded-md transition-colors',
+                        'flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors',
                         isActive ? 'bg-primary/10 text-primary' : 'hover:bg-accent',
                       )}
                     >
-                      <item.icon className="w-5 h-5" />
+                      <item.icon className="h-4 w-4" />
                       <span className="font-medium">{item.label}</span>
                     </Link>
                   );
@@ -164,7 +166,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 min-w-0">
+          <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 sm:py-6">
+            {children}
+          </div>
+        </main>
       </div>
 
       {commandOpen && (

@@ -15,7 +15,7 @@ export function PageHeader({ title, description, actions, meta, className }: Pag
       className={cn('flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between', className)}
     >
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         {meta && <div className="mt-2">{meta}</div>}
       </div>

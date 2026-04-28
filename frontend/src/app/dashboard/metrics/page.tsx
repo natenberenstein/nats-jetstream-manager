@@ -21,13 +21,11 @@ export default function MetricsPage() {
   const { data, isLoading } = useAllStreamMetrics(connectionId, timeWindow);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Stream Metrics</h2>
-          <p className="text-muted-foreground">
-            Real-time message rates and byte throughput
-          </p>
+          <h2 className="text-xl font-bold sm:text-2xl">Stream Metrics</h2>
+          <p className="text-muted-foreground">Real-time message rates and byte throughput</p>
         </div>
         <div className="flex gap-1">
           {WINDOWS.map((w) => (
@@ -43,24 +41,24 @@ export default function MetricsPage() {
         </div>
       </div>
 
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">Loading metrics...</p>
-      )}
+      {isLoading && <p className="text-sm text-muted-foreground">Loading metrics...</p>}
 
       {data && data.streams.length === 0 && (
         <Card className="p-8 text-center">
           <p className="text-muted-foreground">
-            No metrics data available yet. The background collector gathers snapshots every 30 seconds.
+            No metrics data available yet. The background collector gathers snapshots every 30
+            seconds.
           </p>
         </Card>
       )}
 
-      {data && data.streams.map((stream) => (
-        <Card key={stream.stream_name} className="p-6">
-          <h3 className="text-lg font-semibold mb-4">{stream.stream_name}</h3>
-          <StreamMetricsChart points={stream.points} />
-        </Card>
-      ))}
+      {data &&
+        data.streams.map((stream) => (
+          <Card key={stream.stream_name} className="p-6">
+            <h3 className="text-lg font-semibold mb-4">{stream.stream_name}</h3>
+            <StreamMetricsChart points={stream.points} />
+          </Card>
+        ))}
     </div>
   );
 }

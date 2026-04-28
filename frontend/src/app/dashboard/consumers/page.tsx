@@ -797,7 +797,7 @@ export default function ConsumersPage() {
   }, [consumersData?.consumers]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="Consumers"
         description="Manage JetStream consumers by stream"
@@ -872,26 +872,26 @@ export default function ConsumersPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Consumers</p>
-            <p className="text-2xl font-semibold">{healthSummary.total}</p>
+            <p className="text-xl font-semibold">{healthSummary.total}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Pending</p>
-            <p className="text-2xl font-semibold">{healthSummary.totalPending}</p>
+            <p className="text-xl font-semibold">{healthSummary.totalPending}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Ack Pending</p>
-            <p className="text-2xl font-semibold">{healthSummary.totalAckPending}</p>
+            <p className="text-xl font-semibold">{healthSummary.totalAckPending}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Potentially Stalled</p>
             <p
-              className={`text-2xl font-semibold ${healthSummary.stalled > 0 ? 'text-destructive' : ''}`}
+              className={`text-xl font-semibold ${healthSummary.stalled > 0 ? 'text-destructive' : ''}`}
             >
               {healthSummary.stalled}
             </p>
