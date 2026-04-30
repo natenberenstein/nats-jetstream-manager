@@ -6,6 +6,8 @@ import { useAllStreamMetrics } from '@/hooks/useMetrics';
 import StreamMetricsChart from '@/components/charts/StreamMetricsChart';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const WINDOWS = [
   { label: '5m', minutes: 5 },
@@ -22,26 +24,31 @@ export default function MetricsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold sm:text-2xl">Stream Metrics</h2>
-          <p className="text-muted-foreground">Real-time message rates and byte throughput</p>
-        </div>
-        <div className="flex gap-1">
-          {WINDOWS.map((w) => (
-            <Button
-              key={w.minutes}
-              variant={timeWindow === w.minutes ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setTimeWindow(w.minutes)}
-            >
-              {w.label}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="Stream Metrics"
+        description="Real-time message rates and byte throughput"
+        actions={
+          <div className="flex gap-1">
+            {WINDOWS.map((w) => (
+              <Button
+                key={w.minutes}
+                variant={timeWindow === w.minutes ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTimeWindow(w.minutes)}
+              >
+                {w.label}
+              </Button>
+            ))}
+          </div>
+        }
+      />
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading metrics...</p>}
+      {isLoading && (
+        <Card className="p-6 space-y-3">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-48 w-full" />
+        </Card>
+      )}
 
       {data && data.streams.length === 0 && (
         <Card className="p-8 text-center">

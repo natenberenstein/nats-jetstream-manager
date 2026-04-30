@@ -1,20 +1,14 @@
 'use client';
 
-import {
-  Activity,
-  Database,
-  HardDrive,
-  MessageSquare,
-  RefreshCw,
-  Users,
-  AlertTriangle,
-} from 'lucide-react';
+import { Activity, Database, HardDrive, MessageSquare, Users, AlertTriangle } from 'lucide-react';
 
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useSystemObservability } from '@/hooks/useSystem';
 import { formatBytes, formatNumber } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { StatCard } from '@/components/cards/StatCard';
 
 function MiniBarChart({
   title,
@@ -59,7 +53,7 @@ function MiniBarChart({
 
 export default function ObservabilityPage() {
   const { connectionId } = useConnection();
-  const { data, isLoading, isError, error, refetch, isFetching } =
+  const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } =
     useSystemObservability(connectionId);
 
   const cards = [
@@ -71,34 +65,28 @@ export default function ObservabilityPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold sm:text-2xl mb-2">System Observability</h1>
-          <p className="text-muted-foreground">
-            Cluster health, capacity, and high-level workload indicators
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="System Observability"
+        description="Cluster health, capacity, and high-level workload indicators"
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Card key={card.label}>
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground">{card.label}</p>
-                  <Icon className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <p className="text-xl font-semibold">{isLoading ? '...' : card.value}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {cards.map((card) => (
+          <StatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            icon={card.icon}
+            isLoading={isLoading}
+          />
+        ))}
       </div>
 
       <Card>

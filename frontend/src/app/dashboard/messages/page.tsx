@@ -20,6 +20,7 @@ import {
 } from '@/components/messages';
 import { SavedView } from '@/components/messages/types';
 import { usePrompt } from '@/components/ui/confirm-dialog';
+import { PageHeader } from '@/components/ui/page-header';
 
 const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
 const FAVORITE_STREAMS_KEY = 'nats_favorite_streams_v1';
@@ -504,12 +505,10 @@ export default function MessagesPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-xl font-bold mb-2 sm:text-2xl">Messages</h1>
-        <p className="text-muted-foreground">
-          Publish, filter, compare, replay, and monitor messages
-        </p>
-      </div>
+      <PageHeader
+        title="Messages"
+        description="Publish, filter, compare, replay, and monitor messages"
+      />
 
       <ViewControls
         savedViews={savedViews}

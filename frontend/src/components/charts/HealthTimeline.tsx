@@ -26,17 +26,15 @@ export default function HealthTimeline({ checks }: HealthTimelineProps) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        Health Timeline ({display.length} checks)
-      </p>
+      <p className="text-xs text-muted-foreground">Health Timeline ({display.length} checks)</p>
       <div className="flex items-end gap-px h-8">
         {display.map((check, i) => (
           <div
             key={i}
             className={cn(
               'flex-1 min-w-[3px] max-w-[8px] rounded-sm cursor-pointer transition-opacity hover:opacity-80',
-              check.status === 'up' ? 'bg-green-500' : 'bg-red-500',
-              !check.jetstream_ok && check.status === 'up' && 'bg-yellow-500'
+              check.status === 'up' ? 'bg-success' : 'bg-destructive',
+              !check.jetstream_ok && check.status === 'up' && 'bg-warning',
             )}
             style={{ height: '100%' }}
             title={`${formatTime(check.checked_at)} - ${check.status.toUpperCase()}${check.error ? ': ' + check.error : ''}`}
@@ -49,13 +47,13 @@ export default function HealthTimeline({ checks }: HealthTimelineProps) {
       </div>
       <div className="flex gap-4 text-xs">
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-green-500 inline-block" /> Up
+          <span className="w-3 h-3 rounded-sm bg-success inline-block" /> Up
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-yellow-500 inline-block" /> JS Degraded
+          <span className="w-3 h-3 rounded-sm bg-warning inline-block" /> JS Degraded
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-red-500 inline-block" /> Down
+          <span className="w-3 h-3 rounded-sm bg-destructive inline-block" /> Down
         </span>
       </div>
     </div>

@@ -9,13 +9,16 @@ import { useConnection } from '@/contexts/ConnectionContext';
 import { useConsumer, useConsumerMetric, useUpdateConsumer } from '@/hooks/useConsumers';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import { formatNumber } from '@/lib/utils';
-import { ArrowLeft, Layers, RefreshCw, Pencil } from 'lucide-react';
+import { ArrowLeft, Layers, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -52,6 +55,8 @@ export default function ConsumerDetailPage({
   const {
     data: consumer,
     isLoading,
+    isFetching,
+    dataUpdatedAt,
     refetch,
   } = useConsumer(connectionId, streamName, consumerName);
   const { data: metricsData } = useConsumerMetric(connectionId, streamName, consumerName);
@@ -68,7 +73,16 @@ export default function ConsumerDetailPage({
   }, [metricsData]);
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading consumer details...</div>;
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-9 w-64" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (!consumer) {
@@ -84,37 +98,36 @@ export default function ConsumerDetailPage({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="w-4 h-4" />
+      <PageHeader
+        title={consumer.name}
+        description={config.description}
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+        actions={
+          <>
+            <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
+              <Button variant="outline" size="icon" aria-label="Back to consumers">
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Button variant="outline" onClick={() => setEditing(true)}>
+              <Pencil className="w-4 h-4" />
+              Edit
             </Button>
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold sm:text-2xl">{consumer.name}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              {config.description && <p className="text-muted-foreground">{config.description}</p>}
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setEditing(true)}>
-            <Pencil className="w-4 h-4" />
-            Edit
-          </Button>
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
-          <Link href={`/dashboard/streams/${encodeURIComponent(streamName)}`}>
-            <Button variant="outline">
-              <Layers className="w-4 h-4" />
-              View Stream
-            </Button>
-          </Link>
-        </div>
-      </div>
+            <Link href={`/dashboard/streams/${encodeURIComponent(streamName)}`}>
+              <Button variant="outline">
+                <Layers className="w-4 h-4" />
+                View Stream
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       {connectionId && (
         <ConsumerEditDialog

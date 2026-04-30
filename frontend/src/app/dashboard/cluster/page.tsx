@@ -1,25 +1,21 @@
 'use client';
 
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Layers,
-  Network,
-  RefreshCw,
-  Server,
-  ShieldAlert,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Layers, Network, Server, ShieldAlert } from 'lucide-react';
 
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useClusterOverview } from '@/hooks/useCluster';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { Skeleton } from '@/components/ui/skeleton';
+import { StatCard } from '@/components/cards/StatCard';
 
 export default function ClusterPage() {
   const { connectionId } = useConnection();
-  const { data, isLoading, isError, error, refetch, isFetching } = useClusterOverview(connectionId);
+  const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } =
+    useClusterOverview(connectionId);
 
   const stats = [
     {
@@ -34,34 +30,28 @@ export default function ClusterPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold sm:text-2xl mb-2">Cluster</h1>
-          <p className="text-muted-foreground">
-            Version, topology, node health, and replication posture
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="Cluster"
+        description="Version, topology, node health, and replication posture"
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.label}>
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <Icon className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <p className="text-xl font-semibold">{isLoading ? '...' : stat.value}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {stats.map((stat) => (
+          <StatCard
+            key={stat.label}
+            label={stat.label}
+            value={stat.value}
+            icon={stat.icon}
+            isLoading={isLoading}
+          />
+        ))}
       </div>
 
       <Card>
@@ -171,7 +161,7 @@ export default function ClusterPage() {
               <p className="text-muted-foreground mb-1">Caveats</p>
               <div className="space-y-1">
                 {data.caveats.map((caveat) => (
-                  <p key={caveat} className="text-amber-700 text-sm">
+                  <p key={caveat} className="text-warning text-sm">
                     {caveat}
                   </p>
                 ))}
@@ -187,7 +177,11 @@ export default function ClusterPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading nodes...</p>
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
           ) : data?.nodes.length ? (
             data.nodes.map((node) => (
               <div
@@ -202,7 +196,7 @@ export default function ClusterPage() {
                   {node.offline ? (
                     <Badge variant="destructive">offline</Badge>
                   ) : (
-                    <Badge className="bg-emerald-600">online</Badge>
+                    <Badge variant="success">online</Badge>
                   )}
                   {!!node.current && <Badge variant="outline">current</Badge>}
                   {!!node.lag && node.lag > 0 && <Badge variant="secondary">lag {node.lag}</Badge>}
@@ -241,7 +235,11 @@ export default function ClusterPage() {
             </div>
           </div>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading stream health...</p>
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
           ) : data?.stream_health.length ? (
             data.stream_health.map((stream) => (
               <div
@@ -257,7 +255,7 @@ export default function ClusterPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {stream.healthy ? (
-                    <Badge className="bg-emerald-600">
+                    <Badge variant="success">
                       <CheckCircle2 className="w-3 h-3 mr-1" />
                       Healthy
                     </Badge>
@@ -289,13 +287,13 @@ export default function ClusterPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading warnings...</p>
+            <Skeleton className="h-12 w-full" />
           ) : data?.warnings.length ? (
             <div className="space-y-2">
               {data.warnings.map((warning) => (
                 <div
                   key={warning}
-                  className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+                  className="rounded border border-warning/40 bg-warning/10 p-3 text-sm text-warning"
                 >
                   {warning}
                 </div>

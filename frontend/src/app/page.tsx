@@ -179,14 +179,7 @@ export default function HomePage() {
               )}
 
               {testResult && (
-                <Alert
-                  variant={testResult.success ? 'default' : 'destructive'}
-                  className={
-                    testResult.success
-                      ? 'border-emerald-500/40 text-emerald-700 dark:text-emerald-300 [&>svg]:text-emerald-600'
-                      : undefined
-                  }
-                >
+                <Alert variant={testResult.success ? 'success' : 'destructive'}>
                   {testResult.success ? (
                     <>
                       <CheckCircle className="w-5 h-5" />

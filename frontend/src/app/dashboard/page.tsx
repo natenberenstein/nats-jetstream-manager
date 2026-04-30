@@ -6,10 +6,19 @@ import { Layers, MessageSquare, HardDrive, Users } from 'lucide-react';
 import { cn, formatBytes, formatNumber } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const { connectionId } = useConnection();
-  const { data: streamsData, isLoading } = useStreams(connectionId);
+  const {
+    data: streamsData,
+    isLoading,
+    isFetching,
+    dataUpdatedAt,
+    refetch,
+  } = useStreams(connectionId);
 
   const totalStreams = streamsData?.total || 0;
   const totalMessages =
@@ -51,10 +60,17 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-xl font-bold sm:text-2xl mb-2">Dashboard Overview</h1>
-        <p className="text-muted-foreground">Monitor your NATS JetStream cluster</p>
-      </div>
+      <PageHeader
+        title="Dashboard Overview"
+        description="Monitor your NATS JetStream cluster"
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -69,7 +85,11 @@ export default function DashboardPage() {
                   </Badge>
                   <Icon className={cn('w-6 h-6', stat.iconClass)} />
                 </div>
-                <p className="text-2xl font-bold">{isLoading ? '...' : stat.value}</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                )}
               </CardContent>
             </Card>
           );
@@ -83,7 +103,11 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-muted-foreground">Loading streams...</p>
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
           ) : streamsData?.streams && streamsData.streams.length > 0 ? (
             <div className="space-y-4">
               {streamsData.streams.slice(0, 5).map((stream) => (

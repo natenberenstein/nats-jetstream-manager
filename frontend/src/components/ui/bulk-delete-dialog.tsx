@@ -153,6 +153,6 @@ function StatusIcon({ status }: { status: ItemStatus }) {
     return <span className={cn('h-3.5 w-3.5 rounded-full border border-muted-foreground/40')} />;
   if (status === 'running') return <Spinner className="h-3.5 w-3.5 text-primary" label="Running" />;
   if (status === 'success')
-    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-label="Success" />;
+    return <CheckCircle2 className="h-3.5 w-3.5 text-success" aria-label="Success" />;
   return <XCircle className="h-3.5 w-3.5 text-destructive" aria-label="Failed" />;
 }

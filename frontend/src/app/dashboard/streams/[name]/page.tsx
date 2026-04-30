@@ -10,12 +10,15 @@ import { useStream, useUpdateStream } from '@/hooks/useStreams';
 import { useConsumers } from '@/hooks/useConsumers';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { formatBytes, formatNumber } from '@/lib/utils';
-import { ArrowLeft, Users, MessageSquare, RefreshCw, Pencil } from 'lucide-react';
+import { ArrowLeft, Users, MessageSquare, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHeader } from '@/components/ui/page-header';
+import { LastUpdated } from '@/components/ui/last-updated';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -44,12 +47,27 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
   const { name } = use(params);
   const streamName = decodeURIComponent(name);
   const { connectionId } = useConnection();
-  const { data: stream, isLoading, refetch } = useStream(connectionId, streamName);
+  const {
+    data: stream,
+    isLoading,
+    isFetching,
+    dataUpdatedAt,
+    refetch,
+  } = useStream(connectionId, streamName);
   const { data: consumersData } = useConsumers(connectionId, streamName);
   const [editing, setEditing] = useState(false);
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading stream details...</div>;
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-9 w-64" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (!stream) {
@@ -65,41 +83,42 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/streams">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="w-4 h-4" />
+      <PageHeader
+        title={config.name}
+        description={config.description}
+        meta={
+          <LastUpdated
+            timestamp={dataUpdatedAt}
+            isFetching={isFetching}
+            onRefresh={() => refetch()}
+          />
+        }
+        actions={
+          <>
+            <Link href="/dashboard/streams">
+              <Button variant="outline" size="icon" aria-label="Back to streams">
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Button variant="outline" onClick={() => setEditing(true)}>
+              <Pencil className="w-4 h-4" />
+              Edit
             </Button>
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold sm:text-2xl">{config.name}</h1>
-            {config.description && <p className="text-muted-foreground">{config.description}</p>}
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setEditing(true)}>
-            <Pencil className="w-4 h-4" />
-            Edit
-          </Button>
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
-          <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
-            <Button variant="outline">
-              <Users className="w-4 h-4" />
-              View Consumers
-            </Button>
-          </Link>
-          <Link href={`/dashboard/messages?stream=${encodeURIComponent(streamName)}`}>
-            <Button variant="outline">
-              <MessageSquare className="w-4 h-4" />
-              View Messages
-            </Button>
-          </Link>
-        </div>
-      </div>
+            <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
+              <Button variant="outline">
+                <Users className="w-4 h-4" />
+                View Consumers
+              </Button>
+            </Link>
+            <Link href={`/dashboard/messages?stream=${encodeURIComponent(streamName)}`}>
+              <Button variant="outline">
+                <MessageSquare className="w-4 h-4" />
+                View Messages
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       {connectionId && (
         <StreamEditDialog

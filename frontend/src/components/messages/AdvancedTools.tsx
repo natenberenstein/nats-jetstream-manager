@@ -302,7 +302,7 @@ export function AdvancedTools({
           </Button>
           {schemaResult && (
             <div
-              className={`text-xs rounded border p-2 ${schemaResult.valid ? 'text-emerald-600' : 'text-destructive'}`}
+              className={`text-xs rounded border p-2 ${schemaResult.valid ? 'text-success' : 'text-destructive'}`}
             >
               {schemaResult.valid ? 'Valid payload' : schemaResult.errors.join(' | ')}
             </div>

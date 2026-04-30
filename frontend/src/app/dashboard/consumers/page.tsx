@@ -33,6 +33,7 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { BulkDeleteDialog } from '@/components/ui/bulk-delete-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@/components/cards/StatCard';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -869,34 +870,15 @@ export default function ConsumersPage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Consumers</p>
-            <p className="text-xl font-semibold">{healthSummary.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Pending</p>
-            <p className="text-xl font-semibold">{healthSummary.totalPending}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Ack Pending</p>
-            <p className="text-xl font-semibold">{healthSummary.totalAckPending}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Potentially Stalled</p>
-            <p
-              className={`text-xl font-semibold ${healthSummary.stalled > 0 ? 'text-destructive' : ''}`}
-            >
-              {healthSummary.stalled}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard label="Consumers" value={healthSummary.total} isLoading={isLoading} />
+        <StatCard label="Pending" value={healthSummary.totalPending} isLoading={isLoading} />
+        <StatCard label="Ack Pending" value={healthSummary.totalAckPending} isLoading={isLoading} />
+        <StatCard
+          label="Potentially Stalled"
+          value={healthSummary.stalled}
+          isLoading={isLoading}
+          tone={healthSummary.stalled > 0 ? 'destructive' : 'default'}
+        />
       </div>
 
       <ConsumerLagSection
