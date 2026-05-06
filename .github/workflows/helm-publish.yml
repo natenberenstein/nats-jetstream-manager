@@ -1,0 +1,43 @@
+name: helm-publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CHART_DIR: helm/nats-jetstream-manager
+  OCI_REPO: oci://registry-1.docker.io/natenberenstein
+
+jobs:
+  publish-chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Lint chart
+        run: helm lint "$CHART_DIR"
+
+      - name: Login to Docker Hub (OCI)
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | helm registry login registry-1.docker.io -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Package chart
+        run: |
+          mkdir -p dist
+          helm package "$CHART_DIR" -d dist
+
+      - name: Push chart
+        run: |
+          CHART_PKG=$(ls dist/*.tgz)
+          helm push "$CHART_PKG" "$OCI_REPO"
+
+      - name: Logout
+        if: always()
+        run: helm registry logout registry-1.docker.io || true

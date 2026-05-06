@@ -22,6 +22,6 @@ Get the application URLs by running these commands:
 
 {{- end }}
 
-NOTE: The frontend's NEXT_PUBLIC_API_URL is a build-time variable. If you need to
-change the backend URL the frontend points to, you must rebuild the frontend image
-with the updated NEXT_PUBLIC_API_URL environment variable.
+NOTE: NEXT_PUBLIC_API_URL is injected at container start, so changing
+frontend.config.apiUrl and rolling the deployment is enough — no image rebuild
+required.

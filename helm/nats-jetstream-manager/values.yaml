@@ -1,7 +1,7 @@
 # -- Override the chart name
-nameOverride: ""
+nameOverride: ''
 # -- Override the full release name
-fullnameOverride: ""
+fullnameOverride: ''
 
 # -- Number of old ReplicaSets to retain
 revisionHistoryLimit: 3
@@ -12,7 +12,7 @@ serviceAccount:
   # -- Annotations for the ServiceAccount (e.g. for IRSA or Workload Identity)
   annotations: {}
   # -- Override the ServiceAccount name
-  name: ""
+  name: ''
 
 # ------------------------------------------------------------
 # Backend (FastAPI / Python)
@@ -20,7 +20,7 @@ serviceAccount:
 backend:
   image:
     repository: nats-jetstream-manager/backend
-    tag: ""  # defaults to .Chart.AppVersion
+    tag: '' # defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
 
   # -- Number of replicas (ignored when HPA is enabled)
@@ -28,44 +28,44 @@ backend:
 
   config:
     # -- NATS server URL
-    natsUrl: "nats://nats:4222"
+    natsUrl: 'nats://nats:4222'
     # -- Log level
-    logLevel: "info"
+    logLevel: 'info'
     # -- Database type: "sqlite" or "postgres"
-    databaseType: "sqlite"
+    databaseType: 'sqlite'
     # -- Additional non-secret env vars
     extraEnv: {}
 
   # -- PostgreSQL settings (used when databaseType=postgres)
   postgresql:
     # -- PostgreSQL host
-    host: ""
+    host: ''
     # -- PostgreSQL port
     port: 5432
     # -- PostgreSQL database name
-    database: "nats_manager"
+    database: 'nats_manager'
     # -- PostgreSQL username
-    username: "postgres"
+    username: 'postgres'
     # -- Enable SSL
     ssl: false
 
   secrets:
     # -- Use an existing Secret instead of creating one
-    existingSecret: ""
+    existingSecret: ''
     # -- Admin API token (ignored when existingSecret is set)
-    adminToken: ""
+    adminToken: ''
     # -- Viewer API token (ignored when existingSecret is set)
-    viewerToken: ""
+    viewerToken: ''
     # -- SMTP password (ignored when existingSecret is set)
-    smtpPassword: ""
+    smtpPassword: ''
     # -- PostgreSQL password (ignored when existingSecret is set)
-    databasePassword: ""
+    databasePassword: ''
 
   persistence:
     # -- Enable PVC for SQLite data (not needed when using PostgreSQL)
     enabled: true
     # -- Storage class (empty = cluster default)
-    storageClass: ""
+    storageClass: ''
     # -- Access mode
     accessMode: ReadWriteOnce
     # -- PVC size
@@ -115,15 +115,15 @@ backend:
 frontend:
   image:
     repository: nats-jetstream-manager/frontend
-    tag: ""  # defaults to .Chart.AppVersion
+    tag: '' # defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
 
   # -- Number of replicas (ignored when HPA is enabled)
   replicaCount: 1
 
   config:
-    # -- Backend API URL passed as NEXT_PUBLIC_API_URL at build time
-    apiUrl: ""
+    # -- Backend API URL injected at container start as NEXT_PUBLIC_API_URL
+    apiUrl: ''
 
   service:
     type: ClusterIP
@@ -168,12 +168,12 @@ ingress:
   # -- Enable Ingress resources
   enabled: false
   # -- Ingress class name
-  className: ""
+  className: ''
   # -- Shared annotations for both ingress resources
   annotations: {}
   frontend:
     # -- Frontend hostname
-    host: ""
+    host: ''
     # -- Frontend path
     path: /
     # -- Path type
@@ -185,7 +185,7 @@ ingress:
     #      - app.example.com
   backend:
     # -- Backend hostname
-    host: ""
+    host: ''
     # -- Backend path
     path: /
     # -- Path type
