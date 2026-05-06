@@ -21,6 +21,7 @@ import {
 import { SavedView } from '@/components/messages/types';
 import { usePrompt } from '@/components/ui/confirm-dialog';
 import { PageHeader } from '@/components/ui/page-header';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
 const FAVORITE_STREAMS_KEY = 'nats_favorite_streams_v1';
@@ -39,6 +40,7 @@ export default function MessagesPage() {
     [streamsData?.streams],
   );
 
+  const [workspaceMode, setWorkspaceMode] = useState<'browse' | 'publish' | 'tools'>('browse');
   const [maskSensitive, setMaskSensitive] = useState(false);
 
   const [selectedStream, setSelectedStream] = useState<string | null>(null);
@@ -170,7 +172,8 @@ export default function MessagesPage() {
         (target as HTMLElement | null)?.isContentEditable;
       if (event.key === '/' && !isTyping) {
         event.preventDefault();
-        subjectInputRef.current?.focus();
+        setWorkspaceMode('publish');
+        window.setTimeout(() => subjectInputRef.current?.focus(), 0);
       }
       if (event.key.toLowerCase() === 'r' && !isTyping) {
         event.preventDefault();
@@ -503,6 +506,104 @@ export default function MessagesPage() {
     }
   };
 
+  const renderPublishPanel = () => (
+    <MessagePublishForm
+      connectionId={connectionId}
+      selectedStream={selectedStream}
+      streamNames={streamNames}
+      streamsData={streamsData}
+      favoriteStreams={favoriteStreams}
+      subject={subject}
+      replaySubject={replaySubject}
+      subjectInputRef={subjectInputRef}
+      isPublishing={publishMessage.isPending || publishBatch.isPending}
+      onSubjectChange={setSubject}
+      onReplaySubjectChange={setReplaySubject}
+      onSelectStream={handleSelectStream}
+      onToggleFavorite={toggleFavoriteStream}
+      onPublish={handlePublish}
+    />
+  );
+
+  const renderToolsPanel = () => (
+    <>
+      <AdvancedTools
+        connectionId={connectionId}
+        selectedStream={selectedStream}
+        compareSelection={compareSelection}
+        currentMessages={currentMessages}
+        loadedPayloads={loadedPayloads}
+        activeIndexJob={activeIndexJob}
+        indexMeta={indexMeta}
+        indexMatches={indexMatches}
+        indexLoading={indexLoading}
+        indexLimit={indexLimit}
+        onIndexLimitChange={setIndexLimit}
+        onBuildIndex={handleBuildIndex}
+        onCancelJob={(jobId) => cancelJob.mutate(jobId)}
+        cancelJobPending={cancelJob.isPending}
+        onRefetch={refetch}
+        onSetLoadedPayloads={setLoadedPayloads}
+        onSetIndexMatches={setIndexMatches}
+        onSetIndexMeta={setIndexMeta}
+      />
+
+      <DiffCompareCard
+        diffMessages={diffMessages}
+        compareLoading={compareLoading}
+        onOpen={() => setShowDiffViewer(true)}
+      />
+    </>
+  );
+
+  const renderMessageList = (className?: string) => (
+    <MessageList
+      className={className}
+      selectedStream={selectedStream}
+      messagesData={messagesData}
+      isLoading={isLoading}
+      isError={isError}
+      messagesError={messagesError}
+      maskSensitive={maskSensitive}
+      limit={limit}
+      liveIntervalMs={liveIntervalMs}
+      cursorHistory={cursorHistory}
+      compareSelection={compareSelection}
+      expandedPayloads={expandedPayloads}
+      loadedPayloads={loadedPayloads}
+      payloadLoading={payloadLoading}
+      showHeadersCol={showHeadersCol}
+      showSizeCol={showSizeCol}
+      showTimeCol={showTimeCol}
+      filterSubject={filterSubject}
+      headerKey={headerKey}
+      headerValue={headerValue}
+      payloadContains={payloadContains}
+      isPublishing={publishMessage.isPending}
+      diffMessagesCount={diffMessages.length}
+      listContainerRef={listContainerRef}
+      onLimitChange={handleLimitChange}
+      onLiveIntervalChange={setLiveIntervalMs}
+      onRefetch={refetch}
+      onNextPage={handleNextPage}
+      onPreviousPage={handlePreviousPage}
+      onFirstPage={handleFirstPage}
+      onGoToPage={handleGoToPage}
+      onToggleCompare={toggleCompareSelection}
+      onLoadPayload={handleLoadPayload}
+      onHidePayload={handleHidePayload}
+      onReplayMessage={handleReplayMessage}
+      onShowDiffViewer={() => setShowDiffViewer(true)}
+      onFilterSubjectChange={setFilterSubject}
+      onHeaderKeyChange={setHeaderKey}
+      onHeaderValueChange={setHeaderValue}
+      onPayloadContainsChange={setPayloadContains}
+      onShowHeadersColChange={setShowHeadersCol}
+      onShowSizeColChange={setShowSizeCol}
+      onShowTimeColChange={setShowTimeCol}
+    />
+  );
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
@@ -522,98 +623,35 @@ export default function MessagesPage() {
         onApplyView={applySavedView}
       />
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
-        <div className="xl:col-span-2 space-y-6">
-          <MessagePublishForm
-            connectionId={connectionId}
-            selectedStream={selectedStream}
-            streamNames={streamNames}
-            streamsData={streamsData}
-            favoriteStreams={favoriteStreams}
-            subject={subject}
-            replaySubject={replaySubject}
-            subjectInputRef={subjectInputRef}
-            isPublishing={publishMessage.isPending || publishBatch.isPending}
-            onSubjectChange={setSubject}
-            onReplaySubjectChange={setReplaySubject}
-            onSelectStream={handleSelectStream}
-            onToggleFavorite={toggleFavoriteStream}
-            onPublish={handlePublish}
-          />
+      <Tabs
+        value={workspaceMode}
+        onValueChange={(value) => setWorkspaceMode(value as typeof workspaceMode)}
+        className="space-y-4"
+      >
+        <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+          <TabsTrigger value="browse">Browse</TabsTrigger>
+          <TabsTrigger value="publish">Publish</TabsTrigger>
+          <TabsTrigger value="tools">Tools</TabsTrigger>
+        </TabsList>
 
-          <AdvancedTools
-            connectionId={connectionId}
-            selectedStream={selectedStream}
-            compareSelection={compareSelection}
-            currentMessages={currentMessages}
-            loadedPayloads={loadedPayloads}
-            activeIndexJob={activeIndexJob}
-            indexMeta={indexMeta}
-            indexMatches={indexMatches}
-            indexLoading={indexLoading}
-            indexLimit={indexLimit}
-            onIndexLimitChange={setIndexLimit}
-            onBuildIndex={handleBuildIndex}
-            onCancelJob={(jobId) => cancelJob.mutate(jobId)}
-            cancelJobPending={cancelJob.isPending}
-            onRefetch={refetch}
-            onSetLoadedPayloads={setLoadedPayloads}
-            onSetIndexMatches={setIndexMatches}
-            onSetIndexMeta={setIndexMeta}
-          />
+        <TabsContent value="browse" className="mt-0">
+          {renderMessageList()}
+        </TabsContent>
 
-          <DiffCompareCard
-            diffMessages={diffMessages}
-            compareLoading={compareLoading}
-            onOpen={() => setShowDiffViewer(true)}
-          />
-        </div>
+        <TabsContent value="publish" className="mt-0">
+          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
+            <div className="xl:col-span-2">{renderPublishPanel()}</div>
+            {renderMessageList('xl:col-span-3')}
+          </div>
+        </TabsContent>
 
-        <MessageList
-          selectedStream={selectedStream}
-          messagesData={messagesData}
-          isLoading={isLoading}
-          isError={isError}
-          messagesError={messagesError}
-          maskSensitive={maskSensitive}
-          limit={limit}
-          liveIntervalMs={liveIntervalMs}
-          cursorHistory={cursorHistory}
-          compareSelection={compareSelection}
-          expandedPayloads={expandedPayloads}
-          loadedPayloads={loadedPayloads}
-          payloadLoading={payloadLoading}
-          showHeadersCol={showHeadersCol}
-          showSizeCol={showSizeCol}
-          showTimeCol={showTimeCol}
-          filterSubject={filterSubject}
-          headerKey={headerKey}
-          headerValue={headerValue}
-          payloadContains={payloadContains}
-          isPublishing={publishMessage.isPending}
-          diffMessagesCount={diffMessages.length}
-          listContainerRef={listContainerRef}
-          onLimitChange={handleLimitChange}
-          onLiveIntervalChange={setLiveIntervalMs}
-          onRefetch={refetch}
-          onNextPage={handleNextPage}
-          onPreviousPage={handlePreviousPage}
-          onFirstPage={handleFirstPage}
-          onGoToPage={handleGoToPage}
-          onToggleCompare={toggleCompareSelection}
-          onLoadPayload={handleLoadPayload}
-          onHidePayload={handleHidePayload}
-          onReplayMessage={handleReplayMessage}
-          onShowDiffViewer={() => setShowDiffViewer(true)}
-          onFilterSubjectChange={setFilterSubject}
-          onHeaderKeyChange={setHeaderKey}
-          onHeaderValueChange={setHeaderValue}
-          onPayloadContainsChange={setPayloadContains}
-          onShowHeadersColChange={setShowHeadersCol}
-          onShowSizeColChange={setShowSizeCol}
-          onShowTimeColChange={setShowTimeCol}
-        />
-      </div>
+        <TabsContent value="tools" className="mt-0">
+          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
+            <div className="space-y-6 xl:col-span-2">{renderToolsPanel()}</div>
+            {renderMessageList('xl:col-span-3')}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <DiffViewerModal
         diffMessages={diffMessages}

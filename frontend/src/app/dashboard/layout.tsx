@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConnection } from '@/contexts/ConnectionContext';
 import {
@@ -20,12 +20,16 @@ import {
   Moon,
   Sun,
   Menu,
+  FileClock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useStreams } from '@/hooks/useStreams';
+import { useKvStores } from '@/hooks/useKv';
+import { useObjectStores } from '@/hooks/useObjectStore';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { CommandPalette, type CommandItem } from '@/components/layout/CommandPalette';
 
@@ -34,6 +38,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const { connectionId, url, connected, disconnect } = useConnection();
   const { theme, toggleTheme } = useTheme();
+  const { data: streamsData } = useStreams(connectionId);
+  const { data: kvData } = useKvStores(connectionId);
+  const { data: objectStoreData } = useObjectStores(connectionId);
   const [commandOpen, setCommandOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -52,39 +59,88 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/');
   };
 
-  const navSections = [
-    {
-      items: [{ href: '/dashboard', icon: Activity, label: 'Overview' }],
-    },
-    {
-      label: 'Cluster',
-      items: [
-        { href: '/dashboard/cluster', icon: Network, label: 'Cluster' },
-        { href: '/dashboard/observability', icon: LineChart, label: 'Observability' },
-        { href: '/dashboard/metrics', icon: BarChart3, label: 'Metrics' },
-        { href: '/dashboard/health', icon: HeartPulse, label: 'Health' },
-      ],
-    },
-    {
-      label: 'Streaming',
-      items: [
-        { href: '/dashboard/streams', icon: Layers, label: 'Streams' },
-        { href: '/dashboard/consumers', icon: Users, label: 'Consumers' },
-        { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
-      ],
-    },
-    {
-      label: 'Storage',
-      items: [
-        { href: '/dashboard/kv', icon: Key, label: 'KV Stores' },
-        { href: '/dashboard/objectstore', icon: HardDrive, label: 'Object Store' },
-      ],
-    },
-  ];
-
-  const navItems: CommandItem[] = navSections.flatMap((section) =>
-    section.items.map((item) => ({ ...item, keywords: section.label ? [section.label] : [] })),
+  const navSections = useMemo(
+    () => [
+      {
+        items: [{ href: '/dashboard', icon: Activity, label: 'Overview' }],
+      },
+      {
+        label: 'Cluster',
+        items: [
+          { href: '/dashboard/cluster', icon: Network, label: 'Cluster' },
+          { href: '/dashboard/observability', icon: LineChart, label: 'Observability' },
+          { href: '/dashboard/metrics', icon: BarChart3, label: 'Metrics' },
+          { href: '/dashboard/health', icon: HeartPulse, label: 'Health' },
+        ],
+      },
+      {
+        label: 'Streaming',
+        items: [
+          { href: '/dashboard/streams', icon: Layers, label: 'Streams' },
+          { href: '/dashboard/consumers', icon: Users, label: 'Consumers' },
+          { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
+        ],
+      },
+      {
+        label: 'Storage',
+        items: [
+          { href: '/dashboard/kv', icon: Key, label: 'KV Stores' },
+          { href: '/dashboard/objectstore', icon: HardDrive, label: 'Object Store' },
+        ],
+      },
+      {
+        label: 'Operations',
+        items: [{ href: '/dashboard/audit', icon: FileClock, label: 'Audit Log' }],
+      },
+    ],
+    [],
   );
+
+  const navItems = useMemo<CommandItem[]>(
+    () =>
+      navSections.flatMap((section) =>
+        section.items.map((item) => ({ ...item, keywords: section.label ? [section.label] : [] })),
+      ),
+    [navSections],
+  );
+
+  const commandItems = useMemo<CommandItem[]>(() => {
+    const streamItems: CommandItem[] = (streamsData?.streams ?? []).flatMap((stream) => {
+      const name = stream.config.name;
+      const encoded = encodeURIComponent(name);
+      const keywords = ['stream', ...(stream.config.subjects ?? [])];
+      return [
+        {
+          href: `/dashboard/streams/${encoded}`,
+          icon: Layers,
+          label: `Stream: ${name}`,
+          keywords,
+        },
+        {
+          href: `/dashboard/messages?stream=${encoded}`,
+          icon: MessageSquare,
+          label: `Messages: ${name}`,
+          keywords: ['messages', ...keywords],
+        },
+      ];
+    });
+
+    const kvItems: CommandItem[] = (kvData?.kv_stores ?? []).map((store) => ({
+      href: `/dashboard/kv?bucket=${encodeURIComponent(store.bucket)}`,
+      icon: Key,
+      label: `KV: ${store.bucket}`,
+      keywords: ['kv', 'bucket', store.description || ''],
+    }));
+
+    const objectItems: CommandItem[] = (objectStoreData?.object_stores ?? []).map((store) => ({
+      href: `/dashboard/objectstore?bucket=${encodeURIComponent(store.bucket)}`,
+      icon: HardDrive,
+      label: `Object Store: ${store.bucket}`,
+      keywords: ['object', 'bucket', store.description || ''],
+    }));
+
+    return [...navItems, ...streamItems, ...kvItems, ...objectItems];
+  }, [kvData?.kv_stores, navItems, objectStoreData?.object_stores, streamsData?.streams]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -206,7 +262,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
 
-      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} items={navItems} />
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} items={commandItems} />
     </div>
   );
 }

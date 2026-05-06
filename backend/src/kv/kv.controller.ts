@@ -12,12 +12,16 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { KvService, KvStatusResponse, KvEntryResponse } from './kv.service';
 import { KvCreateDto, KvPutDto } from './dto/kv.dto';
+import { AuditService } from '../audit/audit.service';
 
 @ApiTags('Key-Value Stores')
 @Controller('connections/:connectionId/kv')
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 export class KvController {
-  constructor(private readonly kvService: KvService) {}
+  constructor(
+    private readonly kvService: KvService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get()
   async listKvStores(
@@ -31,7 +35,15 @@ export class KvController {
     @Param('connectionId') connectionId: string,
     @Body() dto: KvCreateDto,
   ): Promise<KvStatusResponse> {
-    return this.kvService.createKvStore(connectionId, dto);
+    const store = await this.kvService.createKvStore(connectionId, dto);
+    await this.auditService.log({
+      action: 'kv.create',
+      resourceType: 'kv',
+      resourceName: store.bucket,
+      connectionId,
+      details: { storage: store.storage, replicas: store.replicas, history: store.history },
+    });
+    return store;
   }
 
   @Get(':bucket')
@@ -47,7 +59,14 @@ export class KvController {
     @Param('connectionId') connectionId: string,
     @Param('bucket') bucket: string,
   ): Promise<{ success: boolean; deleted_bucket: string }> {
-    return this.kvService.deleteKvStore(connectionId, bucket);
+    const result = await this.kvService.deleteKvStore(connectionId, bucket);
+    await this.auditService.log({
+      action: 'kv.delete',
+      resourceType: 'kv',
+      resourceName: bucket,
+      connectionId,
+    });
+    return result;
   }
 
   @Get(':bucket/history')
@@ -82,7 +101,15 @@ export class KvController {
     @Param('key') key: string,
     @Body() dto: KvPutDto,
   ): Promise<{ revision: number }> {
-    return this.kvService.putKey(connectionId, bucket, key, dto.value);
+    const result = await this.kvService.putKey(connectionId, bucket, key, dto.value);
+    await this.auditService.log({
+      action: 'kv.key.put',
+      resourceType: 'kv_key',
+      resourceName: key,
+      connectionId,
+      details: { bucket, revision: result.revision, bytes: dto.value.length },
+    });
+    return result;
   }
 
   @Delete(':bucket/keys/:key')
@@ -91,7 +118,15 @@ export class KvController {
     @Param('bucket') bucket: string,
     @Param('key') key: string,
   ): Promise<{ success: boolean }> {
-    return this.kvService.deleteKey(connectionId, bucket, key);
+    const result = await this.kvService.deleteKey(connectionId, bucket, key);
+    await this.auditService.log({
+      action: 'kv.key.delete',
+      resourceType: 'kv_key',
+      resourceName: key,
+      connectionId,
+      details: { bucket },
+    });
+    return result;
   }
 
   @Post(':bucket/keys/:key/purge')
@@ -100,6 +135,14 @@ export class KvController {
     @Param('bucket') bucket: string,
     @Param('key') key: string,
   ): Promise<{ success: boolean }> {
-    return this.kvService.purgeKey(connectionId, bucket, key);
+    const result = await this.kvService.purgeKey(connectionId, bucket, key);
+    await this.auditService.log({
+      action: 'kv.key.purge',
+      resourceType: 'kv_key',
+      resourceName: key,
+      connectionId,
+      details: { bucket },
+    });
+    return result;
   }
 }

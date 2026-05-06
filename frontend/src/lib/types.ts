@@ -432,6 +432,25 @@ export interface ObjectStoreCreateConfig {
   max_chunk_size?: number;
 }
 
+// Audit types
+export interface AuditLogEntry {
+  id: number;
+  user_id: number | null;
+  user_email: string | null;
+  action: string;
+  resource_type: string;
+  resource_name: string | null;
+  connection_id: string | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface AuditListResult {
+  entries: AuditLogEntry[];
+  total: number;
+}
+
 // Consumer Metrics types
 export interface ConsumerMetricPoint {
   consumer_name: string;

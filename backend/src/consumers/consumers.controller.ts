@@ -12,11 +12,15 @@ import {
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConsumersService } from './consumers.service';
 import { ConsumerCreateDto, ConsumerUpdateDto } from './dto/consumer.dto';
+import { AuditService } from '../audit/audit.service';
 
 @ApiTags('Consumers')
 @Controller('connections/:connectionId/streams/:streamName/consumers')
 export class ConsumersController {
-  constructor(private readonly consumersService: ConsumersService) {}
+  constructor(
+    private readonly consumersService: ConsumersService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get()
   listConsumers(
@@ -36,12 +40,24 @@ export class ConsumersController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  createConsumer(
+  async createConsumer(
     @Param('connectionId') connectionId: string,
     @Param('streamName') streamName: string,
     @Body() dto: ConsumerCreateDto,
   ) {
-    return this.consumersService.createConsumer(connectionId, streamName, dto);
+    const consumer = await this.consumersService.createConsumer(connectionId, streamName, dto);
+    await this.auditService.log({
+      action: 'consumer.create',
+      resourceType: 'consumer',
+      resourceName: consumer.name,
+      connectionId,
+      details: {
+        stream: streamName,
+        durable: consumer.config?.durable_name,
+        filter_subject: consumer.config?.filter_subject,
+      },
+    });
+    return consumer;
   }
 
   @Get(':name')
@@ -61,16 +77,37 @@ export class ConsumersController {
     @Param('name') name: string,
     @Body() dto: ConsumerUpdateDto,
   ) {
-    return this.consumersService.updateConsumer(connectionId, streamName, name, dto);
+    const consumer = await this.consumersService.updateConsumer(
+      connectionId,
+      streamName,
+      name,
+      dto,
+    );
+    await this.auditService.log({
+      action: 'consumer.update',
+      resourceType: 'consumer',
+      resourceName: name,
+      connectionId,
+      details: { stream: streamName, fields: Object.keys(dto) },
+    });
+    return consumer;
   }
 
   @Delete(':name')
   @HttpCode(HttpStatus.OK)
-  deleteConsumer(
+  async deleteConsumer(
     @Param('connectionId') connectionId: string,
     @Param('streamName') streamName: string,
     @Param('name') name: string,
   ) {
-    return this.consumersService.deleteConsumer(connectionId, streamName, name);
+    const result = await this.consumersService.deleteConsumer(connectionId, streamName, name);
+    await this.auditService.log({
+      action: 'consumer.delete',
+      resourceType: 'consumer',
+      resourceName: name,
+      connectionId,
+      details: { stream: streamName },
+    });
+    return result;
   }
 }

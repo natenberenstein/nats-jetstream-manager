@@ -15,12 +15,16 @@ import {
   ObjectInfoResponse,
 } from './objectstore.service';
 import { ObjectStoreCreateDto, ObjectPutDto } from './dto/objectstore.dto';
+import { AuditService } from '../audit/audit.service';
 
 @ApiTags('Object Stores')
 @Controller('connections/:connectionId/objectstore')
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 export class ObjectStoreController {
-  constructor(private readonly objectStoreService: ObjectStoreService) {}
+  constructor(
+    private readonly objectStoreService: ObjectStoreService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get()
   async listObjectStores(
@@ -34,7 +38,15 @@ export class ObjectStoreController {
     @Param('connectionId') connectionId: string,
     @Body() dto: ObjectStoreCreateDto,
   ): Promise<ObjectStoreStatusResponse> {
-    return this.objectStoreService.createObjectStore(connectionId, dto);
+    const store = await this.objectStoreService.createObjectStore(connectionId, dto);
+    await this.auditService.log({
+      action: 'objectstore.create',
+      resourceType: 'objectstore',
+      resourceName: store.bucket,
+      connectionId,
+      details: { storage: store.storage, replicas: store.replicas },
+    });
+    return store;
   }
 
   @Get(':bucket')
@@ -50,7 +62,14 @@ export class ObjectStoreController {
     @Param('connectionId') connectionId: string,
     @Param('bucket') bucket: string,
   ): Promise<{ success: boolean; deleted_bucket: string }> {
-    return this.objectStoreService.deleteObjectStore(connectionId, bucket);
+    const result = await this.objectStoreService.deleteObjectStore(connectionId, bucket);
+    await this.auditService.log({
+      action: 'objectstore.delete',
+      resourceType: 'objectstore',
+      resourceName: bucket,
+      connectionId,
+    });
+    return result;
   }
 
   @Get(':bucket/objects')
@@ -85,13 +104,21 @@ export class ObjectStoreController {
     @Param('bucket') bucket: string,
     @Body() dto: ObjectPutDto,
   ): Promise<ObjectInfoResponse> {
-    return this.objectStoreService.putObject(
+    const object = await this.objectStoreService.putObject(
       connectionId,
       bucket,
       dto.name,
       dto.data,
       dto.description,
     );
+    await this.auditService.log({
+      action: 'objectstore.object.put',
+      resourceType: 'object',
+      resourceName: object.name,
+      connectionId,
+      details: { bucket, size: object.size, chunks: object.chunks },
+    });
+    return object;
   }
 
   @Delete(':bucket/objects/:name')
@@ -100,6 +127,14 @@ export class ObjectStoreController {
     @Param('bucket') bucket: string,
     @Param('name') name: string,
   ): Promise<{ success: boolean }> {
-    return this.objectStoreService.deleteObject(connectionId, bucket, name);
+    const result = await this.objectStoreService.deleteObject(connectionId, bucket, name);
+    await this.auditService.log({
+      action: 'objectstore.object.delete',
+      resourceType: 'object',
+      resourceName: name,
+      connectionId,
+      details: { bucket },
+    });
+    return result;
   }
 }

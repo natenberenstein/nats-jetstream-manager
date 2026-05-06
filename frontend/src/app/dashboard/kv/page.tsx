@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
 import {
@@ -408,6 +409,9 @@ function KvKeyBrowser({
 }
 
 export default function KvPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const bucketFromQuery = searchParams.get('bucket');
   const { connectionId } = useConnection();
   const { data: kvData, isLoading, isFetching, dataUpdatedAt, refetch } = useKvStores(connectionId);
   const createKv = useCreateKvStore(connectionId);
@@ -435,6 +439,14 @@ export default function KvPage() {
   useEffect(() => {
     setPageIndex(0);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!bucketFromQuery) return;
+    const match = kvData?.kv_stores.find((kv) => kv.bucket === bucketFromQuery);
+    if (match && selectedBucket !== match) {
+      setSelectedBucket(match);
+    }
+  }, [bucketFromQuery, kvData?.kv_stores, selectedBucket]);
 
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -491,13 +503,19 @@ export default function KvPage() {
     }
   };
 
+  const openBucket = (bucket: KvStoreStatus) => {
+    setSelectedBucket(bucket);
+    router.replace(`/dashboard/kv?bucket=${encodeURIComponent(bucket.bucket)}`);
+  };
+
+  const closeBucket = () => {
+    setSelectedBucket(null);
+    router.replace('/dashboard/kv');
+  };
+
   if (selectedBucket && connectionId) {
     return (
-      <KvKeyBrowser
-        connectionId={connectionId}
-        bucket={selectedBucket}
-        onBack={() => setSelectedBucket(null)}
-      />
+      <KvKeyBrowser connectionId={connectionId} bucket={selectedBucket} onBack={closeBucket} />
     );
   }
 
@@ -640,7 +658,7 @@ export default function KvPage() {
                     <TableRow
                       key={kv.bucket}
                       className="cursor-pointer"
-                      onClick={() => setSelectedBucket(kv)}
+                      onClick={() => openBucket(kv)}
                     >
                       <TableCell className="font-medium">{kv.bucket}</TableCell>
                       <TableCell className="text-muted-foreground">

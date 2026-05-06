@@ -28,6 +28,7 @@ import {
   BuildIndexResponseDto,
 } from './dto/message.dto';
 import { ConnectionsService } from '../connections/connections.service';
+import { AuditService } from '../audit/audit.service';
 
 @ApiTags('Messages')
 @Controller('connections/:connectionId')
@@ -35,6 +36,7 @@ export class MessagesController {
   constructor(
     private readonly messagesService: MessagesService,
     private readonly connectionsService: ConnectionsService,
+    private readonly auditService: AuditService,
   ) {}
 
   @Post('messages/publish')
@@ -44,7 +46,15 @@ export class MessagesController {
     @Body() body: MessagePublishRequestDto,
   ): Promise<MessagePublishResponseDto> {
     const conn = this.connectionsService.getConnection(connectionId);
-    return this.messagesService.publishMessage(conn.js, body);
+    const result = await this.messagesService.publishMessage(conn.js, body);
+    await this.auditService.log({
+      action: 'message.publish',
+      resourceType: 'message',
+      resourceName: body.subject,
+      connectionId,
+      details: { stream: result.stream, seq: result.seq, duplicate: result.duplicate },
+    });
+    return result;
   }
 
   @Post('messages/publish-batch')
@@ -54,7 +64,17 @@ export class MessagesController {
     @Body() body: MessagePublishBatchRequestDto,
   ): Promise<MessagePublishBatchResponseDto> {
     const conn = this.connectionsService.getConnection(connectionId);
-    return this.messagesService.publishBatch(conn.js, body.messages);
+    const result = await this.messagesService.publishBatch(conn.js, body.messages);
+    await this.auditService.log({
+      action: 'message.publish_batch',
+      resourceType: 'message',
+      connectionId,
+      details: {
+        published: result.published,
+        subjects: Array.from(new Set(body.messages.map((message) => message.subject))),
+      },
+    });
+    return result;
   }
 
   @Post('messages/validate-schema')
@@ -106,7 +126,27 @@ export class MessagesController {
     @Body() body: MessageReplayRequestDto,
   ): Promise<MessageReplayResponseDto> {
     const conn = this.connectionsService.getConnection(connectionId);
-    return this.messagesService.replayMessage(conn.js, conn.jsm, streamName, seq, body);
+    const replay = await this.messagesService.replayMessage(
+      conn.js,
+      conn.jsm,
+      streamName,
+      seq,
+      body,
+    );
+    await this.auditService.log({
+      action: 'message.replay',
+      resourceType: 'message',
+      resourceName: `${streamName}:${seq}`,
+      connectionId,
+      details: {
+        source_stream: streamName,
+        source_seq: seq,
+        target_subject: body.target_subject,
+        published_stream: replay.published_stream,
+        published_seq: replay.published_seq,
+      },
+    });
+    return replay;
   }
 
   @Post('streams/:streamName/messages/index/build')
@@ -116,6 +156,14 @@ export class MessagesController {
     @Param('streamName') streamName: string,
   ): Promise<BuildIndexResponseDto> {
     const conn = this.connectionsService.getConnection(connectionId);
-    return this.messagesService.buildSearchIndex(conn.jsm, connectionId, streamName);
+    const result = await this.messagesService.buildSearchIndex(conn.jsm, connectionId, streamName);
+    await this.auditService.log({
+      action: 'message.index_build',
+      resourceType: 'stream',
+      resourceName: streamName,
+      connectionId,
+      details: { indexed_messages: result.indexed_messages },
+    });
+    return result;
   }
 }

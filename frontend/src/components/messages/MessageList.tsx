@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { Download, Eye, EyeOff, Play, RefreshCw } from 'lucide-react';
 
 import { MessageData, MessagesResponse } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -62,6 +63,7 @@ interface MessageListProps {
   onShowHeadersColChange: (value: boolean) => void;
   onShowSizeColChange: (value: boolean) => void;
   onShowTimeColChange: (value: boolean) => void;
+  className?: string;
 }
 
 export function MessageList({
@@ -106,6 +108,7 @@ export function MessageList({
   onShowHeadersColChange,
   onShowSizeColChange,
   onShowTimeColChange,
+  className,
 }: MessageListProps) {
   const currentMessages = useMemo(() => messagesData?.messages ?? [], [messagesData?.messages]);
 
@@ -127,7 +130,7 @@ export function MessageList({
   };
 
   return (
-    <Card className="xl:col-span-3 overflow-hidden">
+    <Card className={cn('overflow-hidden', className)}>
       <CardHeader className="border-b">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-lg">

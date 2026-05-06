@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
 import {
@@ -392,6 +393,9 @@ function ObjectBrowser({
 }
 
 export default function ObjectStorePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const bucketFromQuery = searchParams.get('bucket');
   const { connectionId } = useConnection();
   const {
     data: storeData,
@@ -425,6 +429,14 @@ export default function ObjectStorePage() {
   useEffect(() => {
     setPageIndex(0);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!bucketFromQuery) return;
+    const match = storeData?.object_stores.find((store) => store.bucket === bucketFromQuery);
+    if (match && selectedStore !== match) {
+      setSelectedStore(match);
+    }
+  }, [bucketFromQuery, selectedStore, storeData?.object_stores]);
 
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -474,14 +486,18 @@ export default function ObjectStorePage() {
     }
   };
 
+  const openStore = (store: ObjectStoreStatusInfo) => {
+    setSelectedStore(store);
+    router.replace(`/dashboard/objectstore?bucket=${encodeURIComponent(store.bucket)}`);
+  };
+
+  const closeStore = () => {
+    setSelectedStore(null);
+    router.replace('/dashboard/objectstore');
+  };
+
   if (selectedStore && connectionId) {
-    return (
-      <ObjectBrowser
-        connectionId={connectionId}
-        store={selectedStore}
-        onBack={() => setSelectedStore(null)}
-      />
-    );
+    return <ObjectBrowser connectionId={connectionId} store={selectedStore} onBack={closeStore} />;
   }
 
   return (
@@ -610,7 +626,7 @@ export default function ObjectStorePage() {
                     <TableRow
                       key={store.bucket}
                       className="cursor-pointer"
-                      onClick={() => setSelectedStore(store)}
+                      onClick={() => openStore(store)}
                     >
                       <TableCell className="font-medium">{store.bucket}</TableCell>
                       <TableCell className="text-muted-foreground">

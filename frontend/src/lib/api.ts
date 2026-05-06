@@ -33,6 +33,7 @@ import {
   ObjectStoreStatusInfo,
   ObjectInfoData,
   ObjectStoreCreateConfig,
+  AuditListResult,
   ConsumerMetricsResponse,
 } from './types';
 
@@ -256,7 +257,9 @@ export const messageApi = {
       `/connections/${connectionId}/messages/publish-batch`,
       {
         method: 'POST',
-        body: JSON.stringify({ subject, messages, headers }),
+        body: JSON.stringify({
+          messages: messages.map((data) => ({ subject, data, headers })),
+        }),
       },
     ),
 
@@ -476,6 +479,28 @@ export const objectStoreApi = {
       `/connections/${connectionId}/objectstore/${encodeURIComponent(bucket)}/objects/${encodeURIComponent(name)}`,
       { method: 'DELETE' },
     ),
+};
+
+export interface AuditListParams {
+  limit?: number;
+  offset?: number;
+  action?: string;
+  resourceType?: string;
+  userId?: number;
+}
+
+export const auditApi = {
+  list: (params: AuditListParams = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+    if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
+    if (params.action) searchParams.set('action', params.action);
+    if (params.resourceType) searchParams.set('resource_type', params.resourceType);
+    if (params.userId !== undefined) searchParams.set('user_id', String(params.userId));
+
+    const query = searchParams.toString();
+    return fetchApi<AuditListResult>(`/audit${query ? `?${query}` : ''}`);
+  },
 };
 
 // Health API
