@@ -20,10 +20,10 @@ jobs:
       matrix:
         component:
           - name: backend
-            context: ./backend
+            dockerfile: ./backend/Dockerfile
             image: natenberenstein/nats-jetstream-manager-backend
           - name: frontend
-            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
             image: natenberenstein/nats-jetstream-manager-frontend
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +73,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.component.context }}
+          context: .
+          file: ${{ matrix.component.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.docker_tags.outputs.tags }}
