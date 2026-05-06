@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.2.0...nats-jetstream-manager-v1.3.0) (2026-05-06)
+
+
+### Features
+
+* enhance dashboard interface ([79444e5](https://github.com/natenberenstein/nats-jetstream-manager/commit/79444e5b16f662c2ed2729f5c80aa756f7215d1e))
+
 ## [1.2.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.1.0...nats-jetstream-manager-v1.2.0) (2026-05-06)
 
 
