@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.1.0...nats-jetstream-manager-v1.2.0) (2026-05-06)
+
+
+### Features
+
+* add problem dashboard diagnostics ([83b0512](https://github.com/natenberenstein/nats-jetstream-manager/commit/83b0512102e4e4b442633424a135816193d298da))
+
 ## [1.1.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.0.0...nats-jetstream-manager-v1.1.0) (2026-05-06)
 
 
