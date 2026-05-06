@@ -8,11 +8,26 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConsumersService } from './consumers.service';
 import { ConsumerCreateDto, ConsumerUpdateDto } from './dto/consumer.dto';
 import { AuditService } from '../audit/audit.service';
+
+@ApiTags('Consumers')
+@Controller('connections/:connectionId/consumers')
+export class ConsumerDiagnosticsController {
+  constructor(private readonly consumersService: ConsumersService) {}
+
+  @Get('diagnostics')
+  getConsumerDiagnostics(
+    @Param('connectionId') connectionId: string,
+    @Query('stream') streamName?: string,
+  ) {
+    return this.consumersService.getConsumerDiagnostics(connectionId, streamName);
+  }
+}
 
 @ApiTags('Consumers')
 @Controller('connections/:connectionId/streams/:streamName/consumers')

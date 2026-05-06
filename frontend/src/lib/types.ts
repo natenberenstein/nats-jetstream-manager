@@ -224,6 +224,56 @@ export interface ConsumerAnalytics {
   generated_at: string;
 }
 
+export type ConsumerIssueSeverity = 'critical' | 'warning' | 'info';
+export type ConsumerHealthSeverity = ConsumerIssueSeverity | 'ok';
+
+export interface ConsumerDiagnosticIssue {
+  code: string;
+  severity: ConsumerIssueSeverity;
+  message: string;
+  recommendation: string;
+}
+
+export interface ConsumerDiagnostic {
+  stream_name: string;
+  name: string;
+  type: 'pull' | 'push';
+  filter_subject?: string;
+  deliver_policy: string;
+  ack_policy: string;
+  num_pending: number;
+  num_ack_pending: number;
+  num_waiting: number;
+  stream_lag: number;
+  unacked_span: number;
+  delivered_stream_seq: number;
+  ack_floor_stream_seq: number;
+  last_stream_seq: number;
+  ack_wait_ns?: number;
+  max_ack_pending?: number;
+  max_waiting?: number;
+  max_deliver?: number;
+  severity: ConsumerHealthSeverity;
+  issues: ConsumerDiagnosticIssue[];
+}
+
+export interface ConsumerDiagnosticsResponse {
+  connection_id: string;
+  stream_name?: string;
+  summary: {
+    total: number;
+    ok: number;
+    info: number;
+    warning: number;
+    critical: number;
+    total_pending: number;
+    total_ack_pending: number;
+    max_stream_lag: number;
+  };
+  consumers: ConsumerDiagnostic[];
+  generated_at: string;
+}
+
 // Message types
 export interface MessagePublishRequest {
   subject: string;

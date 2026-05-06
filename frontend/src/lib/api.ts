@@ -18,6 +18,7 @@ import {
   ConsumerConfig,
   ConsumerInfo,
   ConsumerAnalytics,
+  ConsumerDiagnosticsResponse,
   MessagePublishRequest,
   MessagePublishResponse,
   MessageReplayRequest,
@@ -237,6 +238,15 @@ export const consumerApi = {
     fetchApi<ConsumerAnalytics>(
       `/connections/${connectionId}/streams/${streamName}/consumers/analytics`,
     ),
+
+  diagnostics: (connectionId: string, streamName?: string) => {
+    const searchParams = new URLSearchParams();
+    if (streamName) searchParams.set('stream', streamName);
+    const query = searchParams.toString();
+    return fetchApi<ConsumerDiagnosticsResponse>(
+      `/connections/${connectionId}/consumers/diagnostics${query ? `?${query}` : ''}`,
+    );
+  },
 };
 
 // Message API

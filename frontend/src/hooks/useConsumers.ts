@@ -22,6 +22,15 @@ export function useConsumerAnalytics(connectionId: string | null, streamName: st
   });
 }
 
+export function useConsumerDiagnostics(connectionId: string | null, streamName?: string | null) {
+  return useQuery({
+    queryKey: ['consumer-diagnostics', connectionId, streamName ?? null],
+    queryFn: () => consumerApi.diagnostics(connectionId!, streamName || undefined),
+    enabled: !!connectionId,
+    refetchInterval: 10_000,
+  });
+}
+
 export function useConsumer(
   connectionId: string | null,
   streamName: string | null,

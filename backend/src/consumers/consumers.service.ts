@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { AckPolicy, DeliverPolicy, ReplayPolicy, ConsumerInfo } from 'nats';
+import { AckPolicy, DeliverPolicy, ReplayPolicy, ConsumerInfo, StreamInfo } from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
 import { StreamsService } from '../streams/streams.service';
 import { ConsumerCreateDto, ConsumerUpdateDto } from './dto/consumer.dto';
@@ -34,6 +34,56 @@ export interface ConsumerAnalytics {
   total_ack_pending: number;
   max_stream_lag: number;
   consumers: ConsumerMetric[];
+  generated_at: string;
+}
+
+export type ConsumerIssueSeverity = 'critical' | 'warning' | 'info';
+export type ConsumerHealthSeverity = ConsumerIssueSeverity | 'ok';
+
+export interface ConsumerDiagnosticIssue {
+  code: string;
+  severity: ConsumerIssueSeverity;
+  message: string;
+  recommendation: string;
+}
+
+export interface ConsumerDiagnostic {
+  stream_name: string;
+  name: string;
+  type: 'pull' | 'push';
+  filter_subject?: string;
+  deliver_policy: string;
+  ack_policy: string;
+  num_pending: number;
+  num_ack_pending: number;
+  num_waiting: number;
+  stream_lag: number;
+  unacked_span: number;
+  delivered_stream_seq: number;
+  ack_floor_stream_seq: number;
+  last_stream_seq: number;
+  ack_wait_ns?: number;
+  max_ack_pending?: number;
+  max_waiting?: number;
+  max_deliver?: number;
+  severity: ConsumerHealthSeverity;
+  issues: ConsumerDiagnosticIssue[];
+}
+
+export interface ConsumerDiagnosticsResponse {
+  connection_id: string;
+  stream_name?: string;
+  summary: {
+    total: number;
+    ok: number;
+    info: number;
+    warning: number;
+    critical: number;
+    total_pending: number;
+    total_ack_pending: number;
+    max_stream_lag: number;
+  };
+  consumers: ConsumerDiagnostic[];
   generated_at: string;
 }
 
@@ -76,6 +126,11 @@ const REPLAY_POLICY_REVERSE: Record<string, string> = {
   [String(ReplayPolicy.Instant)]: 'instant',
   [String(ReplayPolicy.Original)]: 'original',
 };
+
+const LARGE_BACKLOG_THRESHOLD = 10_000;
+const BACKLOG_WARNING_THRESHOLD = 1_000;
+const ACK_PENDING_WARNING_THRESHOLD = 100;
+const LIMIT_WARNING_RATIO = 0.8;
 
 @Injectable()
 export class ConsumersService {
@@ -320,6 +375,71 @@ export class ConsumersService {
     };
   }
 
+  async getConsumerDiagnostics(
+    connectionId: string,
+    streamName?: string,
+  ): Promise<ConsumerDiagnosticsResponse> {
+    const { jsm } = this.connectionsService.getConnection(connectionId);
+
+    const streamInfos: StreamInfo[] = [];
+    if (streamName) {
+      streamInfos.push(await jsm.streams.info(streamName));
+    } else {
+      const streamLister = jsm.streams.list();
+      for await (const stream of streamLister) {
+        streamInfos.push(stream);
+      }
+    }
+
+    const diagnostics: ConsumerDiagnostic[] = [];
+
+    for (const stream of streamInfos) {
+      const currentStreamName = stream.config.name;
+      const lastStreamSeq = stream.state.last_seq ?? 0;
+      const consumerLister = jsm.consumers.list(currentStreamName);
+
+      for await (const ci of consumerLister) {
+        diagnostics.push(this.buildConsumerDiagnostic(ci, currentStreamName, lastStreamSeq));
+      }
+    }
+
+    const summary = diagnostics.reduce(
+      (acc, diagnostic) => {
+        acc.total += 1;
+        if (diagnostic.severity === 'critical') acc.critical += 1;
+        else if (diagnostic.severity === 'warning') acc.warning += 1;
+        else if (diagnostic.severity === 'info') acc.info += 1;
+        else acc.ok += 1;
+        acc.total_pending += diagnostic.num_pending;
+        acc.total_ack_pending += diagnostic.num_ack_pending;
+        acc.max_stream_lag = Math.max(acc.max_stream_lag, diagnostic.stream_lag);
+        return acc;
+      },
+      {
+        total: 0,
+        ok: 0,
+        info: 0,
+        warning: 0,
+        critical: 0,
+        total_pending: 0,
+        total_ack_pending: 0,
+        max_stream_lag: 0,
+      },
+    );
+
+    return {
+      connection_id: connectionId,
+      stream_name: streamName,
+      summary,
+      consumers: diagnostics.sort((a, b) => {
+        const severityDiff = this.severityRank(b.severity) - this.severityRank(a.severity);
+        if (severityDiff !== 0) return severityDiff;
+        return b.stream_lag - a.stream_lag;
+      }),
+      generated_at: new Date().toISOString(),
+    };
+  }
+
   private convertConsumerInfo(ci: ConsumerInfo): ConsumerResponse {
     const config = ci.config ?? {};
 
@@ -361,5 +481,229 @@ export class ConsumersService {
       num_waiting: ci.num_waiting ?? 0,
       num_ack_pending: ci.num_ack_pending ?? 0,
     };
+  }
+
+  private buildConsumerDiagnostic(
+    ci: ConsumerInfo,
+    streamName: string,
+    lastStreamSeq: number,
+  ): ConsumerDiagnostic {
+    const config = ci.config ?? {};
+    const name = ci.name || config.durable_name || '';
+    const deliveredStreamSeq = ci.delivered?.stream_seq ?? 0;
+    const ackFloorStreamSeq = ci.ack_floor?.stream_seq ?? 0;
+    const numPending = ci.num_pending ?? 0;
+    const numAckPending = ci.num_ack_pending ?? 0;
+    const numWaiting = ci.num_waiting ?? 0;
+    const streamLag = Math.max(0, lastStreamSeq - deliveredStreamSeq);
+    const unackedSpan = Math.max(0, deliveredStreamSeq - ackFloorStreamSeq);
+    const type = config.deliver_subject ? 'push' : 'pull';
+    const ackPolicy = ACK_POLICY_REVERSE[config.ack_policy] ?? 'explicit';
+    const deliverPolicy = DELIVER_POLICY_REVERSE[config.deliver_policy] ?? 'all';
+    const maxAckPending = this.asNumber(config.max_ack_pending);
+    const maxWaiting = this.asNumber(config.max_waiting);
+    const maxDeliver = this.asNumber(config.max_deliver);
+    const ackWaitNs = this.asNumber(config.ack_wait);
+
+    const issues = this.buildDiagnosticIssues({
+      type,
+      ackPolicy,
+      numPending,
+      numAckPending,
+      numWaiting,
+      streamLag,
+      unackedSpan,
+      maxAckPending,
+      maxWaiting,
+      maxDeliver,
+    });
+
+    return {
+      stream_name: streamName,
+      name,
+      type,
+      filter_subject: typeof config.filter_subject === 'string' ? config.filter_subject : undefined,
+      deliver_policy: deliverPolicy,
+      ack_policy: ackPolicy,
+      num_pending: numPending,
+      num_ack_pending: numAckPending,
+      num_waiting: numWaiting,
+      stream_lag: streamLag,
+      unacked_span: unackedSpan,
+      delivered_stream_seq: deliveredStreamSeq,
+      ack_floor_stream_seq: ackFloorStreamSeq,
+      last_stream_seq: lastStreamSeq,
+      ack_wait_ns: ackWaitNs,
+      max_ack_pending: maxAckPending,
+      max_waiting: maxWaiting,
+      max_deliver: maxDeliver,
+      severity: this.getDiagnosticSeverity(issues),
+      issues,
+    };
+  }
+
+  private buildDiagnosticIssues(params: {
+    type: 'pull' | 'push';
+    ackPolicy: string;
+    numPending: number;
+    numAckPending: number;
+    numWaiting: number;
+    streamLag: number;
+    unackedSpan: number;
+    maxAckPending?: number;
+    maxWaiting?: number;
+    maxDeliver?: number;
+  }): ConsumerDiagnosticIssue[] {
+    const issues: ConsumerDiagnosticIssue[] = [];
+    const {
+      type,
+      ackPolicy,
+      numPending,
+      numAckPending,
+      numWaiting,
+      streamLag,
+      unackedSpan,
+      maxAckPending,
+      maxWaiting,
+      maxDeliver,
+    } = params;
+
+    if (numPending >= LARGE_BACKLOG_THRESHOLD || streamLag >= LARGE_BACKLOG_THRESHOLD) {
+      issues.push({
+        code: 'large_backlog',
+        severity: 'critical',
+        message: 'Consumer backlog is very large.',
+        recommendation:
+          'Scale workers, check subscriber health, or replay/redrive through a controlled path.',
+      });
+    } else if (numPending >= BACKLOG_WARNING_THRESHOLD || streamLag >= BACKLOG_WARNING_THRESHOLD) {
+      issues.push({
+        code: 'backlog_growth',
+        severity: 'warning',
+        message: 'Consumer is materially behind the stream.',
+        recommendation:
+          'Check processing rate, delivery limits, and whether subscribers are connected.',
+      });
+    } else if (streamLag > 0 || numPending > 0) {
+      issues.push({
+        code: 'minor_lag',
+        severity: 'info',
+        message: 'Consumer has pending messages or sequence lag.',
+        recommendation: 'Watch the trend and confirm the consumer is draining normally.',
+      });
+    }
+
+    if (type === 'pull' && numPending > 0 && numWaiting === 0) {
+      issues.push({
+        code: 'no_pull_waiters',
+        severity: numPending >= BACKLOG_WARNING_THRESHOLD ? 'warning' : 'info',
+        message: 'Pull consumer has pending messages but no waiting pull requests.',
+        recommendation: 'Confirm workers are issuing fetch requests and have not stopped polling.',
+      });
+    }
+
+    if (type === 'push' && numPending > 0) {
+      issues.push({
+        code: 'push_delivery_backlog',
+        severity: numPending >= BACKLOG_WARNING_THRESHOLD ? 'warning' : 'info',
+        message: 'Push consumer has queued messages waiting for delivery.',
+        recommendation:
+          'Check subscribers on the delivery subject and delivery-group queue membership.',
+      });
+    }
+
+    if (ackPolicy !== 'none' && numAckPending > 0) {
+      issues.push({
+        code: 'ack_pending',
+        severity: numAckPending >= ACK_PENDING_WARNING_THRESHOLD ? 'warning' : 'info',
+        message: 'Consumer has delivered messages waiting for acknowledgements.',
+        recommendation: 'Check handler latency, ack failures, and ack wait versus processing time.',
+      });
+    }
+
+    if (maxAckPending !== undefined && maxAckPending > 0 && numAckPending >= maxAckPending) {
+      issues.push({
+        code: 'max_ack_pending_reached',
+        severity: 'critical',
+        message: 'Consumer reached max_ack_pending and delivery may be blocked.',
+        recommendation:
+          'Ack or terminate in-flight messages, increase max_ack_pending, or scale workers.',
+      });
+    } else if (
+      maxAckPending !== undefined &&
+      maxAckPending > 0 &&
+      numAckPending >= maxAckPending * LIMIT_WARNING_RATIO
+    ) {
+      issues.push({
+        code: 'max_ack_pending_near_limit',
+        severity: 'warning',
+        message: 'Consumer is close to max_ack_pending.',
+        recommendation:
+          'Increase processing capacity or raise the limit after checking subscriber behavior.',
+      });
+    }
+
+    if (
+      type === 'pull' &&
+      maxWaiting !== undefined &&
+      maxWaiting > 0 &&
+      numWaiting >= maxWaiting * LIMIT_WARNING_RATIO
+    ) {
+      issues.push({
+        code: 'max_waiting_near_limit',
+        severity: 'warning',
+        message: 'Pull requests are close to max_waiting.',
+        recommendation: 'Reduce concurrent fetches or raise max_waiting for this consumer.',
+      });
+    }
+
+    if (unackedSpan > Math.max(ACK_PENDING_WARNING_THRESHOLD, numAckPending * 3)) {
+      issues.push({
+        code: 'wide_unacked_span',
+        severity: 'warning',
+        message: 'Ack floor is far behind the delivered sequence.',
+        recommendation:
+          'Look for old in-flight messages, long processing retries, or stuck worker instances.',
+      });
+    }
+
+    if (maxDeliver === 1 && ackPolicy !== 'none' && numAckPending > 0) {
+      issues.push({
+        code: 'single_delivery_risk',
+        severity: 'info',
+        message: 'Consumer is configured for a single delivery attempt.',
+        recommendation:
+          'Verify failures are handled outside JetStream or increase max_deliver for retries.',
+      });
+    }
+
+    return this.dedupeIssues(issues);
+  }
+
+  private getDiagnosticSeverity(issues: ConsumerDiagnosticIssue[]): ConsumerHealthSeverity {
+    if (issues.some((issue) => issue.severity === 'critical')) return 'critical';
+    if (issues.some((issue) => issue.severity === 'warning')) return 'warning';
+    if (issues.some((issue) => issue.severity === 'info')) return 'info';
+    return 'ok';
+  }
+
+  private severityRank(severity: ConsumerHealthSeverity): number {
+    if (severity === 'critical') return 3;
+    if (severity === 'warning') return 2;
+    if (severity === 'info') return 1;
+    return 0;
+  }
+
+  private asNumber(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
+  private dedupeIssues(issues: ConsumerDiagnosticIssue[]): ConsumerDiagnosticIssue[] {
+    const seen = new Set<string>();
+    return issues.filter((issue) => {
+      if (seen.has(issue.code)) return false;
+      seen.add(issue.code);
+      return true;
+    });
   }
 }

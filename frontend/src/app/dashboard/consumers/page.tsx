@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,11 +13,13 @@ import {
   useDeleteConsumer,
   useUpdateConsumer,
   useConsumerAnalytics,
+  useConsumerDiagnostics,
   useConsumerMetrics,
 } from '@/hooks/useConsumers';
 import {
   ConsumerAnalytics,
   ConsumerConfig,
+  ConsumerDiagnostic,
   ConsumerInfo,
   ConsumerMetricsResponse,
 } from '@/lib/types';
@@ -53,6 +55,7 @@ import {
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -76,6 +79,33 @@ const CHART_COLORS = [
 ];
 
 const DEFAULT_VISIBLE_COUNT = 5;
+const HEALTH_LABELS: Record<ConsumerDiagnostic['severity'], string> = {
+  critical: 'Critical',
+  warning: 'Warning',
+  info: 'Info',
+  ok: 'OK',
+};
+
+function healthBadgeVariant(
+  severity: ConsumerDiagnostic['severity'],
+): 'destructive' | 'warning' | 'success' | 'outline' {
+  if (severity === 'critical') return 'destructive';
+  if (severity === 'warning') return 'warning';
+  if (severity === 'ok') return 'success';
+  return 'outline';
+}
+
+function ConsumerHealthBadge({ diagnostic }: { diagnostic?: ConsumerDiagnostic }) {
+  if (!diagnostic) {
+    return <Badge variant="outline">Unknown</Badge>;
+  }
+
+  return (
+    <Badge variant={healthBadgeVariant(diagnostic.severity)}>
+      {HEALTH_LABELS[diagnostic.severity]}
+    </Badge>
+  );
+}
 
 function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
   const [visibleNames, setVisibleNames] = useState<Set<string>>(() => {
@@ -184,7 +214,13 @@ function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
 type SortField = 'name' | 'stream_lag' | 'num_pending' | 'num_ack_pending';
 type SortDir = 'asc' | 'desc';
 
-function ConsumerLagAnalyticsView({ analyticsData }: { analyticsData: ConsumerAnalytics | null }) {
+function ConsumerLagAnalyticsView({
+  analyticsData,
+  diagnosticsByName,
+}: {
+  analyticsData: ConsumerAnalytics | null;
+  diagnosticsByName: Map<string, ConsumerDiagnostic>;
+}) {
   const [sortField, setSortField] = useState<SortField>('stream_lag');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [lagPage, setLagPage] = useState(0);
@@ -274,11 +310,13 @@ function ConsumerLagAnalyticsView({ analyticsData }: { analyticsData: ConsumerAn
                     Ack Pending{sortIndicator('num_ack_pending')}
                   </Button>
                 </TableHead>
+                <TableHead>Health</TableHead>
                 <TableHead className="w-32">Lag</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pagedConsumers.map((metric) => {
+                const diagnostic = diagnosticsByName.get(metric.name);
                 const width = Math.max(
                   2,
                   Math.round(
@@ -296,6 +334,16 @@ function ConsumerLagAnalyticsView({ analyticsData }: { analyticsData: ConsumerAn
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
                       {metric.num_ack_pending}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <ConsumerHealthBadge diagnostic={diagnostic} />
+                        {diagnostic?.issues[0] && (
+                          <p className="max-w-72 text-xs text-muted-foreground">
+                            {diagnostic.issues[0].message}
+                          </p>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="h-2 bg-muted rounded overflow-hidden">
@@ -330,9 +378,11 @@ const COMPACT_THRESHOLD = 2;
 function ConsumerLagSection({
   analyticsData,
   consumerMetrics,
+  diagnosticsByName,
 }: {
   analyticsData: ConsumerAnalytics | null;
   consumerMetrics: ConsumerMetricsResponse[];
+  diagnosticsByName: Map<string, ConsumerDiagnostic>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<'analytics' | 'chart'>(() => {
@@ -398,7 +448,10 @@ function ConsumerLagSection({
             <TabsTrigger value="chart">Over Time</TabsTrigger>
           </TabsList>
           <TabsContent value="analytics">
-            <ConsumerLagAnalyticsView analyticsData={analyticsData} />
+            <ConsumerLagAnalyticsView
+              analyticsData={analyticsData}
+              diagnosticsByName={diagnosticsByName}
+            />
           </TabsContent>
           <TabsContent value="chart">
             {hasChart ? (
@@ -500,7 +553,7 @@ function ConsumerEditForm({
 
   return (
     <TableRow>
-      <TableCell colSpan={10}>
+      <TableCell colSpan={11}>
         <Card className="border-primary/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Edit Consumer: {consumer.name}</CardTitle>
@@ -662,9 +715,23 @@ export default function ConsumersPage() {
   const confirm = useConfirm();
   const [bulkOpen, setBulkOpen] = useState(false);
   const { data: analyticsData } = useConsumerAnalytics(connectionId, selectedStream);
+  const { data: diagnosticsData } = useConsumerDiagnostics(connectionId, selectedStream);
   const { data: consumerMetrics } = useConsumerMetrics(connectionId, selectedStream);
   const createConsumer = useCreateConsumer(connectionId, selectedStream || '');
   const deleteConsumer = useDeleteConsumer(connectionId, selectedStream || '');
+
+  const diagnosticsByName = useMemo(() => {
+    const map = new Map<string, ConsumerDiagnostic>();
+    diagnosticsData?.consumers.forEach((diagnostic) => {
+      map.set(diagnostic.name, diagnostic);
+    });
+    return map;
+  }, [diagnosticsData?.consumers]);
+
+  const topDiagnostics = useMemo(
+    () => (diagnosticsData?.consumers ?? []).filter((diagnostic) => diagnostic.severity !== 'ok'),
+    [diagnosticsData?.consumers],
+  );
 
   const handleCloneConsumer = (consumer: ConsumerInfo) => {
     setFormData({
@@ -793,9 +860,10 @@ export default function ConsumersPage() {
     const total = consumers.length;
     const totalPending = consumers.reduce((sum, c) => sum + c.num_pending, 0);
     const totalAckPending = consumers.reduce((sum, c) => sum + c.num_ack_pending, 0);
-    const stalled = consumers.filter((c) => c.num_ack_pending > 100 || c.num_pending > 1000).length;
-    return { total, totalPending, totalAckPending, stalled };
-  }, [consumersData?.consumers]);
+    const critical = diagnosticsData?.summary.critical ?? 0;
+    const warning = diagnosticsData?.summary.warning ?? 0;
+    return { total, totalPending, totalAckPending, critical, warning };
+  }, [consumersData?.consumers, diagnosticsData?.summary]);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -869,21 +937,65 @@ export default function ConsumersPage() {
         }}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <StatCard label="Consumers" value={healthSummary.total} isLoading={isLoading} />
         <StatCard label="Pending" value={healthSummary.totalPending} isLoading={isLoading} />
         <StatCard label="Ack Pending" value={healthSummary.totalAckPending} isLoading={isLoading} />
         <StatCard
-          label="Potentially Stalled"
-          value={healthSummary.stalled}
+          label="Critical"
+          value={healthSummary.critical}
           isLoading={isLoading}
-          tone={healthSummary.stalled > 0 ? 'destructive' : 'default'}
+          tone={healthSummary.critical > 0 ? 'destructive' : 'default'}
+        />
+        <StatCard
+          label="Warnings"
+          value={healthSummary.warning}
+          isLoading={isLoading}
+          tone={healthSummary.warning > 0 ? 'warning' : 'default'}
         />
       </div>
+
+      {topDiagnostics.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Top Diagnostics</CardTitle>
+            <CardDescription>Current consumer conditions that need review.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {topDiagnostics.slice(0, 5).map((diagnostic) => (
+              <div
+                key={`${diagnostic.stream_name}:${diagnostic.name}`}
+                className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-start sm:justify-between"
+              >
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ConsumerHealthBadge diagnostic={diagnostic} />
+                    <Link
+                      href={`/dashboard/consumers/${encodeURIComponent(diagnostic.stream_name)}/${encodeURIComponent(diagnostic.name)}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {diagnostic.name}
+                    </Link>
+                    <span className="text-sm text-muted-foreground">
+                      lag {diagnostic.stream_lag} · pending {diagnostic.num_pending} · ack pending{' '}
+                      {diagnostic.num_ack_pending}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{diagnostic.issues[0]?.message}</p>
+                </div>
+                <p className="text-sm text-muted-foreground sm:max-w-md">
+                  {diagnostic.issues[0]?.recommendation}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <ConsumerLagSection
         analyticsData={analyticsData ?? null}
         consumerMetrics={consumerMetrics ?? []}
+        diagnosticsByName={diagnosticsByName}
       />
 
       <Dialog
@@ -1267,6 +1379,7 @@ export default function ConsumersPage() {
                   <TableHead>Filter</TableHead>
                   <TableHead>Ack Policy</TableHead>
                   <TableHead>Ack Wait</TableHead>
+                  <TableHead>Health</TableHead>
                   <TableHead>Pending</TableHead>
                   <TableHead>Waiting</TableHead>
                   <TableHead>Created</TableHead>
@@ -1276,73 +1389,85 @@ export default function ConsumersPage() {
               <TableBody>
                 {filteredConsumers
                   .slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-                  .map((consumer) => (
-                    <>
-                      <TableRow key={consumer.name}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedConsumers.has(consumer.name)}
-                            onCheckedChange={() => toggleSelectConsumer(consumer.name)}
+                  .map((consumer) => {
+                    const diagnostic = diagnosticsByName.get(consumer.name);
+                    return (
+                      <Fragment key={consumer.name}>
+                        <TableRow>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedConsumers.has(consumer.name)}
+                              onCheckedChange={() => toggleSelectConsumer(consumer.name)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <Link
+                              href={`/dashboard/consumers/${encodeURIComponent(selectedStream!)}/${encodeURIComponent(consumer.name)}`}
+                              className="text-primary hover:underline"
+                            >
+                              {consumer.name}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{consumer.config.durable_name || '-'}</TableCell>
+                          <TableCell>{consumer.config.filter_subject || '*'}</TableCell>
+                          <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
+                          <TableCell>{formatNsToSeconds(consumer.config.ack_wait)}</TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <ConsumerHealthBadge diagnostic={diagnostic} />
+                              {diagnostic?.issues[0] && (
+                                <p className="max-w-64 text-xs text-muted-foreground">
+                                  {diagnostic.issues[0].message}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{consumer.num_pending}</TableCell>
+                          <TableCell>{consumer.num_waiting}</TableCell>
+                          <TableCell>{formatDate(consumer.created)}</TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button
+                              onClick={() =>
+                                setEditingConsumer(
+                                  editingConsumer === consumer.name ? null : consumer.name,
+                                )
+                              }
+                              variant="ghost"
+                              size="icon"
+                              title="Edit consumer"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              onClick={() => handleCloneConsumer(consumer)}
+                              variant="ghost"
+                              size="icon"
+                              title="Clone consumer config"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteConsumer(consumer.name)}
+                              disabled={deleteConsumer.isPending}
+                              variant="ghost"
+                              size="icon"
+                              title="Delete consumer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {editingConsumer === consumer.name && connectionId && selectedStream && (
+                          <ConsumerEditForm
+                            consumer={consumer}
+                            connectionId={connectionId}
+                            streamName={selectedStream}
+                            onClose={() => setEditingConsumer(null)}
                           />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <Link
-                            href={`/dashboard/consumers/${encodeURIComponent(selectedStream!)}/${encodeURIComponent(consumer.name)}`}
-                            className="text-primary hover:underline"
-                          >
-                            {consumer.name}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{consumer.config.durable_name || '-'}</TableCell>
-                        <TableCell>{consumer.config.filter_subject || '*'}</TableCell>
-                        <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
-                        <TableCell>{formatNsToSeconds(consumer.config.ack_wait)}</TableCell>
-                        <TableCell>{consumer.num_pending}</TableCell>
-                        <TableCell>{consumer.num_waiting}</TableCell>
-                        <TableCell>{formatDate(consumer.created)}</TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button
-                            onClick={() =>
-                              setEditingConsumer(
-                                editingConsumer === consumer.name ? null : consumer.name,
-                              )
-                            }
-                            variant="ghost"
-                            size="icon"
-                            title="Edit consumer"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            onClick={() => handleCloneConsumer(consumer)}
-                            variant="ghost"
-                            size="icon"
-                            title="Clone consumer config"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            onClick={() => handleDeleteConsumer(consumer.name)}
-                            disabled={deleteConsumer.isPending}
-                            variant="ghost"
-                            size="icon"
-                            title="Delete consumer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      {editingConsumer === consumer.name && connectionId && selectedStream && (
-                        <ConsumerEditForm
-                          key={`edit-${consumer.name}`}
-                          consumer={consumer}
-                          connectionId={connectionId}
-                          streamName={selectedStream}
-                          onClose={() => setEditingConsumer(null)}
-                        />
-                      )}
-                    </>
-                  ))}
+                        )}
+                      </Fragment>
+                    );
+                  })}
               </TableBody>
             </Table>
             <Pagination

@@ -6,7 +6,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
-import { useConsumer, useConsumerMetric, useUpdateConsumer } from '@/hooks/useConsumers';
+import {
+  useConsumer,
+  useConsumerDiagnostics,
+  useConsumerMetric,
+  useUpdateConsumer,
+} from '@/hooks/useConsumers';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import { formatNumber } from '@/lib/utils';
 import { ArrowLeft, Layers, Pencil } from 'lucide-react';
@@ -36,11 +41,27 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ConsumerInfo } from '@/lib/types';
+import { ConsumerDiagnostic, ConsumerInfo } from '@/lib/types';
 
 function formatNsToSeconds(nanoseconds?: number): string {
   if (!nanoseconds || Number.isNaN(nanoseconds)) return '-';
   return `${(nanoseconds / 1_000_000_000).toFixed(1)}s`;
+}
+
+const HEALTH_LABELS: Record<ConsumerDiagnostic['severity'], string> = {
+  critical: 'Critical',
+  warning: 'Warning',
+  info: 'Info',
+  ok: 'OK',
+};
+
+function healthBadgeVariant(
+  severity: ConsumerDiagnostic['severity'],
+): 'destructive' | 'warning' | 'success' | 'outline' {
+  if (severity === 'critical') return 'destructive';
+  if (severity === 'warning') return 'warning';
+  if (severity === 'ok') return 'success';
+  return 'outline';
 }
 
 export default function ConsumerDetailPage({
@@ -60,7 +81,13 @@ export default function ConsumerDetailPage({
     refetch,
   } = useConsumer(connectionId, streamName, consumerName);
   const { data: metricsData } = useConsumerMetric(connectionId, streamName, consumerName);
+  const { data: diagnosticsData } = useConsumerDiagnostics(connectionId, streamName);
   const [editing, setEditing] = useState(false);
+
+  const diagnostic = useMemo(
+    () => diagnosticsData?.consumers.find((item) => item.name === consumerName),
+    [consumerName, diagnosticsData?.consumers],
+  );
 
   const chartData = useMemo(() => {
     if (!metricsData?.points?.length) return [];
@@ -144,7 +171,7 @@ export default function ConsumerDetailPage({
       )}
 
       {/* State Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Pending</p>
@@ -155,6 +182,12 @@ export default function ConsumerDetailPage({
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Ack Pending</p>
             <p className="text-xl font-semibold">{formatNumber(consumer.num_ack_pending)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Stream Lag</p>
+            <p className="text-xl font-semibold">{formatNumber(diagnostic?.stream_lag ?? 0)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -176,6 +209,58 @@ export default function ConsumerDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-lg">Diagnostics</CardTitle>
+            <Badge variant={diagnostic ? healthBadgeVariant(diagnostic.severity) : 'outline'}>
+              {diagnostic ? HEALTH_LABELS[diagnostic.severity] : 'Unknown'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {diagnostic ? (
+            diagnostic.issues.length > 0 ? (
+              <div className="space-y-3">
+                {diagnostic.issues.map((issue) => (
+                  <div key={issue.code} className="rounded-md border p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={healthBadgeVariant(issue.severity)}>{issue.severity}</Badge>
+                      <p className="font-medium">{issue.message}</p>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{issue.recommendation}</p>
+                  </div>
+                ))}
+                <div className="grid grid-cols-1 gap-3 pt-1 text-sm md:grid-cols-4">
+                  <div>
+                    <p className="text-muted-foreground">Last Stream Seq</p>
+                    <p className="font-medium">{formatNumber(diagnostic.last_stream_seq)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Stream Lag</p>
+                    <p className="font-medium">{formatNumber(diagnostic.stream_lag)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Unacked Span</p>
+                    <p className="font-medium">{formatNumber(diagnostic.unacked_span)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Type</p>
+                    <p className="font-medium capitalize">{diagnostic.type}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No current consumer issues detected.</p>
+            )
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Diagnostics are not available for this consumer yet.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Metrics Chart */}
       {chartData.length > 0 && (
