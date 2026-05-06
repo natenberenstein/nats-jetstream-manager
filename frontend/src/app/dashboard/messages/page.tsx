@@ -22,6 +22,7 @@ import { SavedView } from '@/components/messages/types';
 import { usePrompt } from '@/components/ui/confirm-dialog';
 import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 
 const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
 const FAVORITE_STREAMS_KEY = 'nats_favorite_streams_v1';
@@ -639,17 +640,42 @@ export default function MessagesPage() {
         </TabsContent>
 
         <TabsContent value="publish" className="mt-0">
-          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
-            <div className="xl:col-span-2">{renderPublishPanel()}</div>
-            {renderMessageList('xl:col-span-3')}
+          {/* Mobile: stacked. Desktop: resizable split. */}
+          <div className="space-y-6 xl:hidden">
+            {renderPublishPanel()}
+            {renderMessageList()}
           </div>
+          <ResizablePanelGroup
+            direction="horizontal"
+            className="hidden min-h-[640px] rounded-md xl:flex"
+          >
+            <ResizablePanel defaultSize={40} minSize={28}>
+              <div className="pr-3">{renderPublishPanel()}</div>
+            </ResizablePanel>
+            <ResizableHandle withHandle className="mx-1" />
+            <ResizablePanel defaultSize={60} minSize={36}>
+              <div className="pl-3">{renderMessageList()}</div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </TabsContent>
 
         <TabsContent value="tools" className="mt-0">
-          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
-            <div className="space-y-6 xl:col-span-2">{renderToolsPanel()}</div>
-            {renderMessageList('xl:col-span-3')}
+          <div className="space-y-6 xl:hidden">
+            {renderToolsPanel()}
+            {renderMessageList()}
           </div>
+          <ResizablePanelGroup
+            direction="horizontal"
+            className="hidden min-h-[640px] rounded-md xl:flex"
+          >
+            <ResizablePanel defaultSize={40} minSize={28}>
+              <div className="space-y-6 pr-3">{renderToolsPanel()}</div>
+            </ResizablePanel>
+            <ResizableHandle withHandle className="mx-1" />
+            <ResizablePanel defaultSize={60} minSize={36}>
+              <div className="pl-3">{renderMessageList()}</div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </TabsContent>
       </Tabs>
 

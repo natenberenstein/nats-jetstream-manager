@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useConnection } from '@/contexts/ConnectionContext';
+import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Database,
   Layers,
@@ -19,19 +19,34 @@ import {
   HardDrive,
   Moon,
   Sun,
-  Menu,
   FileClock,
 } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import { CommandPalette, type CommandItem } from '@/components/layout/CommandPalette';
+import { DashboardBreadcrumb } from '@/components/layout/DashboardBreadcrumb';
+import { useConnection } from '@/contexts/ConnectionContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useStreams } from '@/hooks/useStreams';
 import { useKvStores } from '@/hooks/useKv';
 import { useObjectStores } from '@/hooks/useObjectStore';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { CommandPalette, type CommandItem } from '@/components/layout/CommandPalette';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -42,11 +57,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: kvData } = useKvStores(connectionId);
   const { data: objectStoreData } = useObjectStores(connectionId);
   const [commandOpen, setCommandOpen] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileNavOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     if (!connected || !connectionId) {
@@ -96,15 +106,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     [],
   );
 
-  const navItems = useMemo<CommandItem[]>(
-    () =>
-      navSections.flatMap((section) =>
-        section.items.map((item) => ({ ...item, keywords: section.label ? [section.label] : [] })),
-      ),
-    [navSections],
-  );
-
   const commandItems = useMemo<CommandItem[]>(() => {
+    const navItems: CommandItem[] = navSections.flatMap((section) =>
+      section.items.map((item) => ({
+        ...item,
+        group: 'Navigation',
+        keywords: section.label ? [section.label] : [],
+      })),
+    );
+
     const streamItems: CommandItem[] = (streamsData?.streams ?? []).flatMap((stream) => {
       const name = stream.config.name;
       const encoded = encodeURIComponent(name);
@@ -113,13 +123,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {
           href: `/dashboard/streams/${encoded}`,
           icon: Layers,
-          label: `Stream: ${name}`,
+          label: name,
+          group: 'Streams',
           keywords,
         },
         {
           href: `/dashboard/messages?stream=${encoded}`,
           icon: MessageSquare,
           label: `Messages: ${name}`,
+          group: 'Streams',
           keywords: ['messages', ...keywords],
         },
       ];
@@ -128,19 +140,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const kvItems: CommandItem[] = (kvData?.kv_stores ?? []).map((store) => ({
       href: `/dashboard/kv?bucket=${encodeURIComponent(store.bucket)}`,
       icon: Key,
-      label: `KV: ${store.bucket}`,
+      label: store.bucket,
+      group: 'KV Stores',
       keywords: ['kv', 'bucket', store.description || ''],
     }));
 
     const objectItems: CommandItem[] = (objectStoreData?.object_stores ?? []).map((store) => ({
       href: `/dashboard/objectstore?bucket=${encodeURIComponent(store.bucket)}`,
       icon: HardDrive,
-      label: `Object Store: ${store.bucket}`,
+      label: store.bucket,
+      group: 'Object Stores',
       keywords: ['object', 'bucket', store.description || ''],
     }));
 
     return [...navItems, ...streamItems, ...kvItems, ...objectItems];
-  }, [kvData?.kv_stores, navItems, objectStoreData?.object_stores, streamsData?.streams]);
+  }, [kvData?.kv_stores, navSections, objectStoreData?.object_stores, streamsData?.streams]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -157,73 +171,80 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return null;
   }
 
-  const renderNav = (onNavigate?: () => void) => (
-    <nav className="flex-1 space-y-3 p-3">
-      {navSections.map((section, sectionIndex) => (
-        <div key={section.label ?? `section-${sectionIndex}`} className="space-y-0.5">
-          {section.label && (
-            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {section.label}
-            </p>
-          )}
-          {section.items.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavigate}
-                className={cn(
-                  'flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-                  isActive ? 'bg-primary/10 text-primary' : 'hover:bg-accent',
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      ))}
-    </nav>
-  );
-
   return (
-    <div className="min-h-screen bg-muted/40">
-      {/* Header */}
-      <header className="bg-background border-b">
-        <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="md:hidden"
-                  aria-label="Open navigation"
-                >
-                  <Menu className="h-4 w-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0">
-                <SheetHeader className="border-b p-4">
-                  <SheetTitle>Navigation</SheetTitle>
-                </SheetHeader>
-                {renderNav(() => setMobileNavOpen(false))}
-              </SheetContent>
-            </Sheet>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
+    <SidebarProvider>
+      <Sidebar collapsible="icon">
+        <SidebarHeader>
+          <div className="flex items-center gap-2 px-2 py-1.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary">
               <Database className="h-5 w-5 text-primary-foreground" />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-sm font-semibold leading-tight sm:text-base">
-                NATS JetStream Manager
-              </h1>
-              <p className="truncate text-xs text-muted-foreground">{url}</p>
+            <div className="grid flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+              <span className="truncate text-sm font-semibold leading-tight">NATS JetStream</span>
+              <span className="truncate text-xs text-muted-foreground">{url}</span>
             </div>
           </div>
+        </SidebarHeader>
 
-          <div className="flex items-center gap-2">
+        <SidebarContent>
+          {navSections.map((section, idx) => (
+            <SidebarGroup key={section.label ?? `section-${idx}`}>
+              {section.label && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {section.items.map((item) => {
+                    const isActive = pathname === item.href;
+                    const Icon = item.icon;
+                    return (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
+                          <Link href={item.href}>
+                            <Icon />
+                            <span>{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+        </SidebarContent>
+
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={handleDisconnect} tooltip="Disconnect">
+                <LogOut />
+                <span>Disconnect</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+
+        <SidebarRail />
+      </Sidebar>
+
+      <SidebarInset>
+        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
+          <SidebarTrigger />
+          <Separator orientation="vertical" className="mx-1 h-4" />
+          <DashboardBreadcrumb />
+
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCommandOpen(true)}
+              className="gap-2"
+            >
+              <Search className="h-4 w-4" />
+              <span className="hidden sm:inline">Search</span>
+              <kbd className="ml-1 hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground md:inline">
+                ⌘K
+              </kbd>
+            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -231,38 +252,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               aria-label="Toggle theme"
               title="Toggle theme"
             >
-              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCommandOpen(true)}>
-              <Search className="w-4 h-4" />
-              <span className="hidden sm:inline">Command</span>
-              <kbd className="ml-2 hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground md:inline">
-                ⌘K
-              </kbd>
-            </Button>
-            <Button onClick={handleDisconnect} variant="outline" size="sm">
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Disconnect</span>
+              {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="hidden w-56 flex-col border-r bg-background min-h-[calc(100vh-57px)] md:flex">
-          {renderNav()}
-        </aside>
-
-        {/* Main Content */}
         <main className="flex-1 min-w-0">
           <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 sm:py-6">
             {children}
           </div>
         </main>
-      </div>
+      </SidebarInset>
 
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} items={commandItems} />
-    </div>
+    </SidebarProvider>
   );
 }

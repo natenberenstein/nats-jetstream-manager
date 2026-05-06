@@ -10,13 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/pagination';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { downloadFile, formatPayload, maskSensitiveText, toCsv } from './utils';
 import { PayloadViewer } from './PayloadViewer';
 
@@ -137,19 +132,23 @@ export function MessageList({
             Recent Messages {selectedStream ? `(${selectedStream})` : ''}
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={String(liveIntervalMs)}
-              onValueChange={(value) => onLiveIntervalChange(Number(value))}
-            >
-              <SelectTrigger className="h-9 w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1000">1s</SelectItem>
-                <SelectItem value="2000">2s</SelectItem>
-                <SelectItem value="5000">5s</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2 rounded-md border bg-background px-2.5 h-9">
+              <span className="text-xs text-muted-foreground" aria-hidden>
+                Live
+              </span>
+              <Slider
+                value={[liveIntervalMs]}
+                min={500}
+                max={10000}
+                step={500}
+                onValueChange={([v]) => onLiveIntervalChange(v)}
+                className="w-24"
+                aria-label="Live tail interval"
+              />
+              <span className="text-xs font-mono tabular-nums w-8 text-right">
+                {(liveIntervalMs / 1000).toFixed(liveIntervalMs % 1000 === 0 ? 0 : 1)}s
+              </span>
+            </div>
             <Button onClick={onRefetch} disabled={!selectedStream} variant="outline" size="sm">
               <RefreshCw className="w-4 h-4" />
               Refresh
@@ -194,28 +193,34 @@ export function MessageList({
             onChange={(e) => onPayloadContainsChange(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-4 mt-3 text-sm">
-          <label className="flex items-center gap-2">
-            <Checkbox
-              checked={showHeadersCol}
-              onCheckedChange={(checked) => onShowHeadersColChange(checked === true)}
-            />
-            Headers
-          </label>
-          <label className="flex items-center gap-2">
-            <Checkbox
-              checked={showSizeCol}
-              onCheckedChange={(checked) => onShowSizeColChange(checked === true)}
-            />
-            Size
-          </label>
-          <label className="flex items-center gap-2">
-            <Checkbox
-              checked={showTimeCol}
-              onCheckedChange={(checked) => onShowTimeColChange(checked === true)}
-            />
-            Time
-          </label>
+        <div className="flex items-center gap-2 mt-3">
+          <span className="text-xs text-muted-foreground">Columns:</span>
+          <ToggleGroup
+            type="multiple"
+            size="sm"
+            variant="outline"
+            value={[
+              ...(showHeadersCol ? ['headers'] : []),
+              ...(showSizeCol ? ['size'] : []),
+              ...(showTimeCol ? ['time'] : []),
+            ]}
+            onValueChange={(values) => {
+              onShowHeadersColChange(values.includes('headers'));
+              onShowSizeColChange(values.includes('size'));
+              onShowTimeColChange(values.includes('time'));
+            }}
+            aria-label="Toggle columns"
+          >
+            <ToggleGroupItem value="headers" aria-label="Toggle headers column">
+              Headers
+            </ToggleGroupItem>
+            <ToggleGroupItem value="size" aria-label="Toggle size column">
+              Size
+            </ToggleGroupItem>
+            <ToggleGroupItem value="time" aria-label="Toggle time column">
+              Time
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
       </CardHeader>
       <CardContent className="p-0">

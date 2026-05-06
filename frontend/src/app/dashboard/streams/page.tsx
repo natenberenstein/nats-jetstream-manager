@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -9,7 +9,16 @@ import { useStreams, useDeleteStream, useCreateStream, useUpdateStream } from '@
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { StreamInfo } from '@/lib/types';
 import Link from 'next/link';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Copy, MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { focusFirstError } from '@/lib/form-utils';
 import { Button } from '@/components/ui/button';
@@ -259,6 +268,7 @@ function StreamEditForm({
 }
 
 export default function StreamsPage() {
+  const router = useRouter();
   const { connectionId } = useConnection();
   const {
     data: streamsData,
@@ -542,76 +552,153 @@ export default function StreamsPage() {
               <TableBody>
                 {filteredStreams
                   .slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-                  .map((stream) => (
-                    <>
-                      <TableRow key={stream.config.name}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedStreams.has(stream.config.name)}
-                            onCheckedChange={() => toggleSelectStream(stream.config.name)}
+                  .map((stream) => {
+                    const maxBytes = stream.config.max_bytes ?? -1;
+                    const usedBytes = stream.state.bytes;
+                    const usedPct =
+                      maxBytes > 0 ? Math.min(100, (usedBytes / maxBytes) * 100) : null;
+                    const encoded = encodeURIComponent(stream.config.name);
+                    return (
+                      <React.Fragment key={stream.config.name}>
+                        <ContextMenu>
+                          <ContextMenuTrigger asChild>
+                            <TableRow>
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedStreams.has(stream.config.name)}
+                                  onCheckedChange={() => toggleSelectStream(stream.config.name)}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                <Link
+                                  href={`/dashboard/streams/${encoded}`}
+                                  className="text-primary hover:underline"
+                                >
+                                  {stream.config.name}
+                                </Link>
+                                {stream.config.mirror && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    (mirror)
+                                  </span>
+                                )}
+                                {stream.config.sources && stream.config.sources.length > 0 && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    ({stream.config.sources.length} source
+                                    {stream.config.sources.length > 1 ? 's' : ''})
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {stream.config.subjects.join(', ')}
+                              </TableCell>
+                              <TableCell>{formatNumber(stream.state.messages)}</TableCell>
+                              <TableCell className="min-w-[160px]">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-baseline justify-between gap-2 text-xs">
+                                    <span className="font-medium">{formatBytes(usedBytes)}</span>
+                                    {usedPct !== null && (
+                                      <span className="text-muted-foreground">
+                                        {usedPct.toFixed(0)}% of {formatBytes(maxBytes)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {usedPct !== null && (
+                                    <Progress
+                                      value={usedPct}
+                                      aria-label={`Storage used: ${usedPct.toFixed(0)}%`}
+                                      className={
+                                        usedPct >= 90
+                                          ? '[&>div]:bg-destructive'
+                                          : usedPct >= 75
+                                            ? '[&>div]:bg-warning'
+                                            : ''
+                                      }
+                                    />
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>{stream.state.consumer_count}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="rounded-md">
+                                  {stream.config.storage}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right space-x-1">
+                                <Button
+                                  onClick={() =>
+                                    setEditingStream(
+                                      editingStream === stream.config.name
+                                        ? null
+                                        : stream.config.name,
+                                    )
+                                  }
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Edit stream"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleDelete(stream.config.name)}
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={deleteStream.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <ContextMenuItem
+                              onSelect={() => router.push(`/dashboard/streams/${encoded}`)}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Open stream
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              onSelect={() => router.push(`/dashboard/messages?stream=${encoded}`)}
+                            >
+                              <MessageSquare className="mr-2 h-4 w-4" />
+                              View messages
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              onSelect={() => navigator.clipboard.writeText(stream.config.name)}
+                            >
+                              <Copy className="mr-2 h-4 w-4" />
+                              Copy name
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                              onSelect={() =>
+                                setEditingStream(
+                                  editingStream === stream.config.name ? null : stream.config.name,
+                                )
+                              }
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={() => handleDelete(stream.config.name)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
+                        {editingStream === stream.config.name && connectionId && (
+                          <StreamEditForm
+                            key={`edit-${stream.config.name}`}
+                            stream={stream}
+                            connectionId={connectionId}
+                            onClose={() => setEditingStream(null)}
                           />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <Link
-                            href={`/dashboard/streams/${encodeURIComponent(stream.config.name)}`}
-                            className="text-primary hover:underline"
-                          >
-                            {stream.config.name}
-                          </Link>
-                          {stream.config.mirror && (
-                            <span className="ml-2 text-xs text-muted-foreground">(mirror)</span>
-                          )}
-                          {stream.config.sources && stream.config.sources.length > 0 && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              ({stream.config.sources.length} source
-                              {stream.config.sources.length > 1 ? 's' : ''})
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {stream.config.subjects.join(', ')}
-                        </TableCell>
-                        <TableCell>{formatNumber(stream.state.messages)}</TableCell>
-                        <TableCell>{formatBytes(stream.state.bytes)}</TableCell>
-                        <TableCell>{stream.state.consumer_count}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="rounded-md">
-                            {stream.config.storage}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button
-                            onClick={() =>
-                              setEditingStream(
-                                editingStream === stream.config.name ? null : stream.config.name,
-                              )
-                            }
-                            variant="ghost"
-                            size="icon"
-                            title="Edit stream"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            onClick={() => handleDelete(stream.config.name)}
-                            variant="ghost"
-                            size="icon"
-                            disabled={deleteStream.isPending}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      {editingStream === stream.config.name && connectionId && (
-                        <StreamEditForm
-                          key={`edit-${stream.config.name}`}
-                          stream={stream}
-                          connectionId={connectionId}
-                          onClose={() => setEditingStream(null)}
-                        />
-                      )}
-                    </>
-                  ))}
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
               </TableBody>
             </Table>
             <Pagination

@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, FileClock, Search } from 'lucide-react';
+import { ColumnDef } from '@tanstack/react-table';
+import { ArrowUpDown, AlertTriangle, FileClock, Search } from 'lucide-react';
 
 import { useAuditEntries } from '@/hooks/useAudit';
 import { AuditLogEntry } from '@/lib/types';
@@ -13,14 +14,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataTable } from '@/components/ui/data-table';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
 function auditTone(
   action: string,
@@ -32,10 +28,113 @@ function auditTone(
   return 'outline';
 }
 
-function formatDetails(entry: AuditLogEntry): string {
+function detailsPreview(entry: AuditLogEntry): string {
   if (!entry.details || Object.keys(entry.details).length === 0) return '-';
   return JSON.stringify(entry.details);
 }
+
+function SortableHeader({
+  column,
+  children,
+}: {
+  column: { toggleSorting: (desc?: boolean) => void; getIsSorted: () => false | 'asc' | 'desc' };
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-ml-2 h-7 px-2"
+      onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+    >
+      {children}
+      <ArrowUpDown className="ml-1.5 h-3 w-3 opacity-60" />
+    </Button>
+  );
+}
+
+const columns: ColumnDef<AuditLogEntry>[] = [
+  {
+    accessorKey: 'created_at',
+    id: 'time',
+    header: ({ column }) => <SortableHeader column={column}>Time</SortableHeader>,
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-muted-foreground">
+        {new Date(row.original.created_at).toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'action',
+    id: 'action',
+    header: 'Action',
+    cell: ({ row }) => (
+      <Badge variant={auditTone(row.original.action)} className="rounded-md">
+        {row.original.action}
+      </Badge>
+    ),
+    filterFn: (row, _id, value) =>
+      String(row.original.action).toLowerCase().includes(String(value).toLowerCase()),
+  },
+  {
+    accessorKey: 'resource_type',
+    id: 'resource',
+    header: 'Resource',
+    cell: ({ row }) => <span className="font-medium">{row.original.resource_type}</span>,
+  },
+  {
+    accessorKey: 'resource_name',
+    id: 'name',
+    header: 'Name',
+    cell: ({ row }) => (
+      <span className="block max-w-[220px] truncate font-mono text-xs">
+        {row.original.resource_name || '-'}
+      </span>
+    ),
+  },
+  {
+    id: 'user',
+    header: 'User',
+    cell: ({ row }) => (
+      <span className="block max-w-[220px] truncate">
+        {row.original.user_email || row.original.user_id || '-'}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'connection_id',
+    id: 'connection',
+    header: 'Connection',
+    cell: ({ row }) => (
+      <span className="block max-w-[180px] truncate font-mono text-xs text-muted-foreground">
+        {row.original.connection_id || '-'}
+      </span>
+    ),
+  },
+  {
+    id: 'details',
+    header: 'Details',
+    cell: ({ row }) => {
+      const preview = detailsPreview(row.original);
+      if (preview === '-') return <span className="text-muted-foreground">-</span>;
+      return (
+        <HoverCard openDelay={150}>
+          <HoverCardTrigger asChild>
+            <span className="block max-w-[320px] cursor-help truncate font-mono text-xs text-muted-foreground hover:text-foreground">
+              {preview}
+            </span>
+          </HoverCardTrigger>
+          <HoverCardContent className="w-96" align="end">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">Details</p>
+            <pre className="max-h-72 overflow-auto rounded-md bg-muted p-2 text-[11px] leading-relaxed">
+              {JSON.stringify(row.original.details, null, 2)}
+            </pre>
+          </HoverCardContent>
+        </HoverCard>
+      );
+    },
+  },
+];
 
 export default function AuditPage() {
   const [pageIndex, setPageIndex] = useState(0);
@@ -43,6 +142,7 @@ export default function AuditPage() {
   const [action, setAction] = useState('');
   const [resourceType, setResourceType] = useState('');
   const [userId, setUserId] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   const query = useMemo(() => {
     const trimmedUserId = userId.trim();
@@ -59,12 +159,24 @@ export default function AuditPage() {
   const { data, isLoading, isFetching, isError, error, refetch, dataUpdatedAt } =
     useAuditEntries(query);
 
+  const filteredEntries = useMemo(() => {
+    if (!data?.entries) return [];
+    if (!dateRange?.from) return data.entries;
+    const fromMs = dateRange.from.getTime();
+    const toMs = dateRange.to ? dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1 : Date.now();
+    return data.entries.filter((entry) => {
+      const ts = new Date(entry.created_at).getTime();
+      return ts >= fromMs && ts <= toMs;
+    });
+  }, [data?.entries, dateRange]);
+
   const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
 
   const resetFilters = () => {
     setAction('');
     setResourceType('');
     setUserId('');
+    setDateRange(undefined);
     setPageIndex(0);
   };
 
@@ -89,7 +201,7 @@ export default function AuditPage() {
             Filters
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_160px_auto]">
+        <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_160px_minmax(220px,1fr)_auto]">
           <Input
             value={action}
             onChange={(event) => {
@@ -115,6 +227,11 @@ export default function AuditPage() {
             inputMode="numeric"
             placeholder="User ID"
           />
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            placeholder="Date range (visible page)"
+          />
           <Button type="button" variant="outline" onClick={resetFilters}>
             Clear
           </Button>
@@ -135,56 +252,25 @@ export default function AuditPage() {
           <CardContent className="p-0">
             <TableSkeleton rows={8} columns={7} />
           </CardContent>
-        ) : data?.entries.length ? (
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Resource</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Connection</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.entries.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {new Date(entry.created_at).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={auditTone(entry.action)} className="rounded-md">
-                        {entry.action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{entry.resource_type}</TableCell>
-                    <TableCell className="max-w-[220px] truncate font-mono text-xs">
-                      {entry.resource_name || '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[220px] truncate">
-                      {entry.user_email || entry.user_id || '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[180px] truncate font-mono text-xs text-muted-foreground">
-                      {entry.connection_id || '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[320px] truncate font-mono text-xs text-muted-foreground">
-                      {formatDetails(entry)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <Pagination
-              pageIndex={pageIndex}
-              pageCount={pageCount}
+        ) : filteredEntries.length ? (
+          <CardContent className="p-4">
+            <DataTable
+              columns={columns}
+              data={filteredEntries}
               pageSize={pageSize}
-              onPageChange={setPageIndex}
-              onPageSizeChange={setPageSize}
-              totalItems={data.total}
+              hideFooter
+              emptyText="No audit entries match your filters."
             />
+            <div className="mt-3 border-t pt-3">
+              <Pagination
+                pageIndex={pageIndex}
+                pageCount={pageCount}
+                pageSize={pageSize}
+                onPageChange={setPageIndex}
+                onPageSizeChange={setPageSize}
+                totalItems={data?.total ?? 0}
+              />
+            </div>
           </CardContent>
         ) : (
           <CardContent className="p-8 text-center">
