@@ -13,8 +13,9 @@ import {
   useUpdateConsumer,
 } from '@/hooks/useConsumers';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
+import { copyText, downloadFile } from '@/lib/download';
 import { formatNumber } from '@/lib/utils';
-import { ArrowLeft, Layers, Pencil } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Layers, MessageSquare, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -122,6 +123,31 @@ export default function ConsumerDetailPage({
 
   const config = consumer.config;
   const isPush = !!config.deliver_subject;
+  const consumerCliCommand = [
+    'nats consumer add',
+    streamName,
+    consumer.name,
+    config.filter_subject ? `--filter ${config.filter_subject}` : null,
+    `--ack ${config.ack_policy || 'explicit'}`,
+    `--deliver ${config.deliver_policy || 'all'}`,
+    config.max_deliver != null ? `--max-deliver ${config.max_deliver}` : null,
+    config.max_ack_pending != null ? `--max-pending ${config.max_ack_pending}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const handleCopyCli = async () => {
+    await copyText(consumerCliCommand);
+    toast.success('Copied consumer CLI command.');
+  };
+
+  const handleExportConfig = () => {
+    downloadFile(
+      `${streamName}-${consumer.name}-consumer-config.json`,
+      JSON.stringify(config, null, 2),
+      'application/json',
+    );
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -145,6 +171,14 @@ export default function ConsumerDetailPage({
             <Button variant="outline" onClick={() => setEditing(true)}>
               <Pencil className="w-4 h-4" />
               Edit
+            </Button>
+            <Button variant="outline" onClick={handleCopyCli}>
+              <Copy className="w-4 h-4" />
+              Copy CLI
+            </Button>
+            <Button variant="outline" onClick={handleExportConfig}>
+              <Download className="w-4 h-4" />
+              Export
             </Button>
             <Link href={`/dashboard/streams/${encodeURIComponent(streamName)}`}>
               <Button variant="outline">
@@ -230,6 +264,22 @@ export default function ConsumerDetailPage({
                       <p className="font-medium">{issue.message}</p>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{issue.recommendation}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link
+                        href={`/dashboard/messages?stream=${encodeURIComponent(streamName)}&seq_start=${Math.max(1, diagnostic.ack_floor_stream_seq || diagnostic.delivered_stream_seq || 1)}`}
+                      >
+                        <Button variant="outline" size="sm">
+                          <MessageSquare className="h-4 w-4" />
+                          View Messages
+                        </Button>
+                      </Link>
+                      <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
+                        <Button variant="outline" size="sm">
+                          <Copy className="h-4 w-4" />
+                          Clone or Tune
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 ))}
                 <div className="grid grid-cols-1 gap-3 pt-1 text-sm md:grid-cols-4">

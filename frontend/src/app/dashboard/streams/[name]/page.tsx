@@ -6,11 +6,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
-import { useStream, useUpdateStream } from '@/hooks/useStreams';
+import { usePurgeStream, useStream, useUpdateStream } from '@/hooks/useStreams';
 import { useConsumers } from '@/hooks/useConsumers';
+import { useStreamMetrics } from '@/hooks/useMetrics';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
+import { copyText, downloadFile } from '@/lib/download';
 import { formatBytes, formatNumber } from '@/lib/utils';
-import { ArrowLeft, Users, MessageSquare, Pencil } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Flame, Users, MessageSquare, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +21,8 @@ import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   Select,
   SelectContent,
@@ -55,6 +59,9 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
     refetch,
   } = useStream(connectionId, streamName);
   const { data: consumersData } = useConsumers(connectionId, streamName);
+  const { data: metricsData } = useStreamMetrics(connectionId, streamName, 60);
+  const purgeStream = usePurgeStream(connectionId);
+  const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
 
   if (isLoading) {
@@ -80,6 +87,70 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
 
   const config = stream.config;
   const state = stream.state;
+  const maxBytes = config.max_bytes ?? -1;
+  const storagePct = maxBytes > 0 ? Math.min(100, (state.bytes / maxBytes) * 100) : null;
+  const avgByteRate = metricsData?.points.length
+    ? metricsData.points.reduce((sum, point) => sum + Math.max(0, point.byte_rate), 0) /
+      metricsData.points.length
+    : 0;
+  const secondsToFull =
+    maxBytes > 0 && avgByteRate > 0 ? Math.max(0, (maxBytes - state.bytes) / avgByteRate) : null;
+
+  const formatDuration = (seconds: number | null) => {
+    if (seconds === null) return '-';
+    if (seconds <= 0) return 'now';
+    if (seconds < 3600) return `${Math.ceil(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.ceil(seconds / 3600)}h`;
+    return `${Math.ceil(seconds / 86400)}d`;
+  };
+
+  const streamCliCommand = [
+    'nats stream add',
+    config.name,
+    `--subjects "${config.subjects.join(',')}"`,
+    `--storage ${config.storage || 'file'}`,
+    `--retention ${config.retention || 'limits'}`,
+    `--discard ${config.discard || 'old'}`,
+    `--replicas ${config.replicas ?? 1}`,
+  ].join(' ');
+
+  const handleExportConfig = () => {
+    downloadFile(
+      `${config.name}-stream-config.json`,
+      JSON.stringify(config, null, 2),
+      'application/json',
+    );
+  };
+
+  const handleCopyCli = async () => {
+    await copyText(streamCliCommand);
+    toast.success('Copied stream CLI command.');
+  };
+
+  const handlePurge = async () => {
+    const ok = await confirm({
+      title: 'Purge stream',
+      description: (
+        <>
+          This removes {formatNumber(state.messages)} message
+          {state.messages === 1 ? '' : 's'} from{' '}
+          <span className="font-mono font-semibold">{config.name}</span> without deleting the stream
+          or its consumers.
+        </>
+      ),
+      tone: 'destructive',
+      confirmLabel: 'Purge stream',
+      requireTypedConfirmation: config.name,
+    });
+    if (!ok) return;
+    try {
+      await purgeStream.mutateAsync(config.name);
+      toast.success(`Stream "${config.name}" purged.`);
+      await refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to purge stream');
+    }
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -103,6 +174,22 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
             <Button variant="outline" onClick={() => setEditing(true)}>
               <Pencil className="w-4 h-4" />
               Edit
+            </Button>
+            <Button variant="outline" onClick={handleCopyCli}>
+              <Copy className="w-4 h-4" />
+              Copy CLI
+            </Button>
+            <Button variant="outline" onClick={handleExportConfig}>
+              <Download className="w-4 h-4" />
+              Export
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handlePurge}
+              disabled={state.messages === 0 || purgeStream.isPending}
+            >
+              <Flame className="w-4 h-4" />
+              Purge
             </Button>
             <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
               <Button variant="outline">
@@ -162,6 +249,52 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Capacity Forecast</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Storage Limit</p>
+            <p className="text-lg font-semibold">
+              {maxBytes > 0 ? formatBytes(maxBytes) : 'Unlimited'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Average Write Rate</p>
+            <p className="text-lg font-semibold">{formatBytes(avgByteRate)}/s</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Time To Full</p>
+            <p className="text-lg font-semibold">{formatDuration(secondsToFull)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Retention Horizon</p>
+            <p className="text-lg font-semibold">
+              {config.max_age && config.max_age > 0 ? formatDuration(config.max_age) : 'Unlimited'}
+            </p>
+          </div>
+          {storagePct !== null && (
+            <div className="md:col-span-4">
+              <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                <span>{formatBytes(state.bytes)} used</span>
+                <span>{storagePct.toFixed(0)}%</span>
+              </div>
+              <Progress
+                value={storagePct}
+                className={
+                  storagePct >= 90
+                    ? '[&>div]:bg-destructive'
+                    : storagePct >= 75
+                      ? '[&>div]:bg-warning'
+                      : ''
+                }
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Mirror & Sources */}
       {config.mirror && (

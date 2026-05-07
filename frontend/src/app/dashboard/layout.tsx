@@ -20,9 +20,13 @@ import {
   Moon,
   Sun,
   FileClock,
+  GitBranch,
+  GitFork,
+  FileDiff,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Sidebar,
@@ -48,6 +52,8 @@ import { useStreams } from '@/hooks/useStreams';
 import { useKvStores } from '@/hooks/useKv';
 import { useObjectStores } from '@/hooks/useObjectStore';
 
+const ACTIVE_WORKSPACE_KEY = 'nats_active_workspace_v1';
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -57,12 +63,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: kvData } = useKvStores(connectionId);
   const { data: objectStoreData } = useObjectStores(connectionId);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [workspace, setWorkspace] = useState<{ name: string; environment: string } | null>(null);
 
   useEffect(() => {
     if (!connected || !connectionId) {
       router.push('/');
     }
   }, [connected, connectionId, router]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+    if (!raw) return;
+    try {
+      setWorkspace(JSON.parse(raw) as { name: string; environment: string });
+    } catch {
+      setWorkspace(null);
+    }
+  }, [connectionId]);
 
   const handleDisconnect = async () => {
     await disconnect();
@@ -87,6 +104,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         label: 'Streaming',
         items: [
           { href: '/dashboard/streams', icon: Layers, label: 'Streams' },
+          { href: '/dashboard/subjects', icon: GitBranch, label: 'Subjects' },
+          { href: '/dashboard/topology', icon: GitFork, label: 'Topology' },
           { href: '/dashboard/consumers', icon: Users, label: 'Consumers' },
           { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
         ],
@@ -100,7 +119,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       },
       {
         label: 'Operations',
-        items: [{ href: '/dashboard/audit', icon: FileClock, label: 'Audit Log' }],
+        items: [
+          { href: '/dashboard/config-diff', icon: FileDiff, label: 'Config Diff' },
+          { href: '/dashboard/audit', icon: FileClock, label: 'Audit Log' },
+        ],
       },
     ],
     [],
@@ -233,6 +255,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <DashboardBreadcrumb />
 
           <div className="ml-auto flex items-center gap-2">
+            {workspace && (
+              <div className="hidden items-center gap-2 md:flex">
+                <span className="max-w-40 truncate text-sm font-medium">{workspace.name}</span>
+                <Badge variant="outline" className="uppercase">
+                  {workspace.environment}
+                </Badge>
+              </div>
+            )}
             <Button
               variant="outline"
               size="sm"

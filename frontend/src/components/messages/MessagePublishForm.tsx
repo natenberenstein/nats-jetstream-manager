@@ -1,7 +1,7 @@
 'use client';
 
-import React, { FormEvent, useState } from 'react';
-import { Plus, Star } from 'lucide-react';
+import React, { FormEvent, useEffect, useState } from 'react';
+import { Plus, Save, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { StreamInfo } from '@/lib/types';
@@ -18,7 +18,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { usePrompt } from '@/components/ui/confirm-dialog';
 import { parseHeaders, parsePayload } from './utils';
+
+const PUBLISH_TEMPLATES_KEY = 'nats_publish_templates_v1';
+
+interface PublishTemplate {
+  name: string;
+  subject: string;
+  payload: string;
+  headersInput: string;
+  batchMode: boolean;
+  batchPayload: string;
+}
 
 interface MessagePublishFormProps {
   connectionId: string | null;
@@ -62,6 +74,18 @@ export function MessagePublishForm({
   const [headersInput, setHeadersInput] = useState('');
   const [batchMode, setBatchMode] = useState(false);
   const [batchPayload, setBatchPayload] = useState('{"event":"one"}\n{"event":"two"}');
+  const [templates, setTemplates] = useState<PublishTemplate[]>([]);
+  const prompt = usePrompt();
+
+  useEffect(() => {
+    const raw = localStorage.getItem(PUBLISH_TEMPLATES_KEY);
+    if (!raw) return;
+    try {
+      setTemplates(JSON.parse(raw) as PublishTemplate[]);
+    } catch {
+      setTemplates([]);
+    }
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -91,6 +115,40 @@ export function MessagePublishForm({
         headers,
       });
     }
+  };
+
+  const saveTemplate = async () => {
+    const name = await prompt({
+      title: 'Save publish template',
+      label: 'Template name',
+      placeholder: 'e.g. Order created',
+      confirmLabel: 'Save template',
+    });
+    if (!name) return;
+    const next = [
+      ...templates.filter((template) => template.name !== name),
+      {
+        name,
+        subject,
+        payload,
+        headersInput,
+        batchMode,
+        batchPayload,
+      },
+    ];
+    setTemplates(next);
+    localStorage.setItem(PUBLISH_TEMPLATES_KEY, JSON.stringify(next));
+    toast.success(`Template "${name}" saved.`);
+  };
+
+  const applyTemplate = (name: string) => {
+    const template = templates.find((item) => item.name === name);
+    if (!template) return;
+    onSubjectChange(template.subject);
+    setPayload(template.payload);
+    setHeadersInput(template.headersInput);
+    setBatchMode(template.batchMode);
+    setBatchPayload(template.batchPayload);
   };
 
   return (
@@ -156,6 +214,29 @@ export function MessagePublishForm({
               ))}
             </div>
           )}
+
+          <label className="block space-y-1">
+            <Label>Publish Templates</Label>
+            <div className="flex gap-2">
+              <Select onValueChange={applyTemplate} disabled={templates.length === 0}>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={templates.length === 0 ? 'No saved templates' : 'Apply template'}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((template) => (
+                    <SelectItem key={template.name} value={template.name}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" onClick={saveTemplate}>
+                <Save className="w-4 h-4" />
+              </Button>
+            </div>
+          </label>
 
           <label className="block space-y-1">
             <Label>Subject</Label>

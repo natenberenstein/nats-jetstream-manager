@@ -806,6 +806,7 @@ export default function ConsumersPage() {
       ),
       tone: 'destructive',
       confirmLabel: 'Delete consumer',
+      requireTypedConfirmation: consumerName,
     });
     if (!ok) return;
     try {

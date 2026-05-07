@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { consumerApi, metricsApi } from '@/lib/api';
-import { ConsumerConfig } from '@/lib/types';
+import { ConsumerConfig, ConsumerInfo } from '@/lib/types';
+import { StreamConsumer } from '@/lib/subject-analysis';
 
 export function useConsumers(connectionId: string | null, streamName: string | null) {
   return useQuery({
@@ -11,6 +12,31 @@ export function useConsumers(connectionId: string | null, streamName: string | n
     enabled: !!connectionId && !!streamName,
     refetchInterval: 5000,
   });
+}
+
+export function useAllConsumers(connectionId: string | null, streamNames: string[]) {
+  const results = useQueries({
+    queries: streamNames.map((streamName) => ({
+      queryKey: ['consumers', connectionId, streamName],
+      queryFn: () => consumerApi.list(connectionId!, streamName),
+      enabled: !!connectionId && streamNames.length > 0,
+      refetchInterval: 5000,
+    })),
+  });
+
+  const consumers: StreamConsumer[] = results.flatMap((result, index) => {
+    const streamName = streamNames[index];
+    const items = (result.data?.consumers ?? []) as ConsumerInfo[];
+    return items.map((consumer) => ({ streamName, consumer }));
+  });
+
+  return {
+    consumers,
+    isLoading: results.some((result) => result.isLoading),
+    isFetching: results.some((result) => result.isFetching),
+    isError: results.some((result) => result.isError),
+    errors: results.map((result) => result.error).filter(Boolean),
+  };
 }
 
 export function useConsumerAnalytics(connectionId: string | null, streamName: string | null) {

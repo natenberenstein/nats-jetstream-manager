@@ -20,10 +20,13 @@ const SEGMENT_LABELS: Record<string, string> = {
   metrics: 'Metrics',
   health: 'Health',
   streams: 'Streams',
+  subjects: 'Subjects',
+  topology: 'Topology',
   consumers: 'Consumers',
   messages: 'Messages',
   kv: 'KV Stores',
   objectstore: 'Object Store',
+  'config-diff': 'Config Diff',
   audit: 'Audit Log',
 };
 

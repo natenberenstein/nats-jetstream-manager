@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { messageApi } from '@/lib/api';
 import { MessageData } from '@/lib/types';
+import { copyText } from '@/lib/download';
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useMessages, usePublishBatch, usePublishMessage } from '@/hooks/useMessages';
 import { useCancelJob, useJobs, useStartIndexJob } from '@/hooks/useJobs';
@@ -19,6 +20,7 @@ import {
   DiffViewerModal,
 } from '@/components/messages';
 import { SavedView } from '@/components/messages/types';
+import { formatPayload } from '@/components/messages/utils';
 import { usePrompt } from '@/components/ui/confirm-dialog';
 import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +28,11 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 
 const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
 const FAVORITE_STREAMS_KEY = 'nats_favorite_streams_v1';
+const MESSAGE_BOOKMARKS_KEY = 'nats_message_bookmarks_v1';
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
 
 export default function MessagesPage() {
   const pathname = usePathname();
@@ -69,6 +76,7 @@ export default function MessagesPage() {
   const refetchRef = useRef<() => void>(() => {});
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [favoriteStreams, setFavoriteStreams] = useState<string[]>([]);
+  const [messageBookmarks, setMessageBookmarks] = useState<Record<string, number[]>>({});
 
   const [showHeadersCol, setShowHeadersCol] = useState(true);
   const [showSizeCol, setShowSizeCol] = useState(true);
@@ -103,6 +111,14 @@ export default function MessagesPage() {
         setFavoriteStreams([]);
       }
     }
+    const bookmarksRaw = localStorage.getItem(MESSAGE_BOOKMARKS_KEY);
+    if (bookmarksRaw) {
+      try {
+        setMessageBookmarks(JSON.parse(bookmarksRaw) as Record<string, number[]>);
+      } catch {
+        setMessageBookmarks({});
+      }
+    }
   }, []);
 
   // Sync URL search params to state
@@ -114,6 +130,7 @@ export default function MessagesPage() {
     const headerKeyFromQuery = searchParams.get('header_key');
     const headerValueFromQuery = searchParams.get('header_value');
     const payloadContainsFromQuery = searchParams.get('payload_contains');
+    const seqStartFromQuery = searchParams.get('seq_start');
 
     if (streamFromQuery) setSelectedStream(streamFromQuery);
     if (limitFromQuery) setLimit(Number(limitFromQuery));
@@ -122,6 +139,7 @@ export default function MessagesPage() {
     if (headerKeyFromQuery) setHeaderKey(headerKeyFromQuery);
     if (headerValueFromQuery) setHeaderValue(headerValueFromQuery);
     if (payloadContainsFromQuery) setPayloadContains(payloadContainsFromQuery);
+    if (seqStartFromQuery) setSeqStart(Number(seqStartFromQuery));
   }, [searchParams]);
 
   // Auto-select first stream
@@ -151,6 +169,7 @@ export default function MessagesPage() {
     if (headerKey) params.set('header_key', headerKey);
     if (headerValue) params.set('header_value', headerValue);
     if (payloadContains) params.set('payload_contains', payloadContains);
+    if (seqStart) params.set('seq_start', String(seqStart));
     window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
   }, [
     selectedStream,
@@ -160,6 +179,7 @@ export default function MessagesPage() {
     headerKey,
     headerValue,
     payloadContains,
+    seqStart,
     pathname,
   ]);
 
@@ -225,6 +245,10 @@ export default function MessagesPage() {
   }, [messagesData, liveMode, autoScroll]);
 
   const currentMessages = useMemo(() => messagesData?.messages ?? [], [messagesData?.messages]);
+  const currentBookmarks = useMemo(() => {
+    if (!selectedStream) return [];
+    return messageBookmarks[selectedStream] ?? [];
+  }, [messageBookmarks, selectedStream]);
   const diffMessages = useMemo(
     () =>
       compareSelection
@@ -378,6 +402,12 @@ export default function MessagesPage() {
     setSeqStart(clampedSeq);
   };
 
+  const handleGoToSequence = (seq: number) => {
+    setLiveMode(false);
+    setCursorHistory([]);
+    setSeqStart(seq);
+  };
+
   const handleLoadPayload = async (seq: number) => {
     if (!connectionId || !selectedStream) return;
     if (Object.prototype.hasOwnProperty.call(loadedPayloads, seq)) {
@@ -419,6 +449,46 @@ export default function MessagesPage() {
     } catch (replayError) {
       toast.error(replayError instanceof Error ? replayError.message : 'Failed to replay message');
     }
+  };
+
+  const handleCopyCli = async (message: MessageData) => {
+    if (!connectionId || !selectedStream) return;
+    try {
+      let payload = loadedPayloads[message.seq];
+      if (payload === undefined) {
+        const fullMessage = await messageApi.getMessage(connectionId, selectedStream, message.seq);
+        payload = fullMessage.data ?? fullMessage.data_preview ?? '';
+        setLoadedPayloads((prev) => ({ ...prev, [message.seq]: payload }));
+      }
+      const headers = Object.entries(message.headers ?? {}).flatMap(([key, value]) => [
+        '-H',
+        shellQuote(`${key}: ${value}`),
+      ]);
+      const command = [
+        'nats',
+        'pub',
+        shellQuote(message.subject),
+        shellQuote(formatPayload(payload)),
+        ...headers,
+      ].join(' ');
+      await copyText(command);
+      toast.success(`Copied CLI publish command for seq ${message.seq}.`);
+    } catch (copyError) {
+      toast.error(copyError instanceof Error ? copyError.message : 'Failed to copy CLI command');
+    }
+  };
+
+  const toggleMessageBookmark = (seq: number) => {
+    if (!selectedStream) return;
+    setMessageBookmarks((prev) => {
+      const current = prev[selectedStream] ?? [];
+      const nextForStream = current.includes(seq)
+        ? current.filter((item) => item !== seq)
+        : [...current, seq].sort((a, b) => a - b);
+      const next = { ...prev, [selectedStream]: nextForStream };
+      localStorage.setItem(MESSAGE_BOOKMARKS_KEY, JSON.stringify(next));
+      return next;
+    });
   };
 
   const toggleCompareSelection = (seq: number) => {
@@ -464,6 +534,7 @@ export default function MessagesPage() {
     if (headerKey) params.set('header_key', headerKey);
     if (headerValue) params.set('header_value', headerValue);
     if (payloadContains) params.set('payload_contains', payloadContains);
+    if (seqStart) params.set('seq_start', String(seqStart));
     const nextViews = [
       ...savedViews.filter((v) => v.name !== name),
       { name, query: Object.fromEntries(params) },
@@ -484,7 +555,7 @@ export default function MessagesPage() {
     setHeaderKey(q.header_key || '');
     setHeaderValue(q.header_value || '');
     setPayloadContains(q.payload_contains || '');
-    setSeqStart(undefined);
+    setSeqStart(q.seq_start ? Number(q.seq_start) : undefined);
     setCursorHistory([]);
   };
 
@@ -566,8 +637,10 @@ export default function MessagesPage() {
       isError={isError}
       messagesError={messagesError}
       maskSensitive={maskSensitive}
+      liveMode={liveMode}
       limit={limit}
       liveIntervalMs={liveIntervalMs}
+      bookmarks={currentBookmarks}
       cursorHistory={cursorHistory}
       compareSelection={compareSelection}
       expandedPayloads={expandedPayloads}
@@ -584,16 +657,20 @@ export default function MessagesPage() {
       diffMessagesCount={diffMessages.length}
       listContainerRef={listContainerRef}
       onLimitChange={handleLimitChange}
+      onLiveModeChange={setLiveMode}
       onLiveIntervalChange={setLiveIntervalMs}
       onRefetch={refetch}
       onNextPage={handleNextPage}
       onPreviousPage={handlePreviousPage}
       onFirstPage={handleFirstPage}
       onGoToPage={handleGoToPage}
+      onGoToSequence={handleGoToSequence}
+      onToggleBookmark={toggleMessageBookmark}
       onToggleCompare={toggleCompareSelection}
       onLoadPayload={handleLoadPayload}
       onHidePayload={handleHidePayload}
       onReplayMessage={handleReplayMessage}
+      onCopyCli={handleCopyCli}
       onShowDiffViewer={() => setShowDiffViewer(true)}
       onFilterSubjectChange={setFilterSubject}
       onHeaderKeyChange={setHeaderKey}

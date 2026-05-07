@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { Download, Eye, EyeOff, Play, RefreshCw } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Copy, Download, Eye, EyeOff, Pause, Play, RefreshCw, Star } from 'lucide-react';
 
 import { MessageData, MessagesResponse } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -22,8 +22,10 @@ interface MessageListProps {
   isError: boolean;
   messagesError: Error | null;
   maskSensitive: boolean;
+  liveMode: boolean;
   limit: number;
   liveIntervalMs: number;
+  bookmarks: number[];
   cursorHistory: Array<number | undefined>;
   compareSelection: number[];
   expandedPayloads: Record<number, boolean>;
@@ -40,16 +42,20 @@ interface MessageListProps {
   diffMessagesCount: number;
   listContainerRef: React.Ref<HTMLDivElement>;
   onLimitChange: (value: number) => void;
+  onLiveModeChange: (value: boolean) => void;
   onLiveIntervalChange: (value: number) => void;
   onRefetch: () => void;
   onNextPage: () => void;
   onPreviousPage: () => void;
   onFirstPage: () => void;
   onGoToPage: (page: number) => void;
+  onGoToSequence: (seq: number) => void;
+  onToggleBookmark: (seq: number) => void;
   onToggleCompare: (seq: number) => void;
   onLoadPayload: (seq: number) => void;
   onHidePayload: (seq: number) => void;
   onReplayMessage: (message: MessageData) => void;
+  onCopyCli: (message: MessageData) => void;
   onShowDiffViewer: () => void;
   onFilterSubjectChange: (value: string) => void;
   onHeaderKeyChange: (value: string) => void;
@@ -68,8 +74,10 @@ export function MessageList({
   isError,
   messagesError,
   maskSensitive,
+  liveMode,
   limit,
   liveIntervalMs,
+  bookmarks,
   cursorHistory,
   compareSelection,
   expandedPayloads,
@@ -86,15 +94,19 @@ export function MessageList({
   diffMessagesCount,
   listContainerRef,
   onLimitChange,
+  onLiveModeChange,
   onLiveIntervalChange,
   onRefetch,
   onNextPage,
   onPreviousPage,
   onGoToPage,
+  onGoToSequence,
+  onToggleBookmark,
   onToggleCompare,
   onLoadPayload,
   onHidePayload,
   onReplayMessage,
+  onCopyCli,
   onShowDiffViewer,
   onFilterSubjectChange,
   onHeaderKeyChange,
@@ -105,6 +117,7 @@ export function MessageList({
   onShowTimeColChange,
   className,
 }: MessageListProps) {
+  const [jumpSeq, setJumpSeq] = useState('');
   const currentMessages = useMemo(() => messagesData?.messages ?? [], [messagesData?.messages]);
 
   const renderPayload = (message: MessageData): string => {
@@ -149,6 +162,15 @@ export function MessageList({
                 {(liveIntervalMs / 1000).toFixed(liveIntervalMs % 1000 === 0 ? 0 : 1)}s
               </span>
             </div>
+            <Button
+              onClick={() => onLiveModeChange(!liveMode)}
+              disabled={!selectedStream}
+              variant={liveMode ? 'default' : 'outline'}
+              size="sm"
+            >
+              {liveMode ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {liveMode ? 'Pause' : 'Resume'}
+            </Button>
             <Button onClick={onRefetch} disabled={!selectedStream} variant="outline" size="sm">
               <RefreshCw className="w-4 h-4" />
               Refresh
@@ -192,6 +214,46 @@ export function MessageList({
             value={payloadContains}
             onChange={(e) => onPayloadContainsChange(e.target.value)}
           />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Input
+              value={jumpSeq}
+              onChange={(event) => setJumpSeq(event.target.value)}
+              inputMode="numeric"
+              placeholder="Jump to seq"
+              className="h-8 w-36"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const seq = Number(jumpSeq);
+                if (Number.isInteger(seq) && seq > 0) onGoToSequence(seq);
+              }}
+              disabled={!selectedStream}
+            >
+              Go
+            </Button>
+          </div>
+          {bookmarks.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+              <span>Bookmarks:</span>
+              {bookmarks.slice(0, 8).map((seq) => (
+                <Button
+                  key={seq}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 font-mono text-xs"
+                  onClick={() => onGoToSequence(seq)}
+                >
+                  {seq}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 mt-3">
           <span className="text-xs text-muted-foreground">Columns:</span>
@@ -245,6 +307,25 @@ export function MessageList({
                       checked={compareSelection.includes(message.seq)}
                       onCheckedChange={() => onToggleCompare(message.seq)}
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => onToggleBookmark(message.seq)}
+                      title={
+                        bookmarks.includes(message.seq) ? 'Remove bookmark' : 'Bookmark message'
+                      }
+                    >
+                      <Star
+                        className={cn(
+                          'h-4 w-4',
+                          bookmarks.includes(message.seq)
+                            ? 'fill-yellow-400 text-yellow-500'
+                            : 'text-muted-foreground',
+                        )}
+                      />
+                    </Button>
                     <span className="font-medium">{message.subject}</span>
                     <span className="text-xs text-muted-foreground">seq {message.seq}</span>
                   </div>
@@ -305,6 +386,10 @@ export function MessageList({
                     >
                       <Play className="w-4 h-4" />
                       Replay
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => onCopyCli(message)}>
+                      <Copy className="w-4 h-4" />
+                      CLI
                     </Button>
                   </div>
                 </div>

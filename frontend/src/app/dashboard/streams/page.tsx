@@ -58,6 +58,99 @@ import {
 } from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
 
+type StreamCreateFormState = {
+  name: string;
+  subjects: string;
+  storage: 'file' | 'memory';
+  description: string;
+  retention: 'limits' | 'interest' | 'workqueue';
+  max_consumers: number;
+  max_msgs: number;
+  max_bytes: number;
+  max_age: number;
+  max_msg_size: number;
+  discard: 'old' | 'new';
+  duplicate_window: number;
+  replicas: number;
+  no_ack: boolean;
+};
+
+const DEFAULT_CREATE_STREAM_FORM: StreamCreateFormState = {
+  name: '',
+  subjects: '',
+  storage: 'file',
+  description: '',
+  retention: 'limits',
+  max_consumers: -1,
+  max_msgs: -1,
+  max_bytes: -1,
+  max_age: 0,
+  max_msg_size: -1,
+  discard: 'old',
+  duplicate_window: 120,
+  replicas: 1,
+  no_ack: false,
+};
+
+const STREAM_PRESETS: Array<{
+  label: string;
+  description: string;
+  values: Partial<StreamCreateFormState>;
+}> = [
+  {
+    label: 'Event log',
+    description: 'Durable append log with limit-based retention.',
+    values: {
+      retention: 'limits',
+      storage: 'file',
+      discard: 'old',
+      max_msgs: -1,
+      max_age: 0,
+      duplicate_window: 120,
+      replicas: 1,
+    },
+  },
+  {
+    label: 'Work queue',
+    description: 'Messages are removed after a worker acknowledges them.',
+    values: {
+      retention: 'workqueue',
+      storage: 'file',
+      discard: 'old',
+      max_age: 0,
+      max_consumers: -1,
+      replicas: 1,
+    },
+  },
+  {
+    label: 'Retry/DLQ',
+    description: 'Bounded stream for replay and failure handling.',
+    values: {
+      retention: 'limits',
+      storage: 'file',
+      discard: 'old',
+      max_age: 604800,
+      max_bytes: -1,
+      max_msgs: -1,
+      duplicate_window: 300,
+      replicas: 1,
+    },
+  },
+  {
+    label: 'Short cache',
+    description: 'Small memory-backed stream for recent state or tests.',
+    values: {
+      retention: 'limits',
+      storage: 'memory',
+      discard: 'old',
+      max_msgs: 10000,
+      max_age: 3600,
+      max_bytes: -1,
+      replicas: 1,
+    },
+  },
+];
+
 function StreamEditForm({
   stream,
   connectionId,
@@ -286,12 +379,7 @@ export default function StreamsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingStream, setEditingStream] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState({
-    name: '',
-    subjects: '',
-    storage: 'file' as 'file' | 'memory',
-    description: '',
-  });
+  const [createForm, setCreateForm] = useState<StreamCreateFormState>(DEFAULT_CREATE_STREAM_FORM);
   const [selectedStreams, setSelectedStreams] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -322,6 +410,7 @@ export default function StreamsPage() {
       ),
       tone: 'destructive',
       confirmLabel: 'Delete stream',
+      requireTypedConfirmation: streamName,
     });
     if (!ok) return;
     try {
@@ -380,13 +469,18 @@ export default function StreamsPage() {
         subjects,
         storage: createForm.storage,
         description: createForm.description.trim() || undefined,
+        retention: createForm.retention,
+        max_consumers: createForm.max_consumers,
+        max_msgs: createForm.max_msgs,
+        max_bytes: createForm.max_bytes,
+        max_age: createForm.max_age,
+        max_msg_size: createForm.max_msg_size,
+        discard: createForm.discard,
+        duplicate_window: createForm.duplicate_window,
+        replicas: createForm.replicas,
+        no_ack: createForm.no_ack,
       });
-      setCreateForm({
-        name: '',
-        subjects: '',
-        storage: 'file',
-        description: '',
-      });
+      setCreateForm(DEFAULT_CREATE_STREAM_FORM);
       setShowCreateForm(false);
       toast.success(`Stream "${name}" created successfully.`);
     } catch (error) {
@@ -437,14 +531,47 @@ export default function StreamsPage() {
         }}
       />
 
-      <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
-        <DialogContent>
+      <Dialog
+        open={showCreateForm}
+        onOpenChange={(open) => {
+          setShowCreateForm(open);
+          if (!open) {
+            setCreateForm(DEFAULT_CREATE_STREAM_FORM);
+            setCreateError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Create Stream</DialogTitle>
-            <DialogDescription>Define stream name and subject patterns.</DialogDescription>
+            <DialogDescription>
+              Define subject routing, retention, storage, and limits.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateStream} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+              {STREAM_PRESETS.map((preset) => (
+                <Button
+                  key={preset.label}
+                  type="button"
+                  variant="outline"
+                  className="h-auto flex-col items-start gap-1 whitespace-normal p-3 text-left"
+                  onClick={() =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      ...preset.values,
+                    }))
+                  }
+                >
+                  <span className="font-medium">{preset.label}</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {preset.description}
+                  </span>
+                </Button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="create-name">Name</Label>
                 <Input
@@ -456,13 +583,57 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
+                <Label htmlFor="create-retention">Retention</Label>
+                <Select
+                  value={createForm.retention}
+                  onValueChange={(value) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      retention: value as StreamCreateFormState['retention'],
+                    }))
+                  }
+                >
+                  <SelectTrigger id="create-retention">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="limits">limits</SelectItem>
+                    <SelectItem value="interest">interest</SelectItem>
+                    <SelectItem value="workqueue">workqueue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <Label htmlFor="create-subjects">Subjects (comma-separated)</Label>
+                <Input
+                  id="create-subjects"
+                  value={createForm.subjects}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, subjects: e.target.value }))}
+                  placeholder="orders.created, orders.updated"
+                />
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <Label htmlFor="create-description">Description (optional)</Label>
+                <Input
+                  id="create-description"
+                  value={createForm.description}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({ ...prev, description: e.target.value }))
+                  }
+                  placeholder="Order domain events"
+                />
+              </div>
+
+              <div className="space-y-1">
                 <Label htmlFor="create-storage">Storage</Label>
                 <Select
                   value={createForm.storage}
                   onValueChange={(value) =>
                     setCreateForm((prev) => ({
                       ...prev,
-                      storage: value as 'file' | 'memory',
+                      storage: value as StreamCreateFormState['storage'],
                     }))
                   }
                 >
@@ -475,28 +646,138 @@ export default function StreamsPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="create-subjects">Subjects (comma-separated)</Label>
-              <Input
-                id="create-subjects"
-                value={createForm.subjects}
-                onChange={(e) => setCreateForm((prev) => ({ ...prev, subjects: e.target.value }))}
-                placeholder="orders.created, orders.updated"
-              />
-            </div>
+              <div className="space-y-1">
+                <Label htmlFor="create-discard">Discard Policy</Label>
+                <Select
+                  value={createForm.discard}
+                  onValueChange={(value) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      discard: value as StreamCreateFormState['discard'],
+                    }))
+                  }
+                >
+                  <SelectTrigger id="create-discard">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="old">old</SelectItem>
+                    <SelectItem value="new">new</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="create-description">Description (optional)</Label>
-              <Input
-                id="create-description"
-                value={createForm.description}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, description: e.target.value }))
-                }
-                placeholder="Order domain events"
-              />
+              <label className="space-y-1">
+                <Label>Max Consumers (-1 = unlimited)</Label>
+                <Input
+                  type="number"
+                  value={createForm.max_consumers}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      max_consumers: Number(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Messages (-1 = unlimited)</Label>
+                <Input
+                  type="number"
+                  value={createForm.max_msgs}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({ ...prev, max_msgs: Number(event.target.value) }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Bytes (-1 = unlimited)</Label>
+                <Input
+                  type="number"
+                  value={createForm.max_bytes}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({ ...prev, max_bytes: Number(event.target.value) }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Age (seconds, 0 = unlimited)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={createForm.max_age}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({ ...prev, max_age: Number(event.target.value) }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1">
+                <Label>Max Message Size (-1 = unlimited)</Label>
+                <Input
+                  type="number"
+                  value={createForm.max_msg_size}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      max_msg_size: Number(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1">
+                <Label>Duplicate Window (seconds)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={createForm.duplicate_window}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      duplicate_window: Number(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-1">
+                <Label>Replicas</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={createForm.replicas}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({ ...prev, replicas: Number(event.target.value) }))
+                  }
+                />
+              </label>
+
+              <div className="flex items-center gap-2 pt-6">
+                <Checkbox
+                  id="create-no-ack"
+                  checked={createForm.no_ack}
+                  onCheckedChange={(checked) =>
+                    setCreateForm((prev) => ({ ...prev, no_ack: checked === true }))
+                  }
+                />
+                <Label htmlFor="create-no-ack">No Ack</Label>
+              </div>
+
+              <div className="rounded-md border p-3 text-xs text-muted-foreground md:col-span-2">
+                {createForm.retention === 'workqueue'
+                  ? 'Work queue retention removes messages after consumers acknowledge them.'
+                  : createForm.retention === 'interest'
+                    ? 'Interest retention keeps messages while matching consumers still need them.'
+                    : 'Limits retention keeps messages until size, count, or age limits are reached.'}
+                {createForm.discard === 'new'
+                  ? ' New messages are rejected when limits are reached.'
+                  : ' Old messages are evicted first when limits are reached.'}
+              </div>
             </div>
 
             {createError && <p className="text-sm text-destructive">{createError}</p>}
