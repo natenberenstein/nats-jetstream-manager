@@ -8,6 +8,7 @@ import {
   ValidateNested,
   IsNotEmpty,
   IsEnum,
+  IsDateString,
   Min,
   Max,
 } from 'class-validator';
@@ -150,6 +151,14 @@ export class GetMessagesQueryDto {
   @IsOptional()
   @IsString()
   payload_contains?: string;
+
+  @IsOptional()
+  @IsDateString()
+  from_time?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to_time?: string;
 }
 
 export class SearchIndexQueryDto {

@@ -13,6 +13,7 @@ import {
   useUpdateConsumer,
 } from '@/hooks/useConsumers';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
+import { buildConsumerMessagesHref } from '@/lib/consumer-messages';
 import { copyText, downloadFile } from '@/lib/download';
 import { formatNumber } from '@/lib/utils';
 import { ArrowLeft, Copy, Download, Layers, MessageSquare, Pencil } from 'lucide-react';
@@ -43,6 +44,7 @@ import {
 } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ConsumerDiagnostic, ConsumerInfo } from '@/lib/types';
+import { SubjectChip } from '@/components/subjects/SubjectChips';
 
 function formatNsToSeconds(nanoseconds?: number): string {
   if (!nanoseconds || Number.isNaN(nanoseconds)) return '-';
@@ -265,14 +267,29 @@ export default function ConsumerDetailPage({
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{issue.recommendation}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Link
-                        href={`/dashboard/messages?stream=${encodeURIComponent(streamName)}&seq_start=${Math.max(1, diagnostic.ack_floor_stream_seq || diagnostic.delivered_stream_seq || 1)}`}
-                      >
-                        <Button variant="outline" size="sm">
-                          <MessageSquare className="h-4 w-4" />
-                          View Messages
-                        </Button>
-                      </Link>
+                      {(
+                        [
+                          ['ack_pending', 'Ack pending'] as const,
+                          ['pending', 'Pending'] as const,
+                        ] as const
+                      ).map(([window, label]) => {
+                        const href = buildConsumerMessagesHref({
+                          streamName,
+                          consumerName: consumer.name,
+                          diagnostic,
+                          filterSubject: diagnostic.filter_subject ?? config.filter_subject,
+                          window,
+                        });
+                        if (!href) return null;
+                        return (
+                          <Link key={window} href={href}>
+                            <Button variant="outline" size="sm">
+                              <MessageSquare className="h-4 w-4" />
+                              {label}
+                            </Button>
+                          </Link>
+                        );
+                      })}
                       <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
                         <Button variant="outline" size="sm">
                           <Copy className="h-4 w-4" />
@@ -422,7 +439,9 @@ export default function ConsumerDetailPage({
               )}
               <TableRow>
                 <TableCell className="font-medium">Filter Subject</TableCell>
-                <TableCell>{config.filter_subject || '*'}</TableCell>
+                <TableCell>
+                  <SubjectChip subject={config.filter_subject} />
+                </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Deliver Policy</TableCell>
@@ -464,7 +483,9 @@ export default function ConsumerDetailPage({
                 <>
                   <TableRow>
                     <TableCell className="font-medium">Deliver Subject</TableCell>
-                    <TableCell>{config.deliver_subject}</TableCell>
+                    <TableCell>
+                      <SubjectChip subject={config.deliver_subject} />
+                    </TableCell>
                   </TableRow>
                   {config.deliver_group && (
                     <TableRow>
