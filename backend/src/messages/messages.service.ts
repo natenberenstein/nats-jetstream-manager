@@ -118,6 +118,19 @@ function isNatsNotFound(error: unknown): boolean {
   return message.includes('not found') || message.includes('consumer not found');
 }
 
+function parseOptionalTime(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function storedMessageTimeMs(sm: StoredMsg): number | undefined {
+  if (!sm.time) return undefined;
+  if (sm.time instanceof Date) return sm.time.getTime();
+  const parsed = Date.parse(String(sm.time));
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 @Injectable()
@@ -196,7 +209,11 @@ export class MessagesService {
       header_key,
       header_value,
       payload_contains,
+      from_time,
+      to_time,
     } = query;
+    const fromTimeMs = parseOptionalTime(from_time);
+    const toTimeMs = parseOptionalTime(to_time);
 
     // Get stream info to know the sequence range
     const streamInfo = await jsm.streams.info(streamName);
@@ -247,6 +264,8 @@ export class MessagesService {
           header_key,
           header_value,
           payload_contains,
+          fromTimeMs,
+          toTimeMs,
         );
         if (msg) {
           messages.push(msg);
@@ -268,6 +287,8 @@ export class MessagesService {
           header_key,
           header_value,
           payload_contains,
+          fromTimeMs,
+          toTimeMs,
         );
         if (msg) {
           messages.push(msg);
@@ -672,6 +693,8 @@ export class MessagesService {
     headerKey: string | undefined,
     headerValue: string | undefined,
     payloadContains: string | undefined,
+    fromTimeMs: number | undefined,
+    toTimeMs: number | undefined,
   ): Promise<MessageDataDto | null> {
     let sm: StoredMsg;
     try {
@@ -684,6 +707,13 @@ export class MessagesService {
     // Apply subject filter
     if (subjectRegex && !subjectRegex.test(sm.subject)) {
       return null;
+    }
+
+    if (fromTimeMs !== undefined || toTimeMs !== undefined) {
+      const messageTimeMs = storedMessageTimeMs(sm);
+      if (messageTimeMs === undefined) return null;
+      if (fromTimeMs !== undefined && messageTimeMs < fromTimeMs) return null;
+      if (toTimeMs !== undefined && messageTimeMs > toTimeMs) return null;
     }
 
     // Apply header filter

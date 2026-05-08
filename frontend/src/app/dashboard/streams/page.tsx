@@ -57,6 +57,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
+import { SubjectChips } from '@/components/subjects/SubjectChips';
 
 type StreamCreateFormState = {
   name: string;
@@ -869,8 +870,8 @@ export default function StreamsPage() {
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {stream.config.subjects.join(', ')}
+                              <TableCell className="max-w-[360px] text-muted-foreground">
+                                <SubjectChips subjects={stream.config.subjects} maxVisible={2} />
                               </TableCell>
                               <TableCell>{formatNumber(stream.state.messages)}</TableCell>
                               <TableCell className="min-w-[160px]">

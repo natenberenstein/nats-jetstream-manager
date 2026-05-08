@@ -24,8 +24,9 @@ import {
   ConsumerMetricsResponse,
 } from '@/lib/types';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
+import { buildConsumerMessagesHref } from '@/lib/consumer-messages';
 import Link from 'next/link';
-import { Plus, Trash2, Pencil, Copy } from 'lucide-react';
+import { Plus, Trash2, Pencil, Copy, MessageSquare } from 'lucide-react';
 import { focusFirstError } from '@/lib/form-utils';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
@@ -65,6 +66,7 @@ import {
 } from '@/components/ui/dialog';
 import { Pagination } from '@/components/ui/pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SubjectChip } from '@/components/subjects/SubjectChips';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const CHART_COLORS = [
@@ -312,6 +314,7 @@ function ConsumerLagAnalyticsView({
                 </TableHead>
                 <TableHead>Health</TableHead>
                 <TableHead className="w-32">Lag</TableHead>
+                <TableHead className="w-36">Messages</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -348,6 +351,33 @@ function ConsumerLagAnalyticsView({
                     <TableCell>
                       <div className="h-2 bg-muted rounded overflow-hidden">
                         <div className="h-full bg-primary" style={{ width: `${width}%` }} />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {(
+                          [
+                            ['ack_pending', 'Ack'] as const,
+                            ['pending', 'Pending'] as const,
+                          ] as const
+                        ).map(([window, label]) => {
+                          const href = buildConsumerMessagesHref({
+                            streamName: metric.stream_name,
+                            consumerName: metric.name,
+                            diagnostic,
+                            filterSubject: diagnostic?.filter_subject,
+                            window,
+                          });
+                          if (!href) return null;
+                          return (
+                            <Link key={window} href={href}>
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                {label}
+                              </Button>
+                            </Link>
+                          );
+                        })}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -987,6 +1017,31 @@ export default function ConsumersPage() {
                 <p className="text-sm text-muted-foreground sm:max-w-md">
                   {diagnostic.issues[0]?.recommendation}
                 </p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ['ack_pending', 'Ack pending'] as const,
+                      ['pending', 'Pending'] as const,
+                    ] as const
+                  ).map(([window, label]) => {
+                    const href = buildConsumerMessagesHref({
+                      streamName: diagnostic.stream_name,
+                      consumerName: diagnostic.name,
+                      diagnostic,
+                      filterSubject: diagnostic.filter_subject,
+                      window,
+                    });
+                    if (!href) return null;
+                    return (
+                      <Link key={window} href={href}>
+                        <Button variant="outline" size="sm">
+                          <MessageSquare className="h-4 w-4" />
+                          {label}
+                        </Button>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </CardContent>
@@ -1410,7 +1465,9 @@ export default function ConsumersPage() {
                             </Link>
                           </TableCell>
                           <TableCell>{consumer.config.durable_name || '-'}</TableCell>
-                          <TableCell>{consumer.config.filter_subject || '*'}</TableCell>
+                          <TableCell>
+                            <SubjectChip subject={consumer.config.filter_subject} />
+                          </TableCell>
                           <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
                           <TableCell>{formatNsToSeconds(consumer.config.ack_wait)}</TableCell>
                           <TableCell>

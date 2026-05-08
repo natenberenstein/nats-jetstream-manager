@@ -26,9 +26,10 @@ import {
   DiffCompareCard,
   DiffViewerModal,
 } from '@/components/messages';
-import { SavedView } from '@/components/messages/types';
+import { MessageDatePreset, SavedView } from '@/components/messages/types';
 import { formatPayload } from '@/components/messages/utils';
 import { useConfirm, usePrompt } from '@/components/ui/confirm-dialog';
+import type { DateRange } from '@/components/ui/date-range-picker';
 import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -40,6 +41,15 @@ const MESSAGE_BOOKMARKS_KEY = 'nats_message_bookmarks_v1';
 type WorkspaceMode = 'browse' | 'publish' | 'tools' | 'remediate';
 type RemediationContext = 'pending' | 'ack-pending' | 'general';
 
+const DATE_PRESET_LABELS: Record<MessageDatePreset, string> = {
+  all: 'Any time',
+  today: 'Today',
+  '24h': 'Last 24h',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  custom: 'Custom range',
+};
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
@@ -47,6 +57,58 @@ function shellQuote(value: string): string {
 function normalizeRemediationContext(value: string | null): RemediationContext {
   if (value === 'pending' || value === 'ack-pending') return value;
   return 'general';
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+function endOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function shiftDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function dateRangeForPreset(preset: MessageDatePreset): DateRange | undefined {
+  const now = new Date();
+
+  switch (preset) {
+    case 'today':
+      return { from: startOfLocalDay(now), to: endOfLocalDay(now) };
+    case '24h':
+      return { from: new Date(now.getTime() - 24 * 60 * 60 * 1000), to: now };
+    case '7d':
+      return { from: startOfLocalDay(shiftDays(now, -6)), to: endOfLocalDay(now) };
+    case '30d':
+      return { from: startOfLocalDay(shiftDays(now, -29)), to: endOfLocalDay(now) };
+    case 'custom':
+    case 'all':
+    default:
+      return undefined;
+  }
+}
+
+function normalizeDateRange(range: DateRange | undefined): DateRange | undefined {
+  if (!range?.from) return undefined;
+  return {
+    from: range.from,
+    to: range.to ?? endOfLocalDay(range.from),
+  };
+}
+
+function parseDateRange(from: string | null, to: string | null): DateRange | undefined {
+  if (!from && !to) return undefined;
+  const fromDate = from ? new Date(from) : undefined;
+  const toDate = to ? new Date(to) : undefined;
+
+  return {
+    from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
+    to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
+  };
 }
 
 export default function MessagesPage() {
@@ -77,6 +139,10 @@ export default function MessagesPage() {
   const [headerKey, setHeaderKey] = useState('');
   const [headerValue, setHeaderValue] = useState('');
   const [payloadContains, setPayloadContains] = useState('');
+  const [datePreset, setDatePreset] = useState<MessageDatePreset>('all');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [focusConsumer, setFocusConsumer] = useState('');
+  const [focusWindow, setFocusWindow] = useState<'pending' | 'ack_pending' | ''>('');
 
   const [liveMode, setLiveMode] = useState(false);
   const [liveIntervalMs, setLiveIntervalMs] = useState(2000);
@@ -84,6 +150,7 @@ export default function MessagesPage() {
 
   const [limit, setLimit] = useState(25);
   const [seqStart, setSeqStart] = useState<number | undefined>(undefined);
+  const [seqEnd, setSeqEnd] = useState<number | undefined>(undefined);
   const [cursorHistory, setCursorHistory] = useState<Array<number | undefined>>([]);
   const [loadedPayloads, setLoadedPayloads] = useState<Record<number, unknown>>({});
   const [expandedPayloads, setExpandedPayloads] = useState<Record<number, boolean>>({});
@@ -96,9 +163,17 @@ export default function MessagesPage() {
   const [favoriteStreams, setFavoriteStreams] = useState<string[]>([]);
   const [messageBookmarks, setMessageBookmarks] = useState<Record<string, number[]>>({});
 
-  const [showHeadersCol, setShowHeadersCol] = useState(true);
+  const [showHeadersCol, setShowHeadersCol] = useState(false);
   const [showSizeCol, setShowSizeCol] = useState(true);
   const [showTimeCol, setShowTimeCol] = useState(true);
+
+  const selectedStreamSubjects = useMemo(() => {
+    if (!selectedStream) return [];
+    return (
+      streamsData?.streams?.find((stream) => stream.config.name === selectedStream)?.config
+        .subjects ?? []
+    );
+  }, [selectedStream, streamsData?.streams]);
 
   const [indexMatches, setIndexMatches] = useState<
     Array<{ seq: number; subject: string; payload_preview: string }>
@@ -149,6 +224,12 @@ export default function MessagesPage() {
     const headerValueFromQuery = searchParams.get('header_value');
     const payloadContainsFromQuery = searchParams.get('payload_contains');
     const seqStartFromQuery = searchParams.get('seq_start');
+    const seqEndFromQuery = searchParams.get('seq_end');
+    const fromTimeFromQuery = searchParams.get('from_time');
+    const toTimeFromQuery = searchParams.get('to_time');
+    const datePresetFromQuery = searchParams.get('date_preset') as MessageDatePreset | null;
+    const focusFromQuery = searchParams.get('focus');
+    const consumerFromQuery = searchParams.get('consumer');
 
     if (streamFromQuery) setSelectedStream(streamFromQuery);
     if (limitFromQuery) setLimit(Number(limitFromQuery));
@@ -158,15 +239,24 @@ export default function MessagesPage() {
     if (headerValueFromQuery) setHeaderValue(headerValueFromQuery);
     if (payloadContainsFromQuery) setPayloadContains(payloadContainsFromQuery);
     if (seqStartFromQuery) setSeqStart(Number(seqStartFromQuery));
-    const consumerFromQuery = searchParams.get('consumer');
-    const remediationFromQuery = searchParams.get('remediation');
-    if (consumerFromQuery) {
-      setSelectedConsumerName(consumerFromQuery);
-      setWorkspaceMode('remediate');
+    if (seqEndFromQuery) setSeqEnd(Number(seqEndFromQuery));
+    if (fromTimeFromQuery || toTimeFromQuery) {
+      setDateRange(parseDateRange(fromTimeFromQuery, toTimeFromQuery));
+      setDatePreset(datePresetFromQuery ?? 'custom');
+    } else if (datePresetFromQuery && datePresetFromQuery !== 'all') {
+      setDatePreset(datePresetFromQuery);
+      setDateRange(dateRangeForPreset(datePresetFromQuery));
     }
+    const remediationFromQuery = searchParams.get('remediation');
     if (remediationFromQuery) {
       setRemediationContext(normalizeRemediationContext(remediationFromQuery));
       setWorkspaceMode('remediate');
+      if (consumerFromQuery) setSelectedConsumerName(consumerFromQuery);
+    } else {
+      if (consumerFromQuery) setFocusConsumer(consumerFromQuery);
+      if (focusFromQuery === 'pending' || focusFromQuery === 'ack_pending') {
+        setFocusWindow(focusFromQuery);
+      }
     }
   }, [searchParams]);
 
@@ -204,6 +294,13 @@ export default function MessagesPage() {
     if (headerValue) params.set('header_value', headerValue);
     if (payloadContains) params.set('payload_contains', payloadContains);
     if (seqStart) params.set('seq_start', String(seqStart));
+    if (seqEnd) params.set('seq_end', String(seqEnd));
+    if (datePreset !== 'all') params.set('date_preset', datePreset);
+    const normalizedRange = normalizeDateRange(dateRange);
+    if (normalizedRange?.from) params.set('from_time', normalizedRange.from.toISOString());
+    if (normalizedRange?.to) params.set('to_time', normalizedRange.to.toISOString());
+    if (focusConsumer) params.set('consumer', focusConsumer);
+    if (focusWindow) params.set('focus', focusWindow);
     window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
   }, [
     selectedStream,
@@ -217,6 +314,11 @@ export default function MessagesPage() {
     headerValue,
     payloadContains,
     seqStart,
+    seqEnd,
+    datePreset,
+    dateRange,
+    focusConsumer,
+    focusWindow,
     pathname,
   ]);
 
@@ -246,19 +348,33 @@ export default function MessagesPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const queryParams = useMemo(
-    () => ({
+  const queryParams = useMemo(() => {
+    const normalizedRange = normalizeDateRange(dateRange);
+
+    return {
       limit,
       seqStart,
-      fromLatest: liveMode,
+      seqEnd,
+      fromLatest: liveMode || seqStart === undefined,
       filterSubject: filterSubject || undefined,
       headerKey: headerKey || undefined,
       headerValue: headerValue || undefined,
       payloadContains: payloadContains || undefined,
+      fromTime: normalizedRange?.from?.toISOString(),
+      toTime: normalizedRange?.to?.toISOString(),
       previewBytes: 2048,
-    }),
-    [limit, seqStart, liveMode, filterSubject, headerKey, headerValue, payloadContains],
-  );
+    };
+  }, [
+    limit,
+    seqStart,
+    seqEnd,
+    liveMode,
+    filterSubject,
+    headerKey,
+    headerValue,
+    payloadContains,
+    dateRange,
+  ]);
 
   const {
     data: messagesData,
@@ -375,6 +491,7 @@ export default function MessagesPage() {
     setSelectedConsumerName('');
     setRemediationContext('general');
     setSeqStart(undefined);
+    setSeqEnd(undefined);
     setCursorHistory([]);
     setLoadedPayloads({});
     setExpandedPayloads({});
@@ -421,8 +538,13 @@ export default function MessagesPage() {
 
   const handleNextPage = () => {
     if (!messagesData?.next_seq) return;
-    setCursorHistory((prev) => [...prev, seqStart]);
-    setSeqStart(messagesData.next_seq || undefined);
+    const fromLatest = liveMode || seqStart === undefined;
+    setCursorHistory((prev) => [...prev, fromLatest ? seqEnd : seqStart]);
+    if (fromLatest) {
+      setSeqEnd(messagesData.next_seq || undefined);
+    } else {
+      setSeqStart(messagesData.next_seq || undefined);
+    }
   };
 
   const handlePreviousPage = () => {
@@ -430,12 +552,17 @@ export default function MessagesPage() {
     const previous = [...cursorHistory];
     const previousSeq = previous.pop();
     setCursorHistory(previous);
-    setSeqStart(previousSeq);
+    if (liveMode || seqStart === undefined) {
+      setSeqEnd(previousSeq);
+    } else {
+      setSeqStart(previousSeq);
+    }
   };
 
   const handleFirstPage = () => {
     setCursorHistory([]);
     setSeqStart(undefined);
+    setSeqEnd(undefined);
   };
 
   const handleGoToPage = (page: number) => {
@@ -464,6 +591,7 @@ export default function MessagesPage() {
     setLiveMode(false);
     setCursorHistory([]);
     setSeqStart(seq);
+    setSeqEnd(undefined);
   };
 
   const handleLoadPayload = async (seq: number) => {
@@ -610,6 +738,37 @@ export default function MessagesPage() {
   const handleLimitChange = (newLimit: number) => {
     setLimit(newLimit);
     setSeqStart(undefined);
+    setSeqEnd(undefined);
+    setCursorHistory([]);
+  };
+
+  const handleDatePresetChange = (preset: MessageDatePreset) => {
+    setDatePreset(preset);
+    setDateRange(dateRangeForPreset(preset));
+    setCursorHistory([]);
+    setSeqStart(undefined);
+    setSeqEnd(undefined);
+  };
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDatePreset(range?.from ? 'custom' : 'all');
+    setDateRange(range);
+    setCursorHistory([]);
+    setSeqStart(undefined);
+    setSeqEnd(undefined);
+  };
+
+  const clearMessageFilters = () => {
+    setFilterSubject('');
+    setHeaderKey('');
+    setHeaderValue('');
+    setPayloadContains('');
+    setDatePreset('all');
+    setDateRange(undefined);
+    setSeqStart(undefined);
+    setSeqEnd(undefined);
+    setFocusConsumer('');
+    setFocusWindow('');
     setCursorHistory([]);
   };
 
@@ -660,6 +819,11 @@ export default function MessagesPage() {
     setHeaderValue(q.header_value || '');
     setPayloadContains(q.payload_contains || '');
     setSeqStart(q.seq_start ? Number(q.seq_start) : undefined);
+    setSeqEnd(q.seq_end ? Number(q.seq_end) : undefined);
+    setDatePreset((q.date_preset as MessageDatePreset) || 'all');
+    setDateRange(parseDateRange(q.from_time || null, q.to_time || null));
+    setFocusConsumer(q.consumer || '');
+    setFocusWindow(q.focus === 'pending' || q.focus === 'ack_pending' ? q.focus : '');
     setCursorHistory([]);
   };
 
@@ -757,6 +921,8 @@ export default function MessagesPage() {
       maskSensitive={maskSensitive}
       liveMode={liveMode}
       limit={limit}
+      seqStart={seqStart}
+      seqEnd={seqEnd}
       liveIntervalMs={liveIntervalMs}
       bookmarks={currentBookmarks}
       cursorHistory={cursorHistory}
@@ -771,6 +937,12 @@ export default function MessagesPage() {
       headerKey={headerKey}
       headerValue={headerValue}
       payloadContains={payloadContains}
+      datePreset={datePreset}
+      dateRange={dateRange}
+      datePresetLabels={DATE_PRESET_LABELS}
+      subjectOptions={selectedStreamSubjects}
+      focusConsumer={focusConsumer}
+      focusWindow={focusWindow}
       isPublishing={publishMessage.isPending}
       diffMessagesCount={diffMessages.length}
       listContainerRef={listContainerRef}
@@ -797,6 +969,9 @@ export default function MessagesPage() {
       onHeaderKeyChange={setHeaderKey}
       onHeaderValueChange={setHeaderValue}
       onPayloadContainsChange={setPayloadContains}
+      onDatePresetChange={handleDatePresetChange}
+      onDateRangeChange={handleDateRangeChange}
+      onClearFilters={clearMessageFilters}
       onShowHeadersColChange={setShowHeadersCol}
       onShowSizeColChange={setShowSizeCol}
       onShowTimeColChange={setShowTimeCol}
