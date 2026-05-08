@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.3.0...nats-jetstream-manager-v1.4.0) (2026-05-08)
+
+
+### Features
+
+* improve JetStream workflow UI ([9ee4f56](https://github.com/natenberenstein/nats-jetstream-manager/commit/9ee4f560f2a8bb03e702a6a85634a80d9a57caf8))
+* improve message filtering navigation ([7b5c037](https://github.com/natenberenstein/nats-jetstream-manager/commit/7b5c0378230e3901fb4f5405175f21102637671f))
+* improve message filtering navigation ([e758a54](https://github.com/natenberenstein/nats-jetstream-manager/commit/e758a54f2be679642d0be397edf0fa5fc185decc))
+
 ## [1.3.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.2.0...nats-jetstream-manager-v1.3.0) (2026-05-06)
 
 
