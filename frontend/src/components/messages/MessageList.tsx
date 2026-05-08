@@ -15,6 +15,7 @@ import {
   Search,
   SlidersHorizontal,
   Star,
+  Trash2,
   X,
 } from 'lucide-react';
 
@@ -92,6 +93,7 @@ interface MessageListProps {
   onHidePayload: (seq: number) => void;
   onReplayMessage: (message: MessageData) => void;
   onCopyCli: (message: MessageData) => void;
+  onDeleteMessage?: (message: MessageData) => void;
   onShowDiffViewer: () => void;
   onFilterSubjectChange: (value: string) => void;
   onHeaderKeyChange: (value: string) => void;
@@ -154,6 +156,7 @@ export function MessageList({
   onHidePayload,
   onReplayMessage,
   onCopyCli,
+  onDeleteMessage,
   onShowDiffViewer,
   onFilterSubjectChange,
   onHeaderKeyChange,
@@ -605,6 +608,16 @@ export function MessageList({
                       <Copy className="w-4 h-4" />
                       CLI
                     </Button>
+                    {onDeleteMessage && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => onDeleteMessage(message)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

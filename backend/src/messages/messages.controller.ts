@@ -15,6 +15,12 @@ import {
   MessagePublishRequestDto,
   MessagePublishBatchRequestDto,
   MessageReplayRequestDto,
+  MessageRemediationActionRequestDto,
+  MessageRemediationActionResponseDto,
+  MessageRemediationFetchRequestDto,
+  MessageRemediationFetchResponseDto,
+  MessageDeleteRequestDto,
+  MessageDeleteResponseDto,
   ValidateSchemaRequestDto,
   GetMessagesQueryDto,
   SearchIndexQueryDto,
@@ -147,6 +153,96 @@ export class MessagesController {
       },
     });
     return replay;
+  }
+
+  @Post('streams/:streamName/consumers/:consumerName/remediation/fetch')
+  @HttpCode(HttpStatus.OK)
+  async fetchRemediationMessages(
+    @Param('connectionId') connectionId: string,
+    @Param('streamName') streamName: string,
+    @Param('consumerName') consumerName: string,
+    @Body() body: MessageRemediationFetchRequestDto,
+  ): Promise<MessageRemediationFetchResponseDto> {
+    const conn = this.connectionsService.getConnection(connectionId);
+    const result = await this.messagesService.fetchRemediationMessages(
+      conn.js,
+      conn.jsm,
+      connectionId,
+      streamName,
+      consumerName,
+      body,
+    );
+    await this.auditService.log({
+      action: 'message.remediation.fetch',
+      resourceType: 'consumer',
+      resourceName: consumerName,
+      connectionId,
+      details: {
+        stream: streamName,
+        requested_batch_size: body.batch_size ?? 25,
+        fetched: result.fetched,
+        session_id: result.session_id,
+        expires_at: result.expires_at,
+      },
+    });
+    return result;
+  }
+
+  @Post('streams/:streamName/consumers/:consumerName/remediation/actions')
+  @HttpCode(HttpStatus.OK)
+  async applyRemediationAction(
+    @Param('connectionId') connectionId: string,
+    @Param('streamName') streamName: string,
+    @Param('consumerName') consumerName: string,
+    @Body() body: MessageRemediationActionRequestDto,
+  ): Promise<MessageRemediationActionResponseDto> {
+    const result = await this.messagesService.applyRemediationAction(
+      connectionId,
+      streamName,
+      consumerName,
+      body,
+    );
+    await this.auditService.log({
+      action: 'message.remediation.action',
+      resourceType: 'consumer',
+      resourceName: consumerName,
+      connectionId,
+      details: {
+        stream: streamName,
+        action: body.action,
+        requested_sequences: body.stream_sequences,
+        handled: result.handled,
+        failed: result.failed,
+        remaining_session_messages: result.remaining_session_messages,
+        results: result.results,
+      },
+    });
+    return result;
+  }
+
+  @Post('streams/:streamName/messages/:seq/delete')
+  @HttpCode(HttpStatus.OK)
+  async deleteStreamMessage(
+    @Param('connectionId') connectionId: string,
+    @Param('streamName') streamName: string,
+    @Param('seq', ParseIntPipe) seq: number,
+    @Body() body: MessageDeleteRequestDto,
+  ): Promise<MessageDeleteResponseDto> {
+    const conn = this.connectionsService.getConnection(connectionId);
+    const result = await this.messagesService.deleteStreamMessage(conn.jsm, streamName, seq, body);
+    await this.auditService.log({
+      action: 'message.delete',
+      resourceType: 'message',
+      resourceName: `${streamName}:${seq}`,
+      connectionId,
+      details: {
+        stream: streamName,
+        seq,
+        erased: result.erased,
+        deleted: result.deleted,
+      },
+    });
+    return result;
   }
 
   @Post('streams/:streamName/messages/index/build')
