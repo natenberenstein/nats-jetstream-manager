@@ -5,9 +5,12 @@ import {
   IsNumber,
   IsObject,
   IsArray,
+  ArrayMaxSize,
+  ArrayNotEmpty,
   ValidateNested,
   IsNotEmpty,
   IsEnum,
+  IsInt,
   Min,
   Max,
 } from 'class-validator';
@@ -47,6 +50,79 @@ export class MessageReplayRequestDto {
   @IsOptional()
   @IsObject()
   extra_headers?: Record<string, string>;
+}
+
+export class MessageRemediationFetchRequestDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  batch_size?: number = 25;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1000)
+  @Max(30000)
+  expires_ms?: number = 1000;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(8192)
+  preview_bytes?: number = 2048;
+}
+
+export enum MessageRemediationAction {
+  Ack = 'ack',
+  Nak = 'nak',
+  Term = 'term',
+  Working = 'working',
+}
+
+export class MessageRemediationActionRequestDto {
+  @IsString()
+  @IsNotEmpty()
+  session_id: string;
+
+  @IsEnum(MessageRemediationAction)
+  action: MessageRemediationAction;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(100)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  stream_sequences: number[];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(3600000)
+  nak_delay_ms?: number;
+
+  @IsOptional()
+  @IsString()
+  term_reason?: string;
+}
+
+export class MessageDeleteRequestDto {
+  @IsString()
+  @IsNotEmpty()
+  confirm_stream_name: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  confirm_seq: number;
+
+  @IsOptional()
+  @IsBoolean()
+  erase?: boolean = true;
 }
 
 export class JsonSchemaDefinition {
@@ -203,6 +279,59 @@ export class MessageReplayResponseDto {
   target_subject: string;
   published_stream: string;
   published_seq: number;
+}
+
+export class MessageRemediationMessageDto {
+  subject: string;
+  seq: number;
+  consumer_seq: number;
+  delivery_count: number;
+  pending: number;
+  redelivered: boolean;
+  data?: unknown;
+  data_preview?: string;
+  payload_size?: number;
+  headers?: Record<string, string>;
+  time?: string | null;
+}
+
+export class MessageRemediationFetchResponseDto {
+  session_id: string;
+  connection_id: string;
+  stream_name: string;
+  consumer_name: string;
+  batch_size: number;
+  fetched: number;
+  expires_at: string;
+  messages: MessageRemediationMessageDto[];
+}
+
+export class MessageRemediationActionResultDto {
+  stream_seq: number;
+  consumer_seq?: number;
+  subject?: string;
+  status: 'ok' | 'missing' | 'error';
+  error?: string;
+}
+
+export class MessageRemediationActionResponseDto {
+  session_id: string;
+  stream_name: string;
+  consumer_name: string;
+  action: MessageRemediationAction;
+  handled: number;
+  failed: number;
+  remaining_session_messages: number;
+  expires_at: string;
+  results: MessageRemediationActionResultDto[];
+}
+
+export class MessageDeleteResponseDto {
+  success: boolean;
+  stream_name: string;
+  seq: number;
+  erased: boolean;
+  deleted: boolean;
 }
 
 export class IndexedMessageMatchDto {

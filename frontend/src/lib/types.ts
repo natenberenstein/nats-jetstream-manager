@@ -320,6 +320,81 @@ export interface MessageReplayResponse {
   published_seq: number;
 }
 
+export type MessageRemediationAction = 'ack' | 'nak' | 'term' | 'working';
+
+export interface MessageRemediationFetchRequest {
+  batch_size?: number;
+  expires_ms?: number;
+  preview_bytes?: number;
+}
+
+export interface MessageRemediationMessage {
+  subject: string;
+  seq: number;
+  consumer_seq: number;
+  delivery_count: number;
+  pending: number;
+  redelivered: boolean;
+  data?: unknown;
+  data_preview?: string;
+  payload_size?: number;
+  headers?: Record<string, string>;
+  time?: string | null;
+}
+
+export interface MessageRemediationFetchResponse {
+  session_id: string;
+  connection_id: string;
+  stream_name: string;
+  consumer_name: string;
+  batch_size: number;
+  fetched: number;
+  expires_at: string;
+  messages: MessageRemediationMessage[];
+}
+
+export interface MessageRemediationActionRequest {
+  session_id: string;
+  action: MessageRemediationAction;
+  stream_sequences: number[];
+  nak_delay_ms?: number;
+  term_reason?: string;
+}
+
+export interface MessageRemediationActionResult {
+  stream_seq: number;
+  consumer_seq?: number;
+  subject?: string;
+  status: 'ok' | 'missing' | 'error';
+  error?: string;
+}
+
+export interface MessageRemediationActionResponse {
+  session_id: string;
+  stream_name: string;
+  consumer_name: string;
+  action: MessageRemediationAction;
+  handled: number;
+  failed: number;
+  remaining_session_messages: number;
+  expires_at: string;
+  results: MessageRemediationActionResult[];
+}
+
+export interface MessageDeleteRequest {
+  confirm_stream_name: string;
+  confirm_seq: number;
+  erase?: boolean;
+}
+
+export interface MessageDeleteResponse {
+  success: boolean;
+  stream_name: string;
+  seq: number;
+  erased: boolean;
+  deleted: boolean;
+}
+
 export interface IndexedMessageMatch {
   seq: number;
   subject: string;

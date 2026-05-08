@@ -266,7 +266,7 @@ export default function ConsumerDetailPage({
                     <p className="mt-1 text-sm text-muted-foreground">{issue.recommendation}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Link
-                        href={`/dashboard/messages?stream=${encodeURIComponent(streamName)}&seq_start=${Math.max(1, diagnostic.ack_floor_stream_seq || diagnostic.delivered_stream_seq || 1)}`}
+                        href={`/dashboard/messages?stream=${encodeURIComponent(streamName)}&consumer=${encodeURIComponent(consumerName)}&remediation=${issue.code === 'ack_pending' || issue.code === 'max_ack_pending_reached' || issue.code === 'max_ack_pending_near_limit' ? 'ack-pending' : 'pending'}&seq_start=${Math.max(1, diagnostic.ack_floor_stream_seq || diagnostic.delivered_stream_seq || 1)}`}
                       >
                         <Button variant="outline" size="sm">
                           <MessageSquare className="h-4 w-4" />

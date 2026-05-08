@@ -23,6 +23,12 @@ import {
   MessagePublishResponse,
   MessageReplayRequest,
   MessageReplayResponse,
+  MessageRemediationActionRequest,
+  MessageRemediationActionResponse,
+  MessageRemediationFetchRequest,
+  MessageRemediationFetchResponse,
+  MessageDeleteRequest,
+  MessageDeleteResponse,
   MessageData,
   MessageIndexSearchResponse,
   MessagesResponse,
@@ -309,6 +315,48 @@ export const messageApi = {
   replay: (connectionId: string, streamName: string, seq: number, request: MessageReplayRequest) =>
     fetchApi<MessageReplayResponse>(
       `/connections/${connectionId}/streams/${streamName}/messages/${seq}/replay`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      },
+    ),
+
+  remediationFetch: (
+    connectionId: string,
+    streamName: string,
+    consumerName: string,
+    request: MessageRemediationFetchRequest,
+  ) =>
+    fetchApi<MessageRemediationFetchResponse>(
+      `/connections/${connectionId}/streams/${encodeURIComponent(streamName)}/consumers/${encodeURIComponent(consumerName)}/remediation/fetch`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      },
+    ),
+
+  remediationAction: (
+    connectionId: string,
+    streamName: string,
+    consumerName: string,
+    request: MessageRemediationActionRequest,
+  ) =>
+    fetchApi<MessageRemediationActionResponse>(
+      `/connections/${connectionId}/streams/${encodeURIComponent(streamName)}/consumers/${encodeURIComponent(consumerName)}/remediation/actions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      },
+    ),
+
+  deleteStreamMessage: (
+    connectionId: string,
+    streamName: string,
+    seq: number,
+    request: MessageDeleteRequest,
+  ) =>
+    fetchApi<MessageDeleteResponse>(
+      `/connections/${connectionId}/streams/${encodeURIComponent(streamName)}/messages/${seq}/delete`,
       {
         method: 'POST',
         body: JSON.stringify(request),

@@ -8,20 +8,27 @@ import { messageApi } from '@/lib/api';
 import { MessageData } from '@/lib/types';
 import { copyText } from '@/lib/download';
 import { useConnection } from '@/contexts/ConnectionContext';
-import { useMessages, usePublishBatch, usePublishMessage } from '@/hooks/useMessages';
+import {
+  useDeleteStreamMessage,
+  useMessages,
+  usePublishBatch,
+  usePublishMessage,
+} from '@/hooks/useMessages';
 import { useCancelJob, useJobs, useStartIndexJob } from '@/hooks/useJobs';
+import { useConsumers } from '@/hooks/useConsumers';
 import { useStreams } from '@/hooks/useStreams';
 import {
   ViewControls,
   MessagePublishForm,
   AdvancedTools,
   MessageList,
+  MessageRemediationPanel,
   DiffCompareCard,
   DiffViewerModal,
 } from '@/components/messages';
 import { SavedView } from '@/components/messages/types';
 import { formatPayload } from '@/components/messages/utils';
-import { usePrompt } from '@/components/ui/confirm-dialog';
+import { useConfirm, usePrompt } from '@/components/ui/confirm-dialog';
 import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -30,8 +37,16 @@ const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
 const FAVORITE_STREAMS_KEY = 'nats_favorite_streams_v1';
 const MESSAGE_BOOKMARKS_KEY = 'nats_message_bookmarks_v1';
 
+type WorkspaceMode = 'browse' | 'publish' | 'tools' | 'remediate';
+type RemediationContext = 'pending' | 'ack-pending' | 'general';
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function normalizeRemediationContext(value: string | null): RemediationContext {
+  if (value === 'pending' || value === 'ack-pending') return value;
+  return 'general';
 }
 
 export default function MessagesPage() {
@@ -41,6 +56,7 @@ export default function MessagesPage() {
   const listContainerRef = useRef<HTMLDivElement>(null);
 
   const { connectionId } = useConnection();
+  const confirm = useConfirm();
   const prompt = usePrompt();
   const { data: streamsData } = useStreams(connectionId);
   const streamNames = useMemo(
@@ -48,10 +64,12 @@ export default function MessagesPage() {
     [streamsData?.streams],
   );
 
-  const [workspaceMode, setWorkspaceMode] = useState<'browse' | 'publish' | 'tools'>('browse');
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('browse');
   const [maskSensitive, setMaskSensitive] = useState(false);
 
   const [selectedStream, setSelectedStream] = useState<string | null>(null);
+  const [selectedConsumerName, setSelectedConsumerName] = useState('');
+  const [remediationContext, setRemediationContext] = useState<RemediationContext>('general');
   const [subject, setSubject] = useState('');
   const [replaySubject, setReplaySubject] = useState('');
 
@@ -140,6 +158,16 @@ export default function MessagesPage() {
     if (headerValueFromQuery) setHeaderValue(headerValueFromQuery);
     if (payloadContainsFromQuery) setPayloadContains(payloadContainsFromQuery);
     if (seqStartFromQuery) setSeqStart(Number(seqStartFromQuery));
+    const consumerFromQuery = searchParams.get('consumer');
+    const remediationFromQuery = searchParams.get('remediation');
+    if (consumerFromQuery) {
+      setSelectedConsumerName(consumerFromQuery);
+      setWorkspaceMode('remediate');
+    }
+    if (remediationFromQuery) {
+      setRemediationContext(normalizeRemediationContext(remediationFromQuery));
+      setWorkspaceMode('remediate');
+    }
   }, [searchParams]);
 
   // Auto-select first stream
@@ -164,6 +192,12 @@ export default function MessagesPage() {
     const params = new URLSearchParams();
     if (selectedStream) params.set('stream', selectedStream);
     params.set('limit', String(limit));
+    if (workspaceMode === 'remediate' && selectedConsumerName) {
+      params.set('consumer', selectedConsumerName);
+    }
+    if (workspaceMode === 'remediate') {
+      params.set('remediation', remediationContext);
+    }
     if (liveMode) params.set('live', '1');
     if (filterSubject) params.set('filter_subject', filterSubject);
     if (headerKey) params.set('header_key', headerKey);
@@ -173,6 +207,9 @@ export default function MessagesPage() {
     window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
   }, [
     selectedStream,
+    selectedConsumerName,
+    remediationContext,
+    workspaceMode,
     limit,
     liveMode,
     filterSubject,
@@ -231,8 +268,11 @@ export default function MessagesPage() {
     refetch,
   } = useMessages(connectionId, selectedStream, queryParams, liveMode ? liveIntervalMs : false);
   refetchRef.current = refetch;
+  const { data: consumersData } = useConsumers(connectionId, selectedStream);
+  const consumers = useMemo(() => consumersData?.consumers ?? [], [consumersData?.consumers]);
   const publishMessage = usePublishMessage(connectionId);
   const publishBatch = usePublishBatch(connectionId);
+  const deleteStreamMessage = useDeleteStreamMessage(connectionId);
   const startIndexJob = useStartIndexJob(connectionId);
   const cancelJob = useCancelJob(connectionId);
   const { data: jobsData } = useJobs(connectionId, !!connectionId);
@@ -256,6 +296,22 @@ export default function MessagesPage() {
         .filter((m): m is MessageData => !!m),
     [compareSelection, currentMessages],
   );
+
+  useEffect(() => {
+    if (!consumersData) return;
+    if (workspaceMode !== 'remediate') return;
+    if (!selectedConsumerName && consumers.length > 0) {
+      setSelectedConsumerName(consumers[0].name);
+      return;
+    }
+    if (
+      selectedConsumerName &&
+      consumers.length > 0 &&
+      !consumers.some((consumer) => consumer.name === selectedConsumerName)
+    ) {
+      setSelectedConsumerName(consumers[0].name);
+    }
+  }, [consumers, consumersData, selectedConsumerName, workspaceMode]);
 
   // Load missing payloads for diff comparison
   useEffect(() => {
@@ -316,6 +372,8 @@ export default function MessagesPage() {
 
   const handleSelectStream = (streamName: string) => {
     setSelectedStream(streamName);
+    setSelectedConsumerName('');
+    setRemediationContext('general');
     setSeqStart(undefined);
     setCursorHistory([]);
     setLoadedPayloads({});
@@ -448,6 +506,52 @@ export default function MessagesPage() {
       toast.success(`Replayed seq ${message.seq} to ${replaySubject} as seq ${result.seq}.`);
     } catch (replayError) {
       toast.error(replayError instanceof Error ? replayError.message : 'Failed to replay message');
+    }
+  };
+
+  const handleDeleteStreamMessage = async (seq: number) => {
+    if (!connectionId || !selectedStream) return;
+
+    const typedConfirmation = `${selectedStream}:${seq}`;
+    const confirmed = await confirm({
+      title: 'Erase stream message',
+      description:
+        'This deletes the message from the stream. It is not a consumer-only acknowledgement and cannot be undone.',
+      body: (
+        <div className="rounded-md border p-3 text-sm">
+          <p>
+            Stream: <span className="font-mono">{selectedStream}</span>
+          </p>
+          <p>
+            Sequence: <span className="font-mono">{seq}</span>
+          </p>
+        </div>
+      ),
+      confirmLabel: 'Erase message',
+      tone: 'destructive',
+      requireTypedConfirmation: typedConfirmation,
+    });
+    if (!confirmed) return;
+
+    try {
+      const result = await deleteStreamMessage.mutateAsync({
+        streamName: selectedStream,
+        seq,
+        request: {
+          confirm_stream_name: selectedStream,
+          confirm_seq: seq,
+          erase: true,
+        },
+      });
+      toast.success(`Deleted stream message ${result.stream_name}:${result.seq}.`);
+      setLoadedPayloads((prev) => {
+        const next = { ...prev };
+        delete next[seq];
+        return next;
+      });
+      await refetch();
+    } catch (deleteError) {
+      toast.error(deleteError instanceof Error ? deleteError.message : 'Failed to delete message');
     }
   };
 
@@ -628,6 +732,20 @@ export default function MessagesPage() {
     </>
   );
 
+  const renderRemediationPanel = () => (
+    <MessageRemediationPanel
+      connectionId={connectionId}
+      selectedStream={selectedStream}
+      consumers={consumers}
+      selectedConsumerName={selectedConsumerName}
+      context={remediationContext}
+      replaySubject={replaySubject}
+      onConsumerChange={setSelectedConsumerName}
+      onReplaySubjectChange={setReplaySubject}
+      onDeleteMessage={handleDeleteStreamMessage}
+    />
+  );
+
   const renderMessageList = (className?: string) => (
     <MessageList
       className={className}
@@ -671,6 +789,9 @@ export default function MessagesPage() {
       onHidePayload={handleHidePayload}
       onReplayMessage={handleReplayMessage}
       onCopyCli={handleCopyCli}
+      onDeleteMessage={(message) => {
+        void handleDeleteStreamMessage(message.seq);
+      }}
       onShowDiffViewer={() => setShowDiffViewer(true)}
       onFilterSubjectChange={setFilterSubject}
       onHeaderKeyChange={setHeaderKey}
@@ -686,7 +807,7 @@ export default function MessagesPage() {
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="Messages"
-        description="Publish, filter, compare, replay, and monitor messages"
+        description="Publish, filter, compare, replay, remediate, and monitor messages"
       />
 
       <ViewControls
@@ -703,13 +824,14 @@ export default function MessagesPage() {
 
       <Tabs
         value={workspaceMode}
-        onValueChange={(value) => setWorkspaceMode(value as typeof workspaceMode)}
+        onValueChange={(value) => setWorkspaceMode(value as WorkspaceMode)}
         className="space-y-4"
       >
-        <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+        <TabsList className="grid w-full grid-cols-4 sm:w-auto">
           <TabsTrigger value="browse">Browse</TabsTrigger>
           <TabsTrigger value="publish">Publish</TabsTrigger>
           <TabsTrigger value="tools">Tools</TabsTrigger>
+          <TabsTrigger value="remediate">Remediate</TabsTrigger>
         </TabsList>
 
         <TabsContent value="browse" className="mt-0">
@@ -750,6 +872,25 @@ export default function MessagesPage() {
             </ResizablePanel>
             <ResizableHandle withHandle className="mx-1" />
             <ResizablePanel defaultSize={60} minSize={36}>
+              <div className="pl-3">{renderMessageList()}</div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </TabsContent>
+
+        <TabsContent value="remediate" className="mt-0">
+          <div className="space-y-6 xl:hidden">
+            {renderRemediationPanel()}
+            {renderMessageList()}
+          </div>
+          <ResizablePanelGroup
+            direction="horizontal"
+            className="hidden min-h-[640px] rounded-md xl:flex"
+          >
+            <ResizablePanel defaultSize={44} minSize={32}>
+              <div className="pr-3">{renderRemediationPanel()}</div>
+            </ResizablePanel>
+            <ResizableHandle withHandle className="mx-1" />
+            <ResizablePanel defaultSize={56} minSize={36}>
               <div className="pl-3">{renderMessageList()}</div>
             </ResizablePanel>
           </ResizablePanelGroup>

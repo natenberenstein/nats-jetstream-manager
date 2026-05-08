@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Copy, Download, Eye, EyeOff, Pause, Play, RefreshCw, Star } from 'lucide-react';
+import { Copy, Download, Eye, EyeOff, Pause, Play, RefreshCw, Star, Trash2 } from 'lucide-react';
 
 import { MessageData, MessagesResponse } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -56,6 +56,7 @@ interface MessageListProps {
   onHidePayload: (seq: number) => void;
   onReplayMessage: (message: MessageData) => void;
   onCopyCli: (message: MessageData) => void;
+  onDeleteMessage?: (message: MessageData) => void;
   onShowDiffViewer: () => void;
   onFilterSubjectChange: (value: string) => void;
   onHeaderKeyChange: (value: string) => void;
@@ -107,6 +108,7 @@ export function MessageList({
   onHidePayload,
   onReplayMessage,
   onCopyCli,
+  onDeleteMessage,
   onShowDiffViewer,
   onFilterSubjectChange,
   onHeaderKeyChange,
@@ -391,6 +393,16 @@ export function MessageList({
                       <Copy className="w-4 h-4" />
                       CLI
                     </Button>
+                    {onDeleteMessage && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => onDeleteMessage(message)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
