@@ -3,6 +3,8 @@ export interface SavedView {
   query: Record<string, string>;
 }
 
+export type MessageDatePreset = 'all' | 'today' | '24h' | '7d' | '30d' | 'custom';
+
 export type DiffCellType = 'equal' | 'added' | 'removed' | 'changed' | 'empty';
 
 export interface DiffCell {

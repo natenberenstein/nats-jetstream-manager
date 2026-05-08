@@ -285,6 +285,8 @@ export const messageApi = {
       headerKey,
       headerValue,
       payloadContains,
+      fromTime,
+      toTime,
     } = query;
 
     const searchParams = new URLSearchParams({ limit: limit.toString() });
@@ -297,6 +299,8 @@ export const messageApi = {
     if (headerKey) searchParams.append('header_key', headerKey);
     if (headerValue) searchParams.append('header_value', headerValue);
     if (payloadContains) searchParams.append('payload_contains', payloadContains);
+    if (fromTime) searchParams.append('from_time', fromTime);
+    if (toTime) searchParams.append('to_time', toTime);
 
     return fetchApi<MessagesResponse>(
       `/connections/${connectionId}/streams/${streamName}/messages?${searchParams}`,
@@ -537,4 +541,6 @@ export interface GetMessagesParams {
   headerKey?: string;
   headerValue?: string;
   payloadContains?: string;
+  fromTime?: string;
+  toTime?: string;
 }

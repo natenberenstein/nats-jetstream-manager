@@ -1,17 +1,45 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Copy, Download, Eye, EyeOff, Pause, Play, RefreshCw, Star } from 'lucide-react';
+import {
+  CalendarDays,
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  Filter,
+  GitBranch,
+  Pause,
+  Play,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Star,
+  X,
+} from 'lucide-react';
 
 import { MessageData, MessagesResponse } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { MessageDatePreset } from '@/components/messages/types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Pagination } from '@/components/ui/pagination';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { SubjectChip, SubjectChips } from '@/components/subjects/SubjectChips';
 import { downloadFile, formatPayload, maskSensitiveText, toCsv } from './utils';
 import { PayloadViewer } from './PayloadViewer';
 
@@ -24,6 +52,8 @@ interface MessageListProps {
   maskSensitive: boolean;
   liveMode: boolean;
   limit: number;
+  seqStart: number | undefined;
+  seqEnd: number | undefined;
   liveIntervalMs: number;
   bookmarks: number[];
   cursorHistory: Array<number | undefined>;
@@ -38,6 +68,12 @@ interface MessageListProps {
   headerKey: string;
   headerValue: string;
   payloadContains: string;
+  datePreset: MessageDatePreset;
+  dateRange: DateRange | undefined;
+  datePresetLabels: Record<MessageDatePreset, string>;
+  subjectOptions: string[];
+  focusConsumer: string;
+  focusWindow: 'pending' | 'ack_pending' | '';
   isPublishing: boolean;
   diffMessagesCount: number;
   listContainerRef: React.Ref<HTMLDivElement>;
@@ -61,6 +97,9 @@ interface MessageListProps {
   onHeaderKeyChange: (value: string) => void;
   onHeaderValueChange: (value: string) => void;
   onPayloadContainsChange: (value: string) => void;
+  onDatePresetChange: (value: MessageDatePreset) => void;
+  onDateRangeChange: (value: DateRange | undefined) => void;
+  onClearFilters: () => void;
   onShowHeadersColChange: (value: boolean) => void;
   onShowSizeColChange: (value: boolean) => void;
   onShowTimeColChange: (value: boolean) => void;
@@ -76,6 +115,8 @@ export function MessageList({
   maskSensitive,
   liveMode,
   limit,
+  seqStart,
+  seqEnd,
   liveIntervalMs,
   bookmarks,
   cursorHistory,
@@ -90,6 +131,12 @@ export function MessageList({
   headerKey,
   headerValue,
   payloadContains,
+  datePreset,
+  dateRange,
+  datePresetLabels,
+  subjectOptions,
+  focusConsumer,
+  focusWindow,
   isPublishing,
   diffMessagesCount,
   listContainerRef,
@@ -112,6 +159,9 @@ export function MessageList({
   onHeaderKeyChange,
   onHeaderValueChange,
   onPayloadContainsChange,
+  onDatePresetChange,
+  onDateRangeChange,
+  onClearFilters,
   onShowHeadersColChange,
   onShowSizeColChange,
   onShowTimeColChange,
@@ -119,6 +169,58 @@ export function MessageList({
 }: MessageListProps) {
   const [jumpSeq, setJumpSeq] = useState('');
   const currentMessages = useMemo(() => messagesData?.messages ?? [], [messagesData?.messages]);
+  const subjectSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const subject of [
+      ...subjectOptions,
+      ...currentMessages.map((message) => message.subject),
+    ]) {
+      if (subject?.trim()) seen.add(subject.trim());
+    }
+    return Array.from(seen).slice(0, 12);
+  }, [currentMessages, subjectOptions]);
+  const sequenceFilterLabel =
+    seqStart && seqEnd
+      ? `Seq: ${seqStart}-${seqEnd}`
+      : seqStart
+        ? `Seq >= ${seqStart}`
+        : seqEnd
+          ? `Seq <= ${seqEnd}`
+          : '';
+  const activeFilters = useMemo(
+    () =>
+      [
+        filterSubject ? { key: 'subject', label: `Subject: ${filterSubject}` } : null,
+        payloadContains ? { key: 'payload', label: `Payload: ${payloadContains}` } : null,
+        headerKey
+          ? { key: 'header', label: `Header: ${headerKey}${headerValue ? `=${headerValue}` : ''}` }
+          : null,
+        datePreset !== 'all'
+          ? { key: 'date', label: datePresetLabels[datePreset] ?? 'Date range' }
+          : null,
+        seqStart || seqEnd
+          ? {
+              key: 'sequence',
+              label: sequenceFilterLabel,
+            }
+          : null,
+      ].filter((filter): filter is { key: string; label: string } => filter !== null),
+    [
+      datePreset,
+      datePresetLabels,
+      filterSubject,
+      headerKey,
+      headerValue,
+      payloadContains,
+      sequenceFilterLabel,
+      seqEnd,
+      seqStart,
+    ],
+  );
+  const focusLabel =
+    focusConsumer && focusWindow
+      ? `${focusConsumer} ${focusWindow === 'ack_pending' ? 'ack pending' : 'pending'} window`
+      : '';
 
   const renderPayload = (message: MessageData): string => {
     const base =
@@ -139,13 +241,20 @@ export function MessageList({
 
   return (
     <Card className={cn('overflow-hidden', className)}>
-      <CardHeader className="border-b">
+      <CardHeader className="space-y-4 border-b">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-lg">
-            Recent Messages {selectedStream ? `(${selectedStream})` : ''}
-          </CardTitle>
+          <div className="min-w-0">
+            <CardTitle className="truncate text-lg">
+              Messages {selectedStream ? `(${selectedStream})` : ''}
+            </CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {messagesData
+                ? `${currentMessages.length} shown of ${messagesData.total} stored messages`
+                : 'Filter and inspect stream messages'}
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 rounded-md border bg-background px-2.5 h-9">
+            <div className="flex h-9 items-center gap-2 rounded-md border bg-background px-2.5">
               <span className="text-xs text-muted-foreground" aria-hidden>
                 Live
               </span>
@@ -158,7 +267,7 @@ export function MessageList({
                 className="w-24"
                 aria-label="Live tail interval"
               />
-              <span className="text-xs font-mono tabular-nums w-8 text-right">
+              <span className="w-8 text-right font-mono text-xs tabular-nums">
                 {(liveIntervalMs / 1000).toFixed(liveIntervalMs % 1000 === 0 ? 0 : 1)}s
               </span>
             </div>
@@ -168,122 +277,227 @@ export function MessageList({
               variant={liveMode ? 'default' : 'outline'}
               size="sm"
             >
-              {liveMode ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              {liveMode ? 'Pause' : 'Resume'}
+              {liveMode ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              {liveMode ? 'Pause' : 'Live'}
             </Button>
             <Button onClick={onRefetch} disabled={!selectedStream} variant="outline" size="sm">
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="h-4 w-4" />
               Refresh
             </Button>
-            <Button variant="outline" size="sm" onClick={exportJson}>
-              <Download className="w-4 h-4" />
-              JSON
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              <Download className="w-4 h-4" />
-              CSV
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4" />
+                  Export
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-44 p-2" align="end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={exportJson}
+                >
+                  JSON
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={exportCsv}
+                >
+                  CSV
+                </Button>
+              </PopoverContent>
+            </Popover>
             <Button
               variant={diffMessagesCount === 2 ? 'default' : 'outline'}
               size="sm"
               onClick={onShowDiffViewer}
               disabled={diffMessagesCount !== 2}
             >
-              Diff View
+              Diff
             </Button>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mt-3">
-          <Input
-            placeholder="Filter subject (e.g. orders.*)"
-            value={filterSubject}
-            onChange={(e) => onFilterSubjectChange(e.target.value)}
-          />
-          <Input
-            placeholder="Header key"
-            value={headerKey}
-            onChange={(e) => onHeaderKeyChange(e.target.value)}
-          />
-          <Input
-            placeholder="Header value"
-            value={headerValue}
-            onChange={(e) => onHeaderValueChange(e.target.value)}
-          />
-          <Input
-            placeholder="Payload contains"
-            value={payloadContains}
-            onChange={(e) => onPayloadContainsChange(e.target.value)}
-          />
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <Input
-              value={jumpSeq}
-              onChange={(event) => setJumpSeq(event.target.value)}
-              inputMode="numeric"
-              placeholder="Jump to seq"
-              className="h-8 w-36"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const seq = Number(jumpSeq);
-                if (Number.isInteger(seq) && seq > 0) onGoToSequence(seq);
-              }}
-              disabled={!selectedStream}
+
+        {focusLabel && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm">
+            <Filter className="h-4 w-4 text-warning-foreground" />
+            <span className="font-medium">{focusLabel}</span>
+            <span className="text-muted-foreground">
+              seq {seqStart ?? messagesData?.first_seq ?? 1} -{' '}
+              {seqEnd ?? messagesData?.last_seq ?? 'end'}
+            </span>
+          </div>
+        )}
+
+        <div className="rounded-md border bg-muted/20 p-3">
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(220px,1.2fr)_minmax(220px,1fr)_190px_auto]">
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Payload contains"
+                value={payloadContains}
+                onChange={(event) => onPayloadContainsChange(event.target.value)}
+                className="pl-8"
+              />
+            </label>
+            <label className="relative">
+              <GitBranch className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Subject pattern"
+                value={filterSubject}
+                onChange={(event) => onFilterSubjectChange(event.target.value)}
+                className="pl-8"
+              />
+            </label>
+            <Select
+              value={datePreset}
+              onValueChange={(value) => onDatePresetChange(value as MessageDatePreset)}
             >
-              Go
-            </Button>
-          </div>
-          {bookmarks.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-              <span>Bookmarks:</span>
-              {bookmarks.slice(0, 8).map((seq) => (
-                <Button
-                  key={seq}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 font-mono text-xs"
-                  onClick={() => onGoToSequence(seq)}
-                >
-                  {seq}
+              <SelectTrigger aria-label="Date preset" className="gap-2">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(datePresetLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  More Filters
                 </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[420px] max-w-[calc(100vw-2rem)]" align="end">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Header match</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Header key"
+                        value={headerKey}
+                        onChange={(event) => onHeaderKeyChange(event.target.value)}
+                      />
+                      <Input
+                        placeholder="Header value"
+                        value={headerValue}
+                        onChange={(event) => onHeaderValueChange(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Jump to sequence</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={jumpSeq}
+                        onChange={(event) => setJumpSeq(event.target.value)}
+                        inputMode="numeric"
+                        placeholder="Sequence"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const seq = Number(jumpSeq);
+                          if (Number.isInteger(seq) && seq > 0) onGoToSequence(seq);
+                        }}
+                        disabled={!selectedStream}
+                      >
+                        Go
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Columns</Label>
+                    <ToggleGroup
+                      type="multiple"
+                      size="sm"
+                      variant="outline"
+                      value={[
+                        ...(showHeadersCol ? ['headers'] : []),
+                        ...(showSizeCol ? ['size'] : []),
+                        ...(showTimeCol ? ['time'] : []),
+                      ]}
+                      onValueChange={(values) => {
+                        onShowHeadersColChange(values.includes('headers'));
+                        onShowSizeColChange(values.includes('size'));
+                        onShowTimeColChange(values.includes('time'));
+                      }}
+                      aria-label="Toggle columns"
+                      className="justify-start"
+                    >
+                      <ToggleGroupItem value="headers" aria-label="Toggle headers column">
+                        Headers
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="size" aria-label="Toggle size column">
+                        Size
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="time" aria-label="Toggle time column">
+                        Time
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {datePreset === 'custom' && (
+            <DateRangePicker
+              value={dateRange}
+              onChange={onDateRangeChange}
+              className="mt-2 max-w-md"
+            />
+          )}
+
+          {subjectSuggestions.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Subjects</span>
+              <SubjectChips subjects={subjectSuggestions} maxVisible={6} />
+            </div>
+          )}
+
+          {activeFilters.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {activeFilters.map((filter) => (
+                <Badge key={filter.key} variant="outline" className="gap-1 rounded-md pr-1">
+                  {filter.label}
+                  <button type="button" onClick={onClearFilters} aria-label="Clear filters">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
               ))}
+              <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
+                Clear all
+              </Button>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 mt-3">
-          <span className="text-xs text-muted-foreground">Columns:</span>
-          <ToggleGroup
-            type="multiple"
-            size="sm"
-            variant="outline"
-            value={[
-              ...(showHeadersCol ? ['headers'] : []),
-              ...(showSizeCol ? ['size'] : []),
-              ...(showTimeCol ? ['time'] : []),
-            ]}
-            onValueChange={(values) => {
-              onShowHeadersColChange(values.includes('headers'));
-              onShowSizeColChange(values.includes('size'));
-              onShowTimeColChange(values.includes('time'));
-            }}
-            aria-label="Toggle columns"
-          >
-            <ToggleGroupItem value="headers" aria-label="Toggle headers column">
-              Headers
-            </ToggleGroupItem>
-            <ToggleGroupItem value="size" aria-label="Toggle size column">
-              Size
-            </ToggleGroupItem>
-            <ToggleGroupItem value="time" aria-label="Toggle time column">
-              Time
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </div>
+
+        {bookmarks.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            <span>Bookmarks:</span>
+            {bookmarks.slice(0, 8).map((seq) => (
+              <Button
+                key={seq}
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 font-mono text-xs"
+                onClick={() => onGoToSequence(seq)}
+              >
+                {seq}
+              </Button>
+            ))}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         {!selectedStream ? (
@@ -326,7 +540,7 @@ export function MessageList({
                         )}
                       />
                     </Button>
-                    <span className="font-medium">{message.subject}</span>
+                    <SubjectChip subject={message.subject} />
                     <span className="text-xs text-muted-foreground">seq {message.seq}</span>
                   </div>
                   {showTimeCol && (

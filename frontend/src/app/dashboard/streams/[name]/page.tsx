@@ -46,6 +46,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SubjectChip, SubjectChips } from '@/components/subjects/SubjectChips';
 
 export default function StreamDetailPage({ params }: { params: Promise<{ name: string }> }) {
   const { name } = use(params);
@@ -314,9 +315,7 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
                 {config.mirror.name}
               </Link>
               {config.mirror.filter_subject && (
-                <span className="text-sm text-muted-foreground">
-                  (filter: {config.mirror.filter_subject})
-                </span>
+                <SubjectChip subject={config.mirror.filter_subject} />
               )}
             </div>
           </CardContent>
@@ -341,11 +340,7 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
                   >
                     {source.name}
                   </Link>
-                  {source.filter_subject && (
-                    <span className="text-sm text-muted-foreground">
-                      (filter: {source.filter_subject})
-                    </span>
-                  )}
+                  {source.filter_subject && <SubjectChip subject={source.filter_subject} />}
                 </div>
               ))}
             </div>
@@ -363,7 +358,9 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
             <TableBody>
               <TableRow>
                 <TableCell className="font-medium w-48">Subjects</TableCell>
-                <TableCell>{config.subjects.join(', ')}</TableCell>
+                <TableCell>
+                  <SubjectChips subjects={config.subjects} maxVisible={4} />
+                </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Storage</TableCell>
@@ -442,6 +439,7 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Filter</TableHead>
                   <TableHead>Ack Policy</TableHead>
                   <TableHead>Pending</TableHead>
                   <TableHead>Ack Pending</TableHead>
@@ -458,6 +456,9 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
                       >
                         {consumer.name}
                       </Link>
+                    </TableCell>
+                    <TableCell>
+                      <SubjectChip subject={consumer.config.filter_subject} />
                     </TableCell>
                     <TableCell>{consumer.config.ack_policy}</TableCell>
                     <TableCell>{consumer.num_pending}</TableCell>
