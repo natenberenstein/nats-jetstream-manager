@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.4.0...nats-jetstream-manager-v1.5.0) (2026-05-08)
+
+
+### Features
+
+* add message remediation actions ([80650c6](https://github.com/natenberenstein/nats-jetstream-manager/commit/80650c6e3a6861975b48da90895d6588827f1d6d))
+
 ## [1.4.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.3.0...nats-jetstream-manager-v1.4.0) (2026-05-08)
 
 ### Features
