@@ -304,6 +304,10 @@ export interface MessagesResponse {
   next_seq?: number | null;
   first_seq?: number;
   last_seq?: number;
+  scanned?: number;
+  scan_limit?: number;
+  range_start?: number;
+  range_end?: number;
 }
 
 export interface MessageReplayRequest {

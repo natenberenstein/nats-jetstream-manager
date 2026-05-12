@@ -208,6 +208,13 @@ export class GetMessagesQueryDto {
   preview_bytes?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(10000)
+  scan_limit?: number;
+
+  @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   from_latest?: boolean = false;
@@ -280,6 +287,10 @@ export class MessagesResponseDto {
   next_seq?: number | null;
   first_seq?: number;
   last_seq?: number;
+  scanned?: number;
+  scan_limit?: number;
+  range_start?: number;
+  range_end?: number;
 }
 
 export class MessageReplayResponseDto {
