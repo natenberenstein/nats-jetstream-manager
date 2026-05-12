@@ -16,7 +16,8 @@ import {
   Network,
   Users,
 } from 'lucide-react';
-import { cn, formatBytes, formatNumber } from '@/lib/utils';
+import { formatBytes, formatNumber } from '@/lib/utils';
+import { StatCard } from '@/components/cards/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -213,35 +214,36 @@ export default function DashboardPage() {
     }),
     [attentionItems],
   );
+  const clusterRisk =
+    (clusterData?.leaderless_streams ?? 0) + (clusterData?.quorum_degraded_streams ?? 0);
+  const consumerIssues =
+    (consumerDiagnostics?.summary.critical ?? 0) + (consumerDiagnostics?.summary.warning ?? 0);
+  const maxConsumerLag = consumerDiagnostics?.summary.max_stream_lag ?? 0;
 
   const stats = [
     {
       label: 'Streams',
       value: formatNumber(totalStreams),
       icon: Layers,
-      iconClass: 'text-blue-600 dark:text-blue-400',
-      badgeClass: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+      metric: 'streams' as const,
     },
     {
       label: 'Messages',
       value: formatNumber(totalMessages),
       icon: MessageSquare,
-      iconClass: 'text-green-600 dark:text-green-400',
-      badgeClass: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300',
+      metric: 'messages' as const,
     },
     {
       label: 'Storage',
       value: formatBytes(totalBytes),
       icon: HardDrive,
-      iconClass: 'text-violet-600 dark:text-violet-400',
-      badgeClass: 'bg-violet-100 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300',
+      metric: 'storage' as const,
     },
     {
       label: 'Consumers',
       value: formatNumber(totalConsumers),
       icon: Users,
-      iconClass: 'text-orange-600 dark:text-orange-400',
-      badgeClass: 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300',
+      metric: 'consumers' as const,
     },
   ];
 
@@ -269,26 +271,16 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.label}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <Badge variant="outline" className={cn('rounded-md px-2 py-1', stat.badgeClass)}>
-                    {stat.label}
-                  </Badge>
-                  <Icon className={cn('w-6 h-6', stat.iconClass)} />
-                </div>
-                {isLoading ? (
-                  <Skeleton className="h-8 w-20" />
-                ) : (
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+        {stats.map((stat) => (
+          <StatCard
+            key={stat.label}
+            label={stat.label}
+            value={stat.value}
+            icon={stat.icon}
+            metric={stat.metric}
+            isLoading={isLoading}
+          />
+        ))}
       </div>
 
       <Card>
@@ -352,41 +344,27 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Network className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">Cluster Risk</p>
-              <p className="text-lg font-semibold">
-                {(clusterData?.leaderless_streams ?? 0) +
-                  (clusterData?.quorum_degraded_streams ?? 0)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Gauge className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">Consumer Issues</p>
-              <p className="text-lg font-semibold">
-                {(consumerDiagnostics?.summary.critical ?? 0) +
-                  (consumerDiagnostics?.summary.warning ?? 0)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">Max Consumer Lag</p>
-              <p className="text-lg font-semibold">
-                {formatNumber(consumerDiagnostics?.summary.max_stream_lag ?? 0)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Cluster Risk"
+          value={clusterRisk}
+          icon={Network}
+          metric={clusterRisk > 0 ? 'critical' : 'success'}
+          tone={clusterRisk > 0 ? 'destructive' : 'default'}
+        />
+        <StatCard
+          label="Consumer Issues"
+          value={consumerIssues}
+          icon={Gauge}
+          metric={consumerIssues > 0 ? 'warning' : 'success'}
+          tone={consumerIssues > 0 ? 'warning' : 'default'}
+        />
+        <StatCard
+          label="Max Consumer Lag"
+          value={formatNumber(maxConsumerLag)}
+          icon={AlertTriangle}
+          metric={maxConsumerLag > 0 ? 'warning' : 'success'}
+          tone={maxConsumerLag > 0 ? 'warning' : 'default'}
+        />
       </div>
 
       {/* Recent Streams */}

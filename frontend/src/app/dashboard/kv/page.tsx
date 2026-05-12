@@ -15,8 +15,19 @@ import {
   useKvWatchHistory,
 } from '@/hooks/useKv';
 import { KvStoreStatus } from '@/lib/types';
-import { Plus, Trash2, Eye, ArrowLeft, Radio } from 'lucide-react';
-import { formatBytes, formatNumber } from '@/lib/utils';
+import {
+  ArrowLeft,
+  Database,
+  Eye,
+  HardDrive,
+  History,
+  KeyRound,
+  Layers,
+  Plus,
+  Radio,
+  Trash2,
+} from 'lucide-react';
+import { cn, formatBytes, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
@@ -54,6 +65,12 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Pagination } from '@/components/ui/pagination';
+
+function storageBadgeClass(storage?: string) {
+  return storage === 'memory'
+    ? 'border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300'
+    : 'border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300';
+}
 
 function KvKeyBrowser({
   connectionId,
@@ -292,7 +309,10 @@ function KvKeyBrowser({
                   {pagedKeys.map((key) => (
                     <TableRow
                       key={key}
-                      className={selectedKey === key ? 'bg-accent' : 'cursor-pointer'}
+                      className={cn(
+                        'cursor-pointer border-l-4',
+                        selectedKey === key ? 'border-l-primary bg-accent' : 'border-l-transparent',
+                      )}
                       onClick={() => setSelectedKey(key)}
                     >
                       <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
@@ -301,7 +321,16 @@ function KvKeyBrowser({
                           onCheckedChange={() => toggleSelectKey(key)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium font-mono text-sm">{key}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="gap-1 rounded-md border-green-200 bg-green-100 font-mono text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+                          title={key}
+                        >
+                          <KeyRound className="h-3 w-3" />
+                          <span className="max-w-[240px] truncate">{key}</span>
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button
                           variant="ghost"
@@ -660,19 +689,64 @@ export default function KvPage() {
                       className="cursor-pointer"
                       onClick={() => openBucket(kv)}
                     >
-                      <TableCell className="font-medium">{kv.bucket}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className="gap-1 rounded-md border-green-200 bg-green-100 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+                            title={kv.bucket}
+                          >
+                            <KeyRound className="h-3 w-3" />
+                            <span className="max-w-[180px] truncate">{kv.bucket}</span>
+                          </Badge>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {kv.description || '-'}
                       </TableCell>
-                      <TableCell>{formatNumber(kv.values)}</TableCell>
-                      <TableCell>{formatBytes(kv.size)}</TableCell>
-                      <TableCell>{kv.history}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="rounded-md">
+                        <Badge
+                          variant="outline"
+                          className="gap-1 rounded-md border-green-200 bg-green-100 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+                        >
+                          <KeyRound className="h-3 w-3" />
+                          {formatNumber(kv.values)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="gap-1 rounded-md border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300"
+                        >
+                          <HardDrive className="h-3 w-3" />
+                          {formatBytes(kv.size)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="gap-1 rounded-md">
+                          <History className="h-3 w-3" />
+                          {kv.history}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn('gap-1 rounded-md', storageBadgeClass(kv.storage))}
+                        >
+                          {kv.storage === 'memory' ? (
+                            <Database className="h-3 w-3" />
+                          ) : (
+                            <HardDrive className="h-3 w-3" />
+                          )}
                           {kv.storage}
                         </Badge>
                       </TableCell>
-                      <TableCell>{kv.replicas}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="gap-1 rounded-md">
+                          <Layers className="h-3 w-3" />
+                          {kv.replicas}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button
                           onClick={(e) => {

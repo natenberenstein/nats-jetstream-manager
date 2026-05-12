@@ -1,16 +1,31 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Layers, Network, Server, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, HardDrive, Layers, Network, Server } from 'lucide-react';
 
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useClusterOverview } from '@/hooks/useCluster';
-import { formatBytes, formatNumber } from '@/lib/utils';
+import { cn, formatBytes, formatNumber } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/cards/StatCard';
+
+function replicationRowClass(stream: {
+  healthy: boolean;
+  has_quorum: boolean;
+  offline_replicas: number;
+  lagging_replicas: number;
+}) {
+  if (!stream.has_quorum || stream.offline_replicas > 0) {
+    return 'border-l-destructive bg-destructive/5';
+  }
+  if (!stream.healthy || stream.lagging_replicas > 0) {
+    return 'border-l-warning bg-warning/5';
+  }
+  return 'border-l-success';
+}
 
 export default function ClusterPage() {
   const { connectionId } = useConnection();
@@ -22,10 +37,26 @@ export default function ClusterPage() {
       label: 'Topology',
       value: data?.topology === 'clustered' ? 'Clustered' : 'Standalone',
       icon: Network,
+      metric: 'topology' as const,
     },
-    { label: 'Nodes', value: formatNumber(data?.node_count ?? 0), icon: Server },
-    { label: 'Streams', value: formatNumber(data?.stream_count ?? 0), icon: Layers },
-    { label: 'Storage', value: formatBytes(data?.bytes ?? 0), icon: ShieldAlert },
+    {
+      label: 'Nodes',
+      value: formatNumber(data?.node_count ?? 0),
+      icon: Server,
+      metric: 'topology' as const,
+    },
+    {
+      label: 'Streams',
+      value: formatNumber(data?.stream_count ?? 0),
+      icon: Layers,
+      metric: 'streams' as const,
+    },
+    {
+      label: 'Storage',
+      value: formatBytes(data?.bytes ?? 0),
+      icon: HardDrive,
+      metric: 'storage' as const,
+    },
   ];
 
   return (
@@ -49,6 +80,7 @@ export default function ClusterPage() {
             label={stat.label}
             value={stat.value}
             icon={stat.icon}
+            metric={stat.metric}
             isLoading={isLoading}
           />
         ))}
@@ -217,21 +249,39 @@ export default function ClusterPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-2">
-            <div>
-              <p className="text-muted-foreground">Quorum-Degraded Streams</p>
-              <p
-                className={`font-semibold ${(data?.quorum_degraded_streams || 0) > 0 ? 'text-destructive' : ''}`}
+            <div className="rounded-md border p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <AlertTriangle
+                  className={cn(
+                    'h-4 w-4',
+                    (data?.quorum_degraded_streams || 0) > 0 ? 'text-destructive' : 'text-success',
+                  )}
+                />
+                <p className="text-muted-foreground">Quorum-Degraded Streams</p>
+              </div>
+              <Badge
+                variant={(data?.quorum_degraded_streams || 0) > 0 ? 'destructive' : 'success'}
+                className="rounded-md"
               >
                 {data?.quorum_degraded_streams ?? 0}
-              </p>
+              </Badge>
             </div>
-            <div>
-              <p className="text-muted-foreground">Leaderless Streams</p>
-              <p
-                className={`font-semibold ${(data?.leaderless_streams || 0) > 0 ? 'text-destructive' : ''}`}
+            <div className="rounded-md border p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <AlertTriangle
+                  className={cn(
+                    'h-4 w-4',
+                    (data?.leaderless_streams || 0) > 0 ? 'text-destructive' : 'text-success',
+                  )}
+                />
+                <p className="text-muted-foreground">Leaderless Streams</p>
+              </div>
+              <Badge
+                variant={(data?.leaderless_streams || 0) > 0 ? 'destructive' : 'success'}
+                className="rounded-md"
               >
                 {data?.leaderless_streams ?? 0}
-              </p>
+              </Badge>
             </div>
           </div>
           {isLoading ? (
@@ -244,33 +294,54 @@ export default function ClusterPage() {
             data.stream_health.map((stream) => (
               <div
                 key={stream.stream}
-                className="rounded border p-3 flex flex-wrap items-center justify-between gap-2 text-sm"
+                className={cn(
+                  'flex flex-wrap items-center justify-between gap-2 rounded border border-l-4 p-3 text-sm',
+                  replicationRowClass(stream),
+                )}
               >
                 <div>
                   <p className="font-medium">{stream.stream}</p>
-                  <p className="text-muted-foreground">
-                    leader: {stream.leader || '-'} | replicas: {stream.replicas} | online:{' '}
-                    {stream.online_replicas}
-                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className="rounded-md">
+                      leader: {stream.leader || '-'}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-md">
+                      replicas: {stream.replicas}
+                    </Badge>
+                    <Badge
+                      variant={stream.online_replicas === stream.replicas ? 'success' : 'warning'}
+                      className="rounded-md"
+                    >
+                      online: {stream.online_replicas}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {stream.healthy ? (
-                    <Badge variant="success">
+                    <Badge variant="success" className="rounded-md">
                       <CheckCircle2 className="w-3 h-3 mr-1" />
                       Healthy
                     </Badge>
                   ) : (
-                    <Badge variant="destructive">
+                    <Badge variant="destructive" className="rounded-md">
                       <AlertTriangle className="w-3 h-3 mr-1" />
                       Degraded
                     </Badge>
                   )}
-                  {!stream.has_quorum && <Badge variant="destructive">no quorum</Badge>}
+                  {!stream.has_quorum && (
+                    <Badge variant="destructive" className="rounded-md">
+                      no quorum
+                    </Badge>
+                  )}
                   {stream.offline_replicas > 0 && (
-                    <Badge variant="destructive">offline {stream.offline_replicas}</Badge>
+                    <Badge variant="destructive" className="rounded-md">
+                      offline {stream.offline_replicas}
+                    </Badge>
                   )}
                   {stream.lagging_replicas > 0 && (
-                    <Badge variant="secondary">lagging {stream.lagging_replicas}</Badge>
+                    <Badge variant="warning" className="rounded-md">
+                      lagging {stream.lagging_replicas}
+                    </Badge>
                   )}
                 </div>
               </div>

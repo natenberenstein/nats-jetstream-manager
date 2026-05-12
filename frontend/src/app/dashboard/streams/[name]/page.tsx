@@ -12,8 +12,19 @@ import { useStreamMetrics } from '@/hooks/useMetrics';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { copyText, downloadFile } from '@/lib/download';
 import { formatBytes, formatNumber } from '@/lib/utils';
-import { ArrowLeft, Copy, Download, Flame, Users, MessageSquare, Pencil } from 'lucide-react';
+import {
+  ArrowLeft,
+  Copy,
+  Download,
+  Flame,
+  HardDrive,
+  ListOrdered,
+  MessageSquare,
+  Pencil,
+  Users,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { StatCard } from '@/components/cards/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -223,32 +234,20 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
 
       {/* State Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Messages</p>
-            <p className="text-xl font-semibold">{formatNumber(state.messages)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Size</p>
-            <p className="text-xl font-semibold">{formatBytes(state.bytes)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Consumers</p>
-            <p className="text-xl font-semibold">{state.consumer_count}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Sequence Range</p>
-            <p className="text-xl font-semibold">
-              {state.first_seq} - {state.last_seq}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Messages"
+          value={formatNumber(state.messages)}
+          icon={MessageSquare}
+          metric="messages"
+        />
+        <StatCard label="Size" value={formatBytes(state.bytes)} icon={HardDrive} metric="storage" />
+        <StatCard label="Consumers" value={state.consumer_count} icon={Users} metric="consumers" />
+        <StatCard
+          label="Sequence Range"
+          value={`${state.first_seq} - ${state.last_seq}`}
+          icon={ListOrdered}
+          metric="sequence"
+        />
       </div>
 
       <Card>

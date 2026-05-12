@@ -10,7 +10,16 @@ import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { StreamInfo } from '@/lib/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Copy, MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  Copy,
+  Database,
+  HardDrive,
+  MessageSquare,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import {
   ContextMenu,
@@ -19,7 +28,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { formatBytes, formatNumber } from '@/lib/utils';
+import { cn, formatBytes, formatNumber } from '@/lib/utils';
 import { focusFirstError } from '@/lib/form-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -151,6 +160,23 @@ const STREAM_PRESETS: Array<{
     },
   },
 ];
+
+function retentionBadgeClass(retention?: string) {
+  switch (retention) {
+    case 'workqueue':
+      return 'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300';
+    case 'interest':
+      return 'border-green-200 bg-green-100 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300';
+    default:
+      return 'border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
+  }
+}
+
+function storageBadgeClass(storage?: string) {
+  return storage === 'memory'
+    ? 'border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300'
+    : 'border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300';
+}
 
 function StreamEditForm({
   stream,
@@ -844,7 +870,18 @@ export default function StreamsPage() {
                       <React.Fragment key={stream.config.name}>
                         <ContextMenu>
                           <ContextMenuTrigger asChild>
-                            <TableRow>
+                            <TableRow
+                              className={cn(
+                                'border-l-4 border-l-transparent',
+                                usedPct !== null &&
+                                  usedPct >= 90 &&
+                                  'border-l-destructive bg-destructive/5',
+                                usedPct !== null &&
+                                  usedPct >= 75 &&
+                                  usedPct < 90 &&
+                                  'border-l-warning bg-warning/5',
+                              )}
+                            >
                               <TableCell>
                                 <Checkbox
                                   checked={selectedStreams.has(stream.config.name)}
@@ -859,21 +896,29 @@ export default function StreamsPage() {
                                   {stream.config.name}
                                 </Link>
                                 {stream.config.mirror && (
-                                  <span className="ml-2 text-xs text-muted-foreground">
-                                    (mirror)
-                                  </span>
+                                  <Badge variant="outline" className="ml-2 rounded-md text-xs">
+                                    mirror
+                                  </Badge>
                                 )}
                                 {stream.config.sources && stream.config.sources.length > 0 && (
-                                  <span className="ml-2 text-xs text-muted-foreground">
-                                    ({stream.config.sources.length} source
-                                    {stream.config.sources.length > 1 ? 's' : ''})
-                                  </span>
+                                  <Badge variant="outline" className="ml-2 rounded-md text-xs">
+                                    {stream.config.sources.length} source
+                                    {stream.config.sources.length > 1 ? 's' : ''}
+                                  </Badge>
                                 )}
                               </TableCell>
                               <TableCell className="max-w-[360px] text-muted-foreground">
                                 <SubjectChips subjects={stream.config.subjects} maxVisible={2} />
                               </TableCell>
-                              <TableCell>{formatNumber(stream.state.messages)}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className="gap-1 rounded-md border-green-200 bg-green-100 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+                                >
+                                  <MessageSquare className="h-3 w-3" />
+                                  {formatNumber(stream.state.messages)}
+                                </Badge>
+                              </TableCell>
                               <TableCell className="min-w-[160px]">
                                 <div className="flex flex-col gap-1">
                                   <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -899,11 +944,41 @@ export default function StreamsPage() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>{stream.state.consumer_count}</TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="rounded-md">
-                                  {stream.config.storage}
+                                <Badge
+                                  variant="outline"
+                                  className="gap-1 rounded-md border-orange-200 bg-orange-100 text-orange-700 dark:border-orange-800 dark:bg-orange-900/20 dark:text-orange-300"
+                                >
+                                  <Users className="h-3 w-3" />
+                                  {stream.state.consumer_count}
                                 </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      'gap-1 rounded-md',
+                                      storageBadgeClass(stream.config.storage),
+                                    )}
+                                  >
+                                    {stream.config.storage === 'memory' ? (
+                                      <Database className="h-3 w-3" />
+                                    ) : (
+                                      <HardDrive className="h-3 w-3" />
+                                    )}
+                                    {stream.config.storage}
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      'rounded-md',
+                                      retentionBadgeClass(stream.config.retention),
+                                    )}
+                                  >
+                                    {stream.config.retention || 'limits'}
+                                  </Badge>
+                                </div>
                               </TableCell>
                               <TableCell className="text-right space-x-1">
                                 <Button

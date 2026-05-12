@@ -14,8 +14,21 @@ import {
 } from '@/hooks/useObjectStore';
 import { objectStoreApi } from '@/lib/api';
 import { ObjectStoreStatusInfo } from '@/lib/types';
-import { Plus, Trash2, ArrowLeft, Download, Upload } from 'lucide-react';
-import { formatBytes, formatNumber } from '@/lib/utils';
+import {
+  ArrowLeft,
+  Database,
+  Download,
+  File,
+  HardDrive,
+  Layers,
+  Lock,
+  Package,
+  Plus,
+  Trash2,
+  Unlock,
+  Upload,
+} from 'lucide-react';
+import { cn, formatBytes, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
@@ -52,6 +65,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
+
+function storageBadgeClass(storage?: string) {
+  return storage === 'memory'
+    ? 'border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300'
+    : 'border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300';
+}
 
 function ObjectBrowser({
   connectionId,
@@ -341,12 +360,34 @@ function ObjectBrowser({
                         onCheckedChange={() => toggleSelectObject(obj.name)}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{obj.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Badge
+                        variant="outline"
+                        className="gap-1 rounded-md border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+                        title={obj.name}
+                      >
+                        <File className="h-3 w-3" />
+                        <span className="max-w-[220px] truncate">{obj.name}</span>
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {obj.description || '-'}
                     </TableCell>
-                    <TableCell>{formatBytes(obj.size)}</TableCell>
-                    <TableCell>{formatNumber(obj.chunks)}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="gap-1 rounded-md border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300"
+                      >
+                        <HardDrive className="h-3 w-3" />
+                        {formatBytes(obj.size)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="gap-1 rounded-md">
+                        <Layers className="h-3 w-3" />
+                        {formatNumber(obj.chunks)}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(obj.mtime).toLocaleString()}
                     </TableCell>
@@ -628,24 +669,56 @@ export default function ObjectStorePage() {
                       className="cursor-pointer"
                       onClick={() => openStore(store)}
                     >
-                      <TableCell className="font-medium">{store.bucket}</TableCell>
+                      <TableCell className="font-medium">
+                        <Badge
+                          variant="outline"
+                          className="gap-1 rounded-md border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+                          title={store.bucket}
+                        >
+                          <Package className="h-3 w-3" />
+                          <span className="max-w-[180px] truncate">{store.bucket}</span>
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {store.description || '-'}
                       </TableCell>
-                      <TableCell>{formatBytes(store.size)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="rounded-md">
+                        <Badge
+                          variant="outline"
+                          className="gap-1 rounded-md border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300"
+                        >
+                          <HardDrive className="h-3 w-3" />
+                          {formatBytes(store.size)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn('gap-1 rounded-md', storageBadgeClass(store.storage))}
+                        >
+                          {store.storage === 'memory' ? (
+                            <Database className="h-3 w-3" />
+                          ) : (
+                            <HardDrive className="h-3 w-3" />
+                          )}
                           {store.storage}
                         </Badge>
                       </TableCell>
-                      <TableCell>{store.replicas}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="gap-1 rounded-md">
+                          <Layers className="h-3 w-3" />
+                          {store.replicas}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         {store.sealed ? (
-                          <Badge variant="secondary" className="rounded-md">
+                          <Badge variant="warning" className="gap-1 rounded-md">
+                            <Lock className="h-3 w-3" />
                             Sealed
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="rounded-md">
+                          <Badge variant="success" className="gap-1 rounded-md">
+                            <Unlock className="h-3 w-3" />
                             Open
                           </Badge>
                         )}

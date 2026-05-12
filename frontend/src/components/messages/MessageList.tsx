@@ -7,8 +7,11 @@ import {
   Download,
   Eye,
   EyeOff,
+  FileText,
   Filter,
   GitBranch,
+  Hash,
+  KeyRound,
   Pause,
   Play,
   RefreshCw,
@@ -517,7 +520,16 @@ export function MessageList({
         ) : currentMessages.length > 0 ? (
           <div ref={listContainerRef} className="max-h-[740px] overflow-y-auto divide-y">
             {currentMessages.map((message: MessageData) => (
-              <div key={message.seq} className="p-4 space-y-2">
+              <div
+                key={message.seq}
+                className={cn(
+                  'space-y-2 border-l-4 border-l-transparent p-4',
+                  compareSelection.includes(message.seq) && 'border-l-primary bg-primary/5',
+                  bookmarks.includes(message.seq) &&
+                    !compareSelection.includes(message.seq) &&
+                    'border-l-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/10',
+                )}
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -544,7 +556,18 @@ export function MessageList({
                       />
                     </Button>
                     <SubjectChip subject={message.subject} />
-                    <span className="text-xs text-muted-foreground">seq {message.seq}</span>
+                    <Badge
+                      variant="outline"
+                      className="gap-1 rounded-md border-indigo-200 bg-indigo-100 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300"
+                    >
+                      <Hash className="h-3 w-3" />
+                      {message.seq}
+                    </Badge>
+                    {compareSelection.includes(message.seq) && (
+                      <Badge variant="outline" className="rounded-md">
+                        selected
+                      </Badge>
+                    )}
                   </div>
                   {showTimeCol && (
                     <span className="text-xs text-muted-foreground">
@@ -556,18 +579,30 @@ export function MessageList({
                 <PayloadViewer payload={renderPayload(message)} maxHeight="300px" />
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs text-muted-foreground">
-                    {showSizeCol && <>Size: {message.payload_size ?? 0} bytes</>}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {showSizeCol && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 rounded-md border-green-200 bg-green-100 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+                      >
+                        <FileText className="h-3 w-3" />
+                        {message.payload_size ?? 0} bytes
+                      </Badge>
+                    )}
                     {showHeadersCol &&
                       message.headers &&
                       Object.keys(message.headers).length > 0 && (
-                        <>
-                          {' '}
-                          | Headers:{' '}
-                          {Object.entries(message.headers)
+                        <Badge
+                          variant="outline"
+                          className="gap-1 rounded-md border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+                          title={Object.entries(message.headers)
                             .map(([k, v]) => `${k}: ${v}`)
                             .join(' | ')}
-                        </>
+                        >
+                          <KeyRound className="h-3 w-3" />
+                          {Object.keys(message.headers).length} header
+                          {Object.keys(message.headers).length === 1 ? '' : 's'}
+                        </Badge>
                       )}
                   </div>
                   <div className="flex items-center gap-2">

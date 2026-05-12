@@ -16,8 +16,19 @@ import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import { buildConsumerMessagesHref } from '@/lib/consumer-messages';
 import { copyText, downloadFile } from '@/lib/download';
 import { formatNumber } from '@/lib/utils';
-import { ArrowLeft, Copy, Download, Layers, MessageSquare, Pencil } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Clock,
+  Copy,
+  Download,
+  Layers,
+  ListOrdered,
+  MessageSquare,
+  Pencil,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { StatCard } from '@/components/cards/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -208,42 +219,43 @@ export default function ConsumerDetailPage({
 
       {/* State Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Pending</p>
-            <p className="text-xl font-semibold">{formatNumber(consumer.num_pending)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Ack Pending</p>
-            <p className="text-xl font-semibold">{formatNumber(consumer.num_ack_pending)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Stream Lag</p>
-            <p className="text-xl font-semibold">{formatNumber(diagnostic?.stream_lag ?? 0)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Waiting</p>
-            <p className="text-xl font-semibold">{formatNumber(consumer.num_waiting)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Delivered Seq</p>
-            <p className="text-xl font-semibold">{formatNumber(consumer.delivered.stream_seq)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Ack Floor Seq</p>
-            <p className="text-xl font-semibold">{formatNumber(consumer.ack_floor.stream_seq)}</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Pending"
+          value={formatNumber(consumer.num_pending)}
+          icon={MessageSquare}
+          metric="pending"
+        />
+        <StatCard
+          label="Ack Pending"
+          value={formatNumber(consumer.num_ack_pending)}
+          icon={Clock}
+          metric="pending"
+        />
+        <StatCard
+          label="Stream Lag"
+          value={formatNumber(diagnostic?.stream_lag ?? 0)}
+          icon={AlertTriangle}
+          metric={(diagnostic?.stream_lag ?? 0) > 0 ? 'warning' : 'success'}
+          tone={(diagnostic?.stream_lag ?? 0) > 0 ? 'warning' : 'default'}
+        />
+        <StatCard
+          label="Waiting"
+          value={formatNumber(consumer.num_waiting)}
+          icon={Clock}
+          metric="pending"
+        />
+        <StatCard
+          label="Delivered Seq"
+          value={formatNumber(consumer.delivered.stream_seq)}
+          icon={ListOrdered}
+          metric="sequence"
+        />
+        <StatCard
+          label="Ack Floor Seq"
+          value={formatNumber(consumer.ack_floor.stream_seq)}
+          icon={ListOrdered}
+          metric="sequence"
+        />
       </div>
 
       <Card>

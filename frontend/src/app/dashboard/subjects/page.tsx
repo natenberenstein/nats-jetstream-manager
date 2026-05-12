@@ -10,6 +10,7 @@ import { useAllConsumers } from '@/hooks/useConsumers';
 import { analyzeSubjects, subjectMatches } from '@/lib/subject-analysis';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { StatCard } from '@/components/cards/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { LastUpdated } from '@/components/ui/last-updated';
@@ -120,26 +121,32 @@ export default function SubjectExplorerPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Subject Patterns</p>
-          <p className="mt-1 text-2xl font-semibold">{analysis.streamSubjects.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Orphan Patterns</p>
-          <p className="mt-1 text-2xl font-semibold text-warning">
-            {analysis.orphanStreamSubjects.length}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Unmatched Filters</p>
-          <p className="mt-1 text-2xl font-semibold text-destructive">
-            {analysis.unmatchedConsumerFilters.length}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Cross-Stream Overlaps</p>
-          <p className="mt-1 text-2xl font-semibold">{analysis.overlappingStreamSubjects.length}</p>
-        </Card>
+        <StatCard
+          label="Subject Patterns"
+          value={analysis.streamSubjects.length}
+          icon={GitBranch}
+          metric="topology"
+        />
+        <StatCard
+          label="Orphan Patterns"
+          value={analysis.orphanStreamSubjects.length}
+          icon={AlertTriangle}
+          metric="warning"
+          tone={analysis.orphanStreamSubjects.length > 0 ? 'warning' : 'default'}
+        />
+        <StatCard
+          label="Unmatched Filters"
+          value={analysis.unmatchedConsumerFilters.length}
+          icon={AlertTriangle}
+          metric="critical"
+          tone={analysis.unmatchedConsumerFilters.length > 0 ? 'destructive' : 'default'}
+        />
+        <StatCard
+          label="Cross-Stream Overlaps"
+          value={analysis.overlappingStreamSubjects.length}
+          icon={GitBranch}
+          metric="streams"
+        />
       </div>
 
       <Card>

@@ -12,7 +12,7 @@ import {
   type Edge,
   type Node,
 } from '@xyflow/react';
-import { GitFork, Network } from 'lucide-react';
+import { AlertTriangle, GitFork, Layers, Network, Users } from 'lucide-react';
 
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useClusterOverview } from '@/hooks/useCluster';
@@ -22,6 +22,7 @@ import { subjectPatternsOverlap } from '@/lib/subject-analysis';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { StatCard } from '@/components/cards/StatCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { LastUpdated } from '@/components/ui/last-updated';
 import { PageHeader } from '@/components/ui/page-header';
@@ -284,22 +285,15 @@ export default function TopologyPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Nodes</p>
-          <p className="mt-1 text-2xl font-semibold">{nodes.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Edges</p>
-          <p className="mt-1 text-2xl font-semibold">{edges.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Streams</p>
-          <p className="mt-1 text-2xl font-semibold">{streams.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Consumers</p>
-          <p className="mt-1 text-2xl font-semibold">{allConsumers.consumers.length}</p>
-        </Card>
+        <StatCard label="Nodes" value={nodes.length} icon={Network} metric="topology" />
+        <StatCard label="Edges" value={edges.length} icon={GitFork} metric="topology" />
+        <StatCard label="Streams" value={streams.length} icon={Layers} metric="streams" />
+        <StatCard
+          label="Consumers"
+          value={allConsumers.consumers.length}
+          icon={Users}
+          metric="consumers"
+        />
       </div>
 
       <Card className="overflow-hidden">
@@ -330,10 +324,31 @@ export default function TopologyPage() {
       </Card>
 
       <div className="flex flex-wrap gap-2 text-xs">
-        <Badge variant="outline">blue: stream</Badge>
-        <Badge variant="outline">green: subject</Badge>
-        <Badge variant="outline">violet: consumer</Badge>
-        <Badge variant="warning">warning: lag or degraded replication</Badge>
+        <Badge
+          variant="outline"
+          className="gap-1 rounded-md border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+        >
+          <Layers className="h-3 w-3" />
+          Stream
+        </Badge>
+        <Badge
+          variant="outline"
+          className="gap-1 rounded-md border-green-200 bg-green-100 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"
+        >
+          <GitFork className="h-3 w-3" />
+          Subject
+        </Badge>
+        <Badge
+          variant="outline"
+          className="gap-1 rounded-md border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300"
+        >
+          <Users className="h-3 w-3" />
+          Consumer
+        </Badge>
+        <Badge variant="warning" className="gap-1 rounded-md">
+          <AlertTriangle className="h-3 w-3" />
+          Lag or degraded replication
+        </Badge>
       </div>
     </div>
   );

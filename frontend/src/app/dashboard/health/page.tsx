@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { Activity, AlertTriangle, CheckCircle2, ListChecks } from 'lucide-react';
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useUptimeSummary, useHealthHistory } from '@/hooks/useHealth';
 import HealthTimeline from '@/components/charts/HealthTimeline';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@/components/cards/StatCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
@@ -16,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
 
 const WINDOWS = [
   { label: '1h', hours: 1 },
@@ -55,45 +56,56 @@ export default function HealthPage() {
       {/* Uptime Summary */}
       {uptime && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <p className="text-sm text-muted-foreground">Uptime</p>
-            <p
-              className={cn(
-                'text-2xl font-bold',
-                uptime.uptime_pct >= 99
-                  ? 'text-success'
-                  : uptime.uptime_pct >= 95
-                    ? 'text-warning'
-                    : 'text-destructive',
-              )}
-            >
-              {uptime.uptime_pct}%
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-sm text-muted-foreground">Total Checks</p>
-            <p className="text-2xl font-bold">{uptime.total_checks}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-sm text-muted-foreground">Up / Down</p>
-            <p className="text-2xl font-bold">
-              <span className="text-success">{uptime.up_checks}</span>
-              {' / '}
-              <span className="text-destructive">{uptime.down_checks}</span>
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-sm text-muted-foreground">Current Status</p>
-            <Badge
-              variant={uptime.last_status === 'up' ? 'success' : 'destructive'}
-              className="mt-1"
-            >
-              {uptime.last_status?.toUpperCase() || 'UNKNOWN'}
-            </Badge>
-            {uptime.last_error && (
-              <p className="text-xs text-muted-foreground mt-2 truncate">{uptime.last_error}</p>
-            )}
-          </Card>
+          <StatCard
+            label="Uptime"
+            value={`${uptime.uptime_pct}%`}
+            icon={Activity}
+            metric={
+              uptime.uptime_pct >= 99 ? 'success' : uptime.uptime_pct >= 95 ? 'warning' : 'critical'
+            }
+            tone={
+              uptime.uptime_pct >= 99
+                ? 'success'
+                : uptime.uptime_pct >= 95
+                  ? 'warning'
+                  : 'destructive'
+            }
+          />
+          <StatCard
+            label="Total Checks"
+            value={uptime.total_checks}
+            icon={ListChecks}
+            metric="topology"
+          />
+          <StatCard
+            label="Up / Down"
+            value={
+              <>
+                <span className="text-success">{uptime.up_checks}</span>
+                {' / '}
+                <span className="text-destructive">{uptime.down_checks}</span>
+              </>
+            }
+            icon={Activity}
+            metric={uptime.down_checks > 0 ? 'warning' : 'success'}
+          />
+          <StatCard
+            label="Current Status"
+            value={
+              <div className="space-y-2">
+                <Badge variant={uptime.last_status === 'up' ? 'success' : 'destructive'}>
+                  {uptime.last_status?.toUpperCase() || 'UNKNOWN'}
+                </Badge>
+                {uptime.last_error && (
+                  <p className="truncate text-xs font-normal text-muted-foreground">
+                    {uptime.last_error}
+                  </p>
+                )}
+              </div>
+            }
+            icon={uptime.last_status === 'up' ? CheckCircle2 : AlertTriangle}
+            metric={uptime.last_status === 'up' ? 'success' : 'critical'}
+          />
         </div>
       )}
 

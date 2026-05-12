@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity, Database, HardDrive, MessageSquare, Users, AlertTriangle } from 'lucide-react';
+import { Activity, AlertTriangle, HardDrive, Layers, MessageSquare, Users } from 'lucide-react';
 
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useSystemObservability } from '@/hooks/useSystem';
@@ -57,10 +57,30 @@ export default function ObservabilityPage() {
     useSystemObservability(connectionId);
 
   const cards = [
-    { label: 'Streams', value: formatNumber(data?.streams ?? 0), icon: Database },
-    { label: 'Consumers', value: formatNumber(data?.consumers ?? 0), icon: Users },
-    { label: 'Messages', value: formatNumber(data?.messages ?? 0), icon: MessageSquare },
-    { label: 'Storage', value: formatBytes(data?.bytes ?? 0), icon: HardDrive },
+    {
+      label: 'Streams',
+      value: formatNumber(data?.streams ?? 0),
+      icon: Layers,
+      metric: 'streams' as const,
+    },
+    {
+      label: 'Messages',
+      value: formatNumber(data?.messages ?? 0),
+      icon: MessageSquare,
+      metric: 'messages' as const,
+    },
+    {
+      label: 'Storage',
+      value: formatBytes(data?.bytes ?? 0),
+      icon: HardDrive,
+      metric: 'storage' as const,
+    },
+    {
+      label: 'Consumers',
+      value: formatNumber(data?.consumers ?? 0),
+      icon: Users,
+      metric: 'consumers' as const,
+    },
   ];
 
   return (
@@ -84,6 +104,7 @@ export default function ObservabilityPage() {
             label={card.label}
             value={card.value}
             icon={card.icon}
+            metric={card.metric}
             isLoading={isLoading}
           />
         ))}
