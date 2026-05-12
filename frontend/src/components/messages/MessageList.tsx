@@ -840,24 +840,26 @@ export function MessageList({
 
         <div className="rounded-md border bg-muted/20 p-3">
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(220px,1.2fr)_minmax(220px,1fr)_190px_auto]">
-            <label className="relative">
+            <div className="relative">
               <GitBranch className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                aria-label="Subject pattern"
                 placeholder="Subject pattern"
                 value={filterSubject}
                 onChange={(event) => onFilterSubjectChange(event.target.value)}
                 className="pl-8"
               />
-            </label>
-            <label className="relative">
+            </div>
+            <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                aria-label="Payload contains"
                 placeholder="Payload contains"
                 value={payloadContains}
                 onChange={(event) => onPayloadContainsChange(event.target.value)}
                 className="pl-8"
               />
-            </label>
+            </div>
             <Popover open={customDateOpen} onOpenChange={handleCustomDateOpenChange}>
               <PopoverAnchor asChild>
                 <div>
@@ -1025,25 +1027,28 @@ export function MessageList({
                   className="max-w-full gap-1 rounded-md pr-1"
                 >
                   {filter.key === 'date' && datePreset === 'custom' ? (
-                    <button
+                    <Button
                       type="button"
-                      className="max-w-[16rem] truncate rounded-sm text-left hover:text-foreground"
+                      variant="ghost"
+                      className="h-auto max-w-[16rem] justify-start truncate rounded-sm p-0 text-left text-xs font-semibold hover:bg-transparent hover:text-foreground"
                       onClick={openCustomDateRange}
                       aria-label={`Edit ${filter.label}`}
                     >
                       {filter.label}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="max-w-[16rem] truncate">{filter.label}</span>
                   )}
-                  <button
+                  <Button
                     type="button"
-                    className="rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 rounded-sm p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
                     onClick={() => onClearFilter(filter.key)}
                     aria-label={`Clear ${filter.label}`}
                   >
                     <X className="h-3 w-3" />
-                  </button>
+                  </Button>
                 </Badge>
               ))}
               <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>

@@ -662,50 +662,81 @@ function ConsumerEditForm({
 
               {/* Mutable fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="space-y-1 md:col-span-2">
-                  <Label>Description</Label>
-                  <Input {...register('description')} placeholder="Optional description" />
-                </label>
+                <div className="space-y-1 md:col-span-2">
+                  <Label htmlFor="edit-consumer-description">Description</Label>
+                  <Input
+                    id="edit-consumer-description"
+                    {...register('description')}
+                    placeholder="Optional description"
+                  />
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Ack Wait (seconds)</Label>
-                  <Input type="number" step="0.1" min={0} {...register('ack_wait_seconds')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-consumer-ack-wait">Ack Wait (seconds)</Label>
+                  <Input
+                    id="edit-consumer-ack-wait"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    {...register('ack_wait_seconds')}
+                  />
                   {errors.ack_wait_seconds && (
                     <p className="text-xs text-destructive">{errors.ack_wait_seconds.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Max Deliver (-1 = unlimited)</Label>
-                  <Input type="number" {...register('max_deliver')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-consumer-max-deliver">Max Deliver (-1 = unlimited)</Label>
+                  <Input
+                    id="edit-consumer-max-deliver"
+                    type="number"
+                    {...register('max_deliver')}
+                  />
                   {errors.max_deliver && (
                     <p className="text-xs text-destructive">{errors.max_deliver.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Max Ack Pending</Label>
-                  <Input type="number" min={0} {...register('max_ack_pending')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-consumer-max-ack-pending">Max Ack Pending</Label>
+                  <Input
+                    id="edit-consumer-max-ack-pending"
+                    type="number"
+                    min={0}
+                    {...register('max_ack_pending')}
+                  />
                   {errors.max_ack_pending && (
                     <p className="text-xs text-destructive">{errors.max_ack_pending.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Max Waiting</Label>
-                  <Input type="number" min={0} {...register('max_waiting')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-consumer-max-waiting">Max Waiting</Label>
+                  <Input
+                    id="edit-consumer-max-waiting"
+                    type="number"
+                    min={0}
+                    {...register('max_waiting')}
+                  />
                   {errors.max_waiting && (
                     <p className="text-xs text-destructive">{errors.max_waiting.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Rate Limit (bytes/sec, 0 = unlimited)</Label>
-                  <Input type="number" min={0} {...register('rate_limit_bps')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-consumer-rate-limit">
+                    Rate Limit (bytes/sec, 0 = unlimited)
+                  </Label>
+                  <Input
+                    id="edit-consumer-rate-limit"
+                    type="number"
+                    min={0}
+                    {...register('rate_limit_bps')}
+                  />
                   {errors.rate_limit_bps && (
                     <p className="text-xs text-destructive">{errors.rate_limit_bps.message}</p>
                   )}
-                </label>
+                </div>
 
                 <div className="flex items-center gap-2 pt-6">
                   <Checkbox

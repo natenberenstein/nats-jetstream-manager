@@ -158,15 +158,15 @@ export function MessagePublishForm({
           <CardTitle className="text-lg">Publish Message</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <label className="block space-y-1">
-            <Label>Stream</Label>
+          <div className="block space-y-1">
+            <Label htmlFor="publish-stream">Stream</Label>
             <div className="flex gap-2">
               <Select
                 value={selectedStream || ''}
                 onValueChange={onSelectStream}
                 disabled={streamNames.length === 0}
               >
-                <SelectTrigger>
+                <SelectTrigger id="publish-stream">
                   <SelectValue
                     placeholder={
                       streamNames.length === 0 ? 'No streams available' : 'Select a stream'
@@ -197,7 +197,7 @@ export function MessagePublishForm({
                 />
               </Button>
             </div>
-          </label>
+          </div>
 
           {favoriteStreams.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -215,11 +215,11 @@ export function MessagePublishForm({
             </div>
           )}
 
-          <label className="block space-y-1">
-            <Label>Publish Templates</Label>
+          <div className="block space-y-1">
+            <Label htmlFor="publish-template">Publish Templates</Label>
             <div className="flex gap-2">
               <Select onValueChange={applyTemplate} disabled={templates.length === 0}>
-                <SelectTrigger>
+                <SelectTrigger id="publish-template">
                   <SelectValue
                     placeholder={templates.length === 0 ? 'No saved templates' : 'Apply template'}
                   />
@@ -236,28 +236,30 @@ export function MessagePublishForm({
                 <Save className="w-4 h-4" />
               </Button>
             </div>
-          </label>
+          </div>
 
-          <label className="block space-y-1">
-            <Label>Subject</Label>
+          <div className="block space-y-1">
+            <Label htmlFor="publish-subject">Subject</Label>
             <Input
+              id="publish-subject"
               ref={subjectInputRef}
               type="text"
               value={subject}
               onChange={(event) => onSubjectChange(event.target.value)}
               placeholder="orders.created"
             />
-          </label>
+          </div>
 
-          <label className="block space-y-1">
-            <Label>Replay Subject</Label>
+          <div className="block space-y-1">
+            <Label htmlFor="publish-replay-subject">Replay Subject</Label>
             <Input
+              id="publish-replay-subject"
               type="text"
               value={replaySubject}
               onChange={(event) => onReplaySubjectChange(event.target.value)}
               placeholder="orders.replay"
             />
-          </label>
+          </div>
 
           <div className="flex items-center gap-2">
             <Checkbox
@@ -271,37 +273,40 @@ export function MessagePublishForm({
           </div>
 
           {batchMode ? (
-            <label className="block space-y-1">
-              <Label>Batch Payload</Label>
+            <div className="block space-y-1">
+              <Label htmlFor="publish-batch-payload">Batch Payload</Label>
               <Textarea
+                id="publish-batch-payload"
                 value={batchPayload}
                 onChange={(event) => setBatchPayload(event.target.value)}
                 rows={6}
                 className="font-mono"
               />
-            </label>
+            </div>
           ) : (
-            <label className="block space-y-1">
-              <Label>Payload</Label>
+            <div className="block space-y-1">
+              <Label htmlFor="publish-payload">Payload</Label>
               <Textarea
+                id="publish-payload"
                 value={payload}
                 onChange={(event) => setPayload(event.target.value)}
                 rows={6}
                 className="font-mono"
               />
-            </label>
+            </div>
           )}
 
-          <label className="block space-y-1">
-            <Label>Headers (optional)</Label>
+          <div className="block space-y-1">
+            <Label htmlFor="publish-headers">Headers (optional)</Label>
             <Textarea
+              id="publish-headers"
               value={headersInput}
               onChange={(event) => setHeadersInput(event.target.value)}
               rows={3}
               placeholder={'Nats-Msg-Id: msg-123\nContent-Type: application/json'}
               className="font-mono"
             />
-          </label>
+          </div>
 
           <Button
             type="submit"

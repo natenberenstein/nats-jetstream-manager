@@ -20,21 +20,25 @@ Next.js frontend for managing NATS JetStream clusters.
 ### Installation
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
 2. Create `.env.local` file:
+
 ```bash
 cp .env.local.example .env.local
 ```
 
 3. Update the API URL in `.env.local`:
+
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 4. Run the development server:
+
 ```bash
 npm run dev
 ```
@@ -44,6 +48,7 @@ The application will be available at `http://localhost:3000`
 ### Using Docker
 
 Build and run with Docker:
+
 ```bash
 docker build -t nats-manager-frontend .
 docker run -p 3000:3000 nats-manager-frontend
@@ -86,6 +91,7 @@ src/
 ### Code Style
 
 Format code:
+
 ```bash
 npm run lint
 ```

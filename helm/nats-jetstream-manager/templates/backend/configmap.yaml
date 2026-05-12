@@ -6,7 +6,6 @@ metadata:
   labels:
     {{- include "nats-jetstream-manager.backend.labels" . | nindent 4 }}
 data:
-  NATS_URL: {{ .Values.backend.config.natsUrl | quote }}
   LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
   CORS_ORIGINS: {{ include "nats-jetstream-manager.corsOrigins" . | quote }}
   DATABASE_TYPE: {{ .Values.backend.config.databaseType | quote }}

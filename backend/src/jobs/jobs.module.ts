@@ -6,10 +6,7 @@ import { JobsService } from './jobs.service';
 import { MessagesModule } from '../messages/messages.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Job]),
-    forwardRef(() => MessagesModule),
-  ],
+  imports: [TypeOrmModule.forFeature([Job]), forwardRef(() => MessagesModule)],
   controllers: [JobsController],
   providers: [JobsService],
   exports: [JobsService],

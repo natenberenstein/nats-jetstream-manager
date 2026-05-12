@@ -169,6 +169,32 @@ describe('MessagesService getMessages', () => {
   });
 });
 
+describe('MessagesService search index', () => {
+  let service: MessagesService;
+
+  beforeEach(() => {
+    service = new MessagesService();
+  });
+
+  it('indexes only the latest messages up to the requested limit', async () => {
+    const mocks = createNatsMocks();
+    mocks.streamInfo.mockResolvedValue({
+      state: { first_seq: 1, last_seq: 10, messages: 10 },
+    });
+    mocks.getMessage.mockImplementation(async (_stream: string, request: { seq: number }) =>
+      createStoredMsg(request.seq, `orders.${request.seq}`),
+    );
+
+    const result = await service.buildSearchIndex(mocks.jsm, 'conn', 'ORDERS', 3);
+    const search = service.searchIndexMessages('conn', 'ORDERS', 'orders', 10);
+
+    expect(result.indexed_messages).toBe(3);
+    expect(mocks.getMessage).toHaveBeenCalledTimes(3);
+    expect(mocks.getMessage).toHaveBeenNthCalledWith(1, 'ORDERS', { seq: 8 });
+    expect(search.matches.map((message) => message.seq)).toEqual([8, 9, 10]);
+  });
+});
+
 describe('MessagesService remediation', () => {
   let service: MessagesService;
 

@@ -37,7 +37,8 @@ export function useUpdateStream(connectionId: string | null, streamName: string)
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (config: Partial<StreamConfig>) => streamApi.update(connectionId!, streamName, config),
+    mutationFn: (config: Partial<StreamConfig>) =>
+      streamApi.update(connectionId!, streamName, config),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
       queryClient.invalidateQueries({ queryKey: ['stream', connectionId, streamName] });

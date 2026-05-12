@@ -15,7 +15,7 @@ serviceAccount:
   name: ''
 
 # ------------------------------------------------------------
-# Backend (FastAPI / Python)
+# Backend (NestJS / Node.js)
 # ------------------------------------------------------------
 backend:
   image:
@@ -27,8 +27,6 @@ backend:
   replicaCount: 1
 
   config:
-    # -- NATS server URL
-    natsUrl: 'nats://nats:4222'
     # -- Log level
     logLevel: 'info'
     # -- Database type: "sqlite" or "postgres"
@@ -52,12 +50,6 @@ backend:
   secrets:
     # -- Use an existing Secret instead of creating one
     existingSecret: ''
-    # -- Admin API token (ignored when existingSecret is set)
-    adminToken: ''
-    # -- Viewer API token (ignored when existingSecret is set)
-    viewerToken: ''
-    # -- SMTP password (ignored when existingSecret is set)
-    smtpPassword: ''
     # -- PostgreSQL password (ignored when existingSecret is set)
     databasePassword: ''
 

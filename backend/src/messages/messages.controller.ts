@@ -22,6 +22,7 @@ import {
   MessageDeleteRequestDto,
   MessageDeleteResponseDto,
   ValidateSchemaRequestDto,
+  BuildIndexRequestDto,
   GetMessagesQueryDto,
   SearchIndexQueryDto,
   MessagePublishResponseDto,
@@ -250,15 +251,21 @@ export class MessagesController {
   async buildSearchIndex(
     @Param('connectionId') connectionId: string,
     @Param('streamName') streamName: string,
+    @Body() body: BuildIndexRequestDto = {},
   ): Promise<BuildIndexResponseDto> {
     const conn = this.connectionsService.getConnection(connectionId);
-    const result = await this.messagesService.buildSearchIndex(conn.jsm, connectionId, streamName);
+    const result = await this.messagesService.buildSearchIndex(
+      conn.jsm,
+      connectionId,
+      streamName,
+      body.limit,
+    );
     await this.auditService.log({
       action: 'message.index_build',
       resourceType: 'stream',
       resourceName: streamName,
       connectionId,
-      details: { indexed_messages: result.indexed_messages },
+      details: { limit: body.limit, indexed_messages: result.indexed_messages },
     });
     return result;
   }

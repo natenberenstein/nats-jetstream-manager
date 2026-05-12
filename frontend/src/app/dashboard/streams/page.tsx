@@ -256,28 +256,36 @@ function StreamEditForm({
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit, focusFirstError)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="space-y-1">
+                <div className="space-y-1">
                   <Label className="text-muted-foreground">Name (read-only)</Label>
                   <Input value={stream.config.name} disabled />
-                </label>
+                </div>
 
-                <label className="space-y-1">
+                <div className="space-y-1">
                   <Label className="text-muted-foreground">Storage (read-only)</Label>
                   <Input value={stream.config.storage || 'file'} disabled />
-                </label>
+                </div>
 
-                <label className="space-y-1 md:col-span-2">
-                  <Label>Subjects (comma-separated)</Label>
-                  <Input {...register('subjects')} placeholder="orders.created, orders.updated" />
+                <div className="space-y-1 md:col-span-2">
+                  <Label htmlFor="edit-subjects">Subjects (comma-separated)</Label>
+                  <Input
+                    id="edit-subjects"
+                    {...register('subjects')}
+                    placeholder="orders.created, orders.updated"
+                  />
                   {errors.subjects && (
                     <p className="text-xs text-destructive">{errors.subjects.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1 md:col-span-2">
-                  <Label>Description</Label>
-                  <Input {...register('description')} placeholder="Optional description" />
-                </label>
+                <div className="space-y-1 md:col-span-2">
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Input
+                    id="edit-description"
+                    {...register('description')}
+                    placeholder="Optional description"
+                  />
+                </div>
 
                 <div className="space-y-1">
                   <Label htmlFor="edit-retention">Retention</Label>
@@ -321,53 +329,53 @@ function StreamEditForm({
                   />
                 </div>
 
-                <label className="space-y-1">
-                  <Label>Max Consumers (-1 = unlimited)</Label>
-                  <Input type="number" {...register('max_consumers')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-max-consumers">Max Consumers (-1 = unlimited)</Label>
+                  <Input id="edit-max-consumers" type="number" {...register('max_consumers')} />
                   {errors.max_consumers && (
                     <p className="text-xs text-destructive">{errors.max_consumers.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Max Messages (-1 = unlimited)</Label>
-                  <Input type="number" {...register('max_msgs')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-max-messages">Max Messages (-1 = unlimited)</Label>
+                  <Input id="edit-max-messages" type="number" {...register('max_msgs')} />
                   {errors.max_msgs && (
                     <p className="text-xs text-destructive">{errors.max_msgs.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Max Bytes (-1 = unlimited)</Label>
-                  <Input type="number" {...register('max_bytes')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-max-bytes">Max Bytes (-1 = unlimited)</Label>
+                  <Input id="edit-max-bytes" type="number" {...register('max_bytes')} />
                   {errors.max_bytes && (
                     <p className="text-xs text-destructive">{errors.max_bytes.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Max Age (seconds, 0 = unlimited)</Label>
-                  <Input type="number" {...register('max_age')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-max-age">Max Age (seconds, 0 = unlimited)</Label>
+                  <Input id="edit-max-age" type="number" {...register('max_age')} />
                   {errors.max_age && (
                     <p className="text-xs text-destructive">{errors.max_age.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Max Message Size (-1 = unlimited)</Label>
-                  <Input type="number" {...register('max_msg_size')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-max-msg-size">Max Message Size (-1 = unlimited)</Label>
+                  <Input id="edit-max-msg-size" type="number" {...register('max_msg_size')} />
                   {errors.max_msg_size && (
                     <p className="text-xs text-destructive">{errors.max_msg_size.message}</p>
                   )}
-                </label>
+                </div>
 
-                <label className="space-y-1">
-                  <Label>Replicas</Label>
-                  <Input type="number" min={1} {...register('replicas')} />
+                <div className="space-y-1">
+                  <Label htmlFor="edit-replicas">Replicas</Label>
+                  <Input id="edit-replicas" type="number" min={1} {...register('replicas')} />
                   {errors.replicas && (
                     <p className="text-xs text-destructive">{errors.replicas.message}</p>
                   )}
-                </label>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2">
@@ -695,9 +703,10 @@ export default function StreamsPage() {
                 </Select>
               </div>
 
-              <label className="space-y-1">
-                <Label>Max Consumers (-1 = unlimited)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="create-max-consumers">Max Consumers (-1 = unlimited)</Label>
                 <Input
+                  id="create-max-consumers"
                   type="number"
                   value={createForm.max_consumers}
                   onChange={(event) =>
@@ -707,33 +716,36 @@ export default function StreamsPage() {
                     }))
                   }
                 />
-              </label>
+              </div>
 
-              <label className="space-y-1">
-                <Label>Max Messages (-1 = unlimited)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="create-max-messages">Max Messages (-1 = unlimited)</Label>
                 <Input
+                  id="create-max-messages"
                   type="number"
                   value={createForm.max_msgs}
                   onChange={(event) =>
                     setCreateForm((prev) => ({ ...prev, max_msgs: Number(event.target.value) }))
                   }
                 />
-              </label>
+              </div>
 
-              <label className="space-y-1">
-                <Label>Max Bytes (-1 = unlimited)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="create-max-bytes">Max Bytes (-1 = unlimited)</Label>
                 <Input
+                  id="create-max-bytes"
                   type="number"
                   value={createForm.max_bytes}
                   onChange={(event) =>
                     setCreateForm((prev) => ({ ...prev, max_bytes: Number(event.target.value) }))
                   }
                 />
-              </label>
+              </div>
 
-              <label className="space-y-1">
-                <Label>Max Age (seconds, 0 = unlimited)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="create-max-age">Max Age (seconds, 0 = unlimited)</Label>
                 <Input
+                  id="create-max-age"
                   type="number"
                   min={0}
                   value={createForm.max_age}
@@ -741,11 +753,12 @@ export default function StreamsPage() {
                     setCreateForm((prev) => ({ ...prev, max_age: Number(event.target.value) }))
                   }
                 />
-              </label>
+              </div>
 
-              <label className="space-y-1">
-                <Label>Max Message Size (-1 = unlimited)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="create-max-msg-size">Max Message Size (-1 = unlimited)</Label>
                 <Input
+                  id="create-max-msg-size"
                   type="number"
                   value={createForm.max_msg_size}
                   onChange={(event) =>
@@ -755,11 +768,12 @@ export default function StreamsPage() {
                     }))
                   }
                 />
-              </label>
+              </div>
 
-              <label className="space-y-1">
-                <Label>Duplicate Window (seconds)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="create-duplicate-window">Duplicate Window (seconds)</Label>
                 <Input
+                  id="create-duplicate-window"
                   type="number"
                   min={0}
                   value={createForm.duplicate_window}
@@ -770,11 +784,12 @@ export default function StreamsPage() {
                     }))
                   }
                 />
-              </label>
+              </div>
 
-              <label className="space-y-1">
-                <Label>Replicas</Label>
+              <div className="space-y-1">
+                <Label htmlFor="create-replicas">Replicas</Label>
                 <Input
+                  id="create-replicas"
                   type="number"
                   min={1}
                   value={createForm.replicas}
@@ -782,7 +797,7 @@ export default function StreamsPage() {
                     setCreateForm((prev) => ({ ...prev, replicas: Number(event.target.value) }))
                   }
                 />
-              </label>
+              </div>
 
               <div className="flex items-center gap-2 pt-6">
                 <Checkbox

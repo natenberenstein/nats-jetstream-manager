@@ -7,6 +7,7 @@ import { MessageData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -247,13 +248,17 @@ export function DiffViewerModal({
                 <SelectItem value="json">JSON path</SelectItem>
               </SelectContent>
             </Select>
-            <label className="flex items-center gap-2 text-sm">
+            <Label
+              htmlFor="diff-changed-only"
+              className="flex items-center gap-2 text-sm font-normal"
+            >
               <Checkbox
+                id="diff-changed-only"
                 checked={showChangedOnly}
                 onCheckedChange={(checked) => setShowChangedOnly(checked === true)}
               />
               Changed only
-            </label>
+            </Label>
             {diffBusy && (
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                 <Loader2 className="w-3 h-3 animate-spin" />
