@@ -26,8 +26,20 @@ import {
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import { buildConsumerMessagesHref } from '@/lib/consumer-messages';
 import Link from 'next/link';
-import { Plus, Trash2, Pencil, Copy, MessageSquare } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Info,
+  MessageSquare,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import { focusFirstError } from '@/lib/form-utils';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
@@ -99,14 +111,34 @@ function healthBadgeVariant(
 
 function ConsumerHealthBadge({ diagnostic }: { diagnostic?: ConsumerDiagnostic }) {
   if (!diagnostic) {
-    return <Badge variant="outline">Unknown</Badge>;
+    return (
+      <Badge variant="outline" className="gap-1 rounded-md">
+        <Info className="h-3 w-3" />
+        Unknown
+      </Badge>
+    );
   }
 
+  const Icon =
+    diagnostic.severity === 'ok'
+      ? CheckCircle2
+      : diagnostic.severity === 'info'
+        ? Info
+        : AlertTriangle;
+
   return (
-    <Badge variant={healthBadgeVariant(diagnostic.severity)}>
+    <Badge variant={healthBadgeVariant(diagnostic.severity)} className="gap-1 rounded-md">
+      <Icon className="h-3 w-3" />
       {HEALTH_LABELS[diagnostic.severity]}
     </Badge>
   );
+}
+
+function consumerRowClass(diagnostic?: ConsumerDiagnostic) {
+  if (diagnostic?.severity === 'critical') return 'border-l-destructive bg-destructive/5';
+  if (diagnostic?.severity === 'warning') return 'border-l-warning bg-warning/5';
+  if (diagnostic?.severity === 'ok') return 'border-l-success';
+  return 'border-l-muted';
 }
 
 function ConsumerLagChart({ metrics }: { metrics: ConsumerMetricsResponse[] }) {
@@ -969,18 +1001,40 @@ export default function ConsumersPage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <StatCard label="Consumers" value={healthSummary.total} isLoading={isLoading} />
-        <StatCard label="Pending" value={healthSummary.totalPending} isLoading={isLoading} />
-        <StatCard label="Ack Pending" value={healthSummary.totalAckPending} isLoading={isLoading} />
+        <StatCard
+          label="Consumers"
+          value={healthSummary.total}
+          icon={Users}
+          metric="consumers"
+          isLoading={isLoading}
+        />
+        <StatCard
+          label="Pending"
+          value={healthSummary.totalPending}
+          icon={MessageSquare}
+          metric="pending"
+          isLoading={isLoading}
+        />
+        <StatCard
+          label="Ack Pending"
+          value={healthSummary.totalAckPending}
+          icon={Clock}
+          metric="pending"
+          isLoading={isLoading}
+        />
         <StatCard
           label="Critical"
           value={healthSummary.critical}
+          icon={AlertTriangle}
+          metric="critical"
           isLoading={isLoading}
           tone={healthSummary.critical > 0 ? 'destructive' : 'default'}
         />
         <StatCard
           label="Warnings"
           value={healthSummary.warning}
+          icon={AlertTriangle}
+          metric="warning"
           isLoading={isLoading}
           tone={healthSummary.warning > 0 ? 'warning' : 'default'}
         />
@@ -1414,7 +1468,7 @@ export default function ConsumersPage() {
           </CardContent>
         ) : isLoading ? (
           <CardContent className="p-0">
-            <TableSkeleton rows={6} columns={8} />
+            <TableSkeleton rows={6} columns={12} />
           </CardContent>
         ) : filteredConsumers.length > 0 ? (
           <CardContent className="p-0">
@@ -1437,6 +1491,7 @@ export default function ConsumersPage() {
                   <TableHead>Ack Wait</TableHead>
                   <TableHead>Health</TableHead>
                   <TableHead>Pending</TableHead>
+                  <TableHead>Ack Pending</TableHead>
                   <TableHead>Waiting</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -1449,7 +1504,13 @@ export default function ConsumersPage() {
                     const diagnostic = diagnosticsByName.get(consumer.name);
                     return (
                       <Fragment key={consumer.name}>
-                        <TableRow>
+                        <TableRow
+                          className={cn(
+                            'border-l-4',
+                            consumerRowClass(diagnostic),
+                            consumer.num_pending > 0 && !diagnostic && 'bg-warning/5',
+                          )}
+                        >
                           <TableCell>
                             <Checkbox
                               checked={selectedConsumers.has(consumer.name)}
@@ -1464,12 +1525,38 @@ export default function ConsumersPage() {
                               {consumer.name}
                             </Link>
                           </TableCell>
-                          <TableCell>{consumer.config.durable_name || '-'}</TableCell>
+                          <TableCell>
+                            {consumer.config.durable_name ? (
+                              <Badge
+                                variant="outline"
+                                className="rounded-md"
+                                title={consumer.config.durable_name}
+                              >
+                                <span className="max-w-[180px] truncate">
+                                  {consumer.config.durable_name}
+                                </span>
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <SubjectChip subject={consumer.config.filter_subject} />
                           </TableCell>
-                          <TableCell>{consumer.config.ack_policy || '-'}</TableCell>
-                          <TableCell>{formatNsToSeconds(consumer.config.ack_wait)}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="rounded-md border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+                            >
+                              {consumer.config.ack_policy || '-'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="gap-1 rounded-md">
+                              <Clock className="h-3 w-3" />
+                              {formatNsToSeconds(consumer.config.ack_wait)}
+                            </Badge>
+                          </TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               <ConsumerHealthBadge diagnostic={diagnostic} />
@@ -1480,8 +1567,40 @@ export default function ConsumersPage() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{consumer.num_pending}</TableCell>
-                          <TableCell>{consumer.num_waiting}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'gap-1 rounded-md',
+                                consumer.num_pending > 0
+                                  ? 'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300'
+                                  : 'border-success/30 bg-success/10 text-success',
+                              )}
+                            >
+                              <MessageSquare className="h-3 w-3" />
+                              {consumer.num_pending}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'gap-1 rounded-md',
+                                consumer.num_ack_pending > 0
+                                  ? 'border-warning/30 bg-warning/10 text-warning'
+                                  : 'border-success/30 bg-success/10 text-success',
+                              )}
+                            >
+                              <Clock className="h-3 w-3" />
+                              {consumer.num_ack_pending}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="gap-1 rounded-md">
+                              <Users className="h-3 w-3" />
+                              {consumer.num_waiting}
+                            </Badge>
+                          </TableCell>
                           <TableCell>{formatDate(consumer.created)}</TableCell>
                           <TableCell className="text-right space-x-1">
                             <Button
