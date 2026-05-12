@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.8.0...v1.8.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* toggle latest message sorting ([b1c240b](https://github.com/natenberenstein/nats-jetstream-manager/commit/b1c240b0b1aa5e36c79f048a2bc7bbdba38ed97d))
+* toggle latest message sorting ([72236fe](https://github.com/natenberenstein/nats-jetstream-manager/commit/72236fe10a985cfc515076c8245255b5254050a5))
+
 ## [1.8.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.7.0...v1.8.0) (2026-05-12)
 
 
