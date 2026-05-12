@@ -2,6 +2,7 @@
 
 import { Save } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,15 +42,27 @@ export function ViewControls({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">View Controls</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-lg">View Controls</CardTitle>
+          <Badge variant={savedViews.length > 0 ? 'secondary' : 'outline'} className="rounded-md">
+            {savedViews.length > 0
+              ? `${savedViews.length} saved view${savedViews.length === 1 ? '' : 's'}`
+              : 'No saved views'}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent className="grid grid-cols-1 lg:grid-cols-5 gap-3">
         <div className="space-y-1 lg:col-span-2">
           <Label>Saved Views</Label>
           <div className="flex gap-2">
-            <Select onValueChange={(value) => value && onApplyView(value)}>
+            <Select
+              onValueChange={(value) => value && onApplyView(value)}
+              disabled={savedViews.length === 0}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select a saved view" />
+                <SelectValue
+                  placeholder={savedViews.length > 0 ? 'Select a saved view' : 'No saved views'}
+                />
               </SelectTrigger>
               <SelectContent>
                 {savedViews.map((view) => (

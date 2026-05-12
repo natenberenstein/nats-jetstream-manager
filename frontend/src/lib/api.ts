@@ -286,6 +286,7 @@ export const messageApi = {
       seqEnd,
       includePayload = false,
       previewBytes = 1024,
+      scanLimit,
       fromLatest = false,
       filterSubject,
       headerKey,
@@ -300,6 +301,7 @@ export const messageApi = {
     if (seqEnd) searchParams.append('seq_end', seqEnd.toString());
     searchParams.append('include_payload', includePayload ? 'true' : 'false');
     searchParams.append('preview_bytes', previewBytes.toString());
+    if (scanLimit) searchParams.append('scan_limit', scanLimit.toString());
     searchParams.append('from_latest', fromLatest ? 'true' : 'false');
     if (filterSubject) searchParams.append('filter_subject', filterSubject);
     if (headerKey) searchParams.append('header_key', headerKey);
@@ -584,6 +586,7 @@ export interface GetMessagesParams {
   seqEnd?: number;
   includePayload?: boolean;
   previewBytes?: number;
+  scanLimit?: number;
   fromLatest?: boolean;
   filterSubject?: string;
   headerKey?: string;

@@ -40,6 +40,7 @@ const MESSAGE_BOOKMARKS_KEY = 'nats_message_bookmarks_v1';
 
 type WorkspaceMode = 'browse' | 'publish' | 'tools' | 'remediate';
 type RemediationContext = 'pending' | 'ack-pending' | 'general';
+type MessageFilterKey = 'subject' | 'payload' | 'header' | 'date' | 'sequence';
 
 const DATE_PRESET_LABELS: Record<MessageDatePreset, string> = {
   all: 'Any time',
@@ -50,8 +51,27 @@ const DATE_PRESET_LABELS: Record<MessageDatePreset, string> = {
   custom: 'Custom range',
 };
 
+const MESSAGE_DATE_PRESETS = new Set<MessageDatePreset>([
+  'all',
+  'today',
+  '24h',
+  '7d',
+  '30d',
+  'custom',
+]);
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function isMessageDatePreset(value: string | null): value is MessageDatePreset {
+  return Boolean(value && MESSAGE_DATE_PRESETS.has(value as MessageDatePreset));
+}
+
+function parsePositiveInteger(value: string | null): number | undefined {
+  if (!value || !/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function normalizeRemediationContext(value: string | null): RemediationContext {
@@ -111,6 +131,17 @@ function parseDateRange(from: string | null, to: string | null): DateRange | und
   };
 }
 
+function dateValue(range: DateRange | undefined, key: 'from' | 'to'): number | undefined {
+  return range?.[key]?.getTime();
+}
+
+function areDateRangesEqual(left: DateRange | undefined, right: DateRange | undefined): boolean {
+  return (
+    dateValue(left, 'from') === dateValue(right, 'from') &&
+    dateValue(left, 'to') === dateValue(right, 'to')
+  );
+}
+
 export default function MessagesPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -145,6 +176,7 @@ export default function MessagesPage() {
   const [focusWindow, setFocusWindow] = useState<'pending' | 'ack_pending' | ''>('');
 
   const [liveMode, setLiveMode] = useState(false);
+  const [latestMode, setLatestMode] = useState(false);
   const [liveIntervalMs, setLiveIntervalMs] = useState(2000);
   const [autoScroll, setAutoScroll] = useState(true);
 
@@ -231,21 +263,32 @@ export default function MessagesPage() {
     const focusFromQuery = searchParams.get('focus');
     const consumerFromQuery = searchParams.get('consumer');
 
-    if (streamFromQuery) setSelectedStream(streamFromQuery);
-    if (limitFromQuery) setLimit(Number(limitFromQuery));
+    if (streamFromQuery)
+      setSelectedStream((current) => (current === streamFromQuery ? current : streamFromQuery));
+    const parsedLimit = parsePositiveInteger(limitFromQuery);
+    if (parsedLimit) setLimit((current) => (current === parsedLimit ? current : parsedLimit));
     if (liveFromQuery) setLiveMode(liveFromQuery === '1');
     if (filterSubjectFromQuery) setFilterSubject(filterSubjectFromQuery);
     if (headerKeyFromQuery) setHeaderKey(headerKeyFromQuery);
     if (headerValueFromQuery) setHeaderValue(headerValueFromQuery);
     if (payloadContainsFromQuery) setPayloadContains(payloadContainsFromQuery);
-    if (seqStartFromQuery) setSeqStart(Number(seqStartFromQuery));
-    if (seqEndFromQuery) setSeqEnd(Number(seqEndFromQuery));
+    const parsedSeqStart = parsePositiveInteger(seqStartFromQuery);
+    const parsedSeqEnd = parsePositiveInteger(seqEndFromQuery);
+    if (parsedSeqStart) {
+      setSeqStart((current) => (current === parsedSeqStart ? current : parsedSeqStart));
+    }
+    if (parsedSeqEnd) {
+      setSeqEnd((current) => (current === parsedSeqEnd ? current : parsedSeqEnd));
+    }
     if (fromTimeFromQuery || toTimeFromQuery) {
-      setDateRange(parseDateRange(fromTimeFromQuery, toTimeFromQuery));
-      setDatePreset(datePresetFromQuery ?? 'custom');
-    } else if (datePresetFromQuery && datePresetFromQuery !== 'all') {
-      setDatePreset(datePresetFromQuery);
-      setDateRange(dateRangeForPreset(datePresetFromQuery));
+      const nextRange = parseDateRange(fromTimeFromQuery, toTimeFromQuery);
+      const nextPreset = isMessageDatePreset(datePresetFromQuery) ? datePresetFromQuery : 'custom';
+      setDateRange((current) => (areDateRangesEqual(current, nextRange) ? current : nextRange));
+      setDatePreset((current) => (current === nextPreset ? current : nextPreset));
+    } else if (isMessageDatePreset(datePresetFromQuery) && datePresetFromQuery !== 'all') {
+      const nextRange = dateRangeForPreset(datePresetFromQuery);
+      setDatePreset((current) => (current === datePresetFromQuery ? current : datePresetFromQuery));
+      setDateRange((current) => (areDateRangesEqual(current, nextRange) ? current : nextRange));
     }
     const remediationFromQuery = searchParams.get('remediation');
     if (remediationFromQuery) {
@@ -301,7 +344,12 @@ export default function MessagesPage() {
     if (normalizedRange?.to) params.set('to_time', normalizedRange.to.toISOString());
     if (focusConsumer) params.set('consumer', focusConsumer);
     if (focusWindow) params.set('focus', focusWindow);
-    window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
+    const query = params.toString();
+    const nextUrl = query ? `${pathname}?${query}` : pathname;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (currentUrl !== nextUrl) {
+      window.history.replaceState(null, '', nextUrl);
+    }
   }, [
     selectedStream,
     selectedConsumerName,
@@ -355,7 +403,7 @@ export default function MessagesPage() {
       limit,
       seqStart,
       seqEnd,
-      fromLatest: liveMode || seqStart === undefined,
+      fromLatest: liveMode || latestMode,
       filterSubject: filterSubject || undefined,
       headerKey: headerKey || undefined,
       headerValue: headerValue || undefined,
@@ -363,12 +411,14 @@ export default function MessagesPage() {
       fromTime: normalizedRange?.from?.toISOString(),
       toTime: normalizedRange?.to?.toISOString(),
       previewBytes: 2048,
+      scanLimit: Math.min(Math.max(limit * 30, 2000), 10000),
     };
   }, [
     limit,
     seqStart,
     seqEnd,
     liveMode,
+    latestMode,
     filterSubject,
     headerKey,
     headerValue,
@@ -379,6 +429,7 @@ export default function MessagesPage() {
   const {
     data: messagesData,
     isLoading,
+    isFetching,
     isError,
     error: messagesError,
     refetch,
@@ -486,13 +537,18 @@ export default function MessagesPage() {
 
   // --- Handlers ---
 
+  const resetMessageCursor = () => {
+    setSeqStart(undefined);
+    setSeqEnd(undefined);
+    setCursorHistory([]);
+  };
+
   const handleSelectStream = (streamName: string) => {
     setSelectedStream(streamName);
     setSelectedConsumerName('');
     setRemediationContext('general');
-    setSeqStart(undefined);
-    setSeqEnd(undefined);
-    setCursorHistory([]);
+    setLatestMode(false);
+    resetMessageCursor();
     setLoadedPayloads({});
     setExpandedPayloads({});
     setPayloadLoading({});
@@ -502,6 +558,20 @@ export default function MessagesPage() {
     if (selected?.config?.subjects?.[0]) {
       setSubject(selected.config.subjects[0]);
       setReplaySubject(selected.config.subjects[0]);
+    }
+  };
+
+  const handleLatestMessages = () => {
+    const nextLatestMode = !latestMode;
+    const shouldRefetchCurrentPage =
+      liveMode && nextLatestMode && seqStart === undefined && seqEnd === undefined;
+
+    setLiveMode(false);
+    setLatestMode(nextLatestMode);
+    resetMessageCursor();
+
+    if (shouldRefetchCurrentPage) {
+      void refetch();
     }
   };
 
@@ -538,7 +608,7 @@ export default function MessagesPage() {
 
   const handleNextPage = () => {
     if (!messagesData?.next_seq) return;
-    const fromLatest = liveMode || seqStart === undefined;
+    const fromLatest = liveMode || latestMode;
     setCursorHistory((prev) => [...prev, fromLatest ? seqEnd : seqStart]);
     if (fromLatest) {
       setSeqEnd(messagesData.next_seq || undefined);
@@ -552,7 +622,7 @@ export default function MessagesPage() {
     const previous = [...cursorHistory];
     const previousSeq = previous.pop();
     setCursorHistory(previous);
-    if (liveMode || seqStart === undefined) {
+    if (liveMode || latestMode) {
       setSeqEnd(previousSeq);
     } else {
       setSeqStart(previousSeq);
@@ -575,23 +645,44 @@ export default function MessagesPage() {
     const seqRange = last_seq - first_seq + 1;
     const totalPages = Math.ceil(messagesData.total / limit);
     // Estimate sequence for the target page proportionally across the seq range
-    const targetSeq = Math.round(first_seq + ((page - 1) / totalPages) * seqRange);
+    const targetSeq = latestMode
+      ? Math.round(last_seq - ((page - 1) / totalPages) * seqRange)
+      : Math.round(first_seq + ((page - 1) / totalPages) * seqRange);
     const clampedSeq = Math.max(first_seq, Math.min(targetSeq, last_seq));
     // Build a synthetic cursor history so "Prev" goes back to page 1
     const history: Array<number | undefined> = [undefined];
     for (let p = 2; p < page; p++) {
-      const hSeq = Math.round(first_seq + ((p - 1) / totalPages) * seqRange);
+      const hSeq = latestMode
+        ? Math.round(last_seq - ((p - 1) / totalPages) * seqRange)
+        : Math.round(first_seq + ((p - 1) / totalPages) * seqRange);
       history.push(Math.max(first_seq, Math.min(hSeq, last_seq)));
     }
     setCursorHistory(history);
-    setSeqStart(clampedSeq);
+    if (latestMode) {
+      setSeqStart(undefined);
+      setSeqEnd(clampedSeq);
+    } else {
+      setSeqStart(clampedSeq);
+      setSeqEnd(undefined);
+    }
   };
 
   const handleGoToSequence = (seq: number) => {
     setLiveMode(false);
+    setLatestMode(false);
     setCursorHistory([]);
     setSeqStart(seq);
     setSeqEnd(undefined);
+  };
+
+  const handleSequenceRangeChange = (start: number | undefined, end: number | undefined) => {
+    setLiveMode(false);
+    setLatestMode(false);
+    setCursorHistory([]);
+    setSeqStart(start);
+    setSeqEnd(end);
+    setFocusConsumer('');
+    setFocusWindow('');
   };
 
   const handleLoadPayload = async (seq: number) => {
@@ -737,25 +828,39 @@ export default function MessagesPage() {
 
   const handleLimitChange = (newLimit: number) => {
     setLimit(newLimit);
-    setSeqStart(undefined);
-    setSeqEnd(undefined);
-    setCursorHistory([]);
+    resetMessageCursor();
   };
 
   const handleDatePresetChange = (preset: MessageDatePreset) => {
     setDatePreset(preset);
     setDateRange(dateRangeForPreset(preset));
-    setCursorHistory([]);
-    setSeqStart(undefined);
-    setSeqEnd(undefined);
+    resetMessageCursor();
   };
 
   const handleDateRangeChange = (range: DateRange | undefined) => {
     setDatePreset(range?.from ? 'custom' : 'all');
     setDateRange(range);
-    setCursorHistory([]);
-    setSeqStart(undefined);
-    setSeqEnd(undefined);
+    resetMessageCursor();
+  };
+
+  const handleFilterSubjectChange = (value: string) => {
+    setFilterSubject(value);
+    resetMessageCursor();
+  };
+
+  const handleHeaderKeyChange = (value: string) => {
+    setHeaderKey(value);
+    resetMessageCursor();
+  };
+
+  const handleHeaderValueChange = (value: string) => {
+    setHeaderValue(value);
+    resetMessageCursor();
+  };
+
+  const handlePayloadContainsChange = (value: string) => {
+    setPayloadContains(value);
+    resetMessageCursor();
   };
 
   const clearMessageFilters = () => {
@@ -769,7 +874,33 @@ export default function MessagesPage() {
     setSeqEnd(undefined);
     setFocusConsumer('');
     setFocusWindow('');
-    setCursorHistory([]);
+    resetMessageCursor();
+  };
+
+  const clearMessageFilter = (filter: MessageFilterKey) => {
+    switch (filter) {
+      case 'subject':
+        setFilterSubject('');
+        break;
+      case 'payload':
+        setPayloadContains('');
+        break;
+      case 'header':
+        setHeaderKey('');
+        setHeaderValue('');
+        break;
+      case 'date':
+        setDatePreset('all');
+        setDateRange(undefined);
+        break;
+      case 'sequence':
+        setSeqStart(undefined);
+        setSeqEnd(undefined);
+        setFocusConsumer('');
+        setFocusWindow('');
+        setCursorHistory([]);
+        break;
+    }
   };
 
   const toggleFavoriteStream = () => {
@@ -798,6 +929,13 @@ export default function MessagesPage() {
     if (headerValue) params.set('header_value', headerValue);
     if (payloadContains) params.set('payload_contains', payloadContains);
     if (seqStart) params.set('seq_start', String(seqStart));
+    if (seqEnd) params.set('seq_end', String(seqEnd));
+    if (datePreset !== 'all') params.set('date_preset', datePreset);
+    const normalizedRange = normalizeDateRange(dateRange);
+    if (normalizedRange?.from) params.set('from_time', normalizedRange.from.toISOString());
+    if (normalizedRange?.to) params.set('to_time', normalizedRange.to.toISOString());
+    if (focusConsumer) params.set('consumer', focusConsumer);
+    if (focusWindow) params.set('focus', focusWindow);
     const nextViews = [
       ...savedViews.filter((v) => v.name !== name),
       { name, query: Object.fromEntries(params) },
@@ -914,12 +1052,16 @@ export default function MessagesPage() {
     <MessageList
       className={className}
       selectedStream={selectedStream}
+      streamNames={streamNames}
+      consumers={consumers}
       messagesData={messagesData}
       isLoading={isLoading}
+      isFetching={isFetching}
       isError={isError}
       messagesError={messagesError}
       maskSensitive={maskSensitive}
       liveMode={liveMode}
+      latestMode={latestMode}
       limit={limit}
       seqStart={seqStart}
       seqEnd={seqEnd}
@@ -947,6 +1089,8 @@ export default function MessagesPage() {
       diffMessagesCount={diffMessages.length}
       listContainerRef={listContainerRef}
       onLimitChange={handleLimitChange}
+      onSelectStream={handleSelectStream}
+      onLatestMessages={handleLatestMessages}
       onLiveModeChange={setLiveMode}
       onLiveIntervalChange={setLiveIntervalMs}
       onRefetch={refetch}
@@ -965,12 +1109,14 @@ export default function MessagesPage() {
         void handleDeleteStreamMessage(message.seq);
       }}
       onShowDiffViewer={() => setShowDiffViewer(true)}
-      onFilterSubjectChange={setFilterSubject}
-      onHeaderKeyChange={setHeaderKey}
-      onHeaderValueChange={setHeaderValue}
-      onPayloadContainsChange={setPayloadContains}
+      onFilterSubjectChange={handleFilterSubjectChange}
+      onHeaderKeyChange={handleHeaderKeyChange}
+      onHeaderValueChange={handleHeaderValueChange}
+      onPayloadContainsChange={handlePayloadContainsChange}
       onDatePresetChange={handleDatePresetChange}
       onDateRangeChange={handleDateRangeChange}
+      onSequenceRangeChange={handleSequenceRangeChange}
+      onClearFilter={clearMessageFilter}
       onClearFilters={clearMessageFilters}
       onShowHeadersColChange={setShowHeadersCol}
       onShowSizeColChange={setShowSizeCol}

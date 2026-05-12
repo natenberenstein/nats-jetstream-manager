@@ -65,6 +65,8 @@ const REMEDIATION_SESSION_TTL_MS = 2 * 60 * 1000;
 const MAX_REMEDIATION_BATCH_SIZE = 100;
 const DEFAULT_REMEDIATION_FETCH_EXPIRES_MS = 1000;
 const DEFAULT_REMEDIATION_ACK_TIMEOUT_MS = 2000;
+const DEFAULT_MESSAGE_SCAN_LIMIT = 2000;
+const MAX_MESSAGE_SCAN_LIMIT = 10000;
 
 /**
  * Convert a NATS subject pattern (with wildcards) to a RegExp.
@@ -204,6 +206,7 @@ export class MessagesService {
       seq_end,
       include_payload = true,
       preview_bytes,
+      scan_limit,
       from_latest = false,
       filter_subject,
       header_key,
@@ -214,6 +217,10 @@ export class MessagesService {
     } = query;
     const fromTimeMs = parseOptionalTime(from_time);
     const toTimeMs = parseOptionalTime(to_time);
+    const scanLimit = Math.min(
+      Math.max(scan_limit ?? Math.max(limit * 20, DEFAULT_MESSAGE_SCAN_LIMIT), limit),
+      MAX_MESSAGE_SCAN_LIMIT,
+    );
 
     // Get stream info to know the sequence range
     const streamInfo = await jsm.streams.info(streamName);
@@ -222,7 +229,14 @@ export class MessagesService {
     const totalMessages = streamInfo.state.messages;
 
     if (totalMessages === 0) {
-      return { messages: [], total: 0, has_more: false, next_seq: null };
+      return {
+        messages: [],
+        total: 0,
+        has_more: false,
+        next_seq: null,
+        scanned: 0,
+        scan_limit: scanLimit,
+      };
     }
 
     // Determine the iteration range
@@ -232,7 +246,7 @@ export class MessagesService {
     if (from_latest) {
       // Work backwards from the end
       endSeq = seq_end ?? lastSeq;
-      startSeq = Math.max(firstSeq, endSeq - limit * 2 + 1); // over-fetch for filtering
+      startSeq = seq_start ?? firstSeq;
     } else {
       startSeq = seq_start ?? firstSeq;
       endSeq = seq_end ?? lastSeq;
@@ -250,14 +264,16 @@ export class MessagesService {
 
     const messages: MessageDataDto[] = [];
     let nextSeq: number | null = null;
+    let scanned = 0;
 
     if (from_latest) {
       // Iterate backwards
-      for (let seq = endSeq; seq >= startSeq && messages.length < limit; seq--) {
+      let cursor = endSeq;
+      while (cursor >= startSeq && messages.length < limit && scanned < scanLimit) {
         const msg = await this.fetchAndFilterMessage(
           jsm,
           streamName,
-          seq,
+          cursor,
           include_payload,
           preview_bytes,
           subjectRegex,
@@ -270,17 +286,18 @@ export class MessagesService {
         if (msg) {
           messages.push(msg);
         }
+        scanned += 1;
+        cursor -= 1;
       }
-      // Reverse so messages are in ascending order
-      messages.reverse();
-      nextSeq = startSeq > firstSeq ? startSeq - 1 : null;
+      nextSeq = cursor >= startSeq ? cursor : null;
     } else {
       // Iterate forwards
-      for (let seq = startSeq; seq <= endSeq && messages.length < limit; seq++) {
+      let cursor = startSeq;
+      while (cursor <= endSeq && messages.length < limit && scanned < scanLimit) {
         const msg = await this.fetchAndFilterMessage(
           jsm,
           streamName,
-          seq,
+          cursor,
           include_payload,
           preview_bytes,
           subjectRegex,
@@ -293,10 +310,11 @@ export class MessagesService {
         if (msg) {
           messages.push(msg);
         }
+        scanned += 1;
+        cursor += 1;
       }
-      // Determine if there are more messages after our last fetched seq
-      const lastFetchedSeq = messages.length > 0 ? messages[messages.length - 1].seq : endSeq;
-      nextSeq = lastFetchedSeq < lastSeq ? lastFetchedSeq + 1 : null;
+      // Continue from the next unscanned sequence, even when filters matched no messages.
+      nextSeq = cursor <= endSeq ? cursor : null;
     }
 
     return {
@@ -306,6 +324,10 @@ export class MessagesService {
       next_seq: nextSeq,
       first_seq: firstSeq,
       last_seq: lastSeq,
+      scanned,
+      scan_limit: scanLimit,
+      range_start: startSeq,
+      range_end: endSeq,
     };
   }
 

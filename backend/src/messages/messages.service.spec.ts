@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { JsMsg } from 'nats';
+import { JsMsg, StoredMsg } from 'nats';
 import { MessagesService } from './messages.service';
 import { MessageRemediationAction } from './dto/message.dto';
 
@@ -56,11 +56,28 @@ function createJsMsg(seq: number, payload = `payload-${seq}`) {
   return { msg, ackAck, nak, term, working };
 }
 
+function createStoredMsg(seq: number, subject = `orders.${seq}`, payload = `payload-${seq}`) {
+  return {
+    subject,
+    seq,
+    data: new TextEncoder().encode(payload),
+    header: undefined,
+    time: new Date('2026-01-01T00:00:00.000Z'),
+  } as unknown as StoredMsg;
+}
+
 function createNatsMocks(messages: JsMsg[] = []) {
   const delivery = createDelivery(messages);
   const fetch = jest.fn().mockResolvedValue(delivery);
   const get = jest.fn().mockResolvedValue({ fetch });
   const info = jest.fn().mockResolvedValue({ config: {} });
+  const streamInfo = jest.fn().mockResolvedValue({
+    state: {
+      first_seq: 1,
+      last_seq: 1,
+      messages: 1,
+    },
+  });
   const getMessage = jest.fn().mockResolvedValue({ seq: 1 });
   const deleteMessage = jest.fn().mockResolvedValue(true);
 
@@ -70,16 +87,87 @@ function createNatsMocks(messages: JsMsg[] = []) {
     } as any,
     jsm: {
       consumers: { info },
-      streams: { getMessage, deleteMessage },
+      streams: { info: streamInfo, getMessage, deleteMessage },
     } as any,
     delivery,
     fetch,
     get,
     info,
+    streamInfo,
     getMessage,
     deleteMessage,
   };
 }
+
+describe('MessagesService getMessages', () => {
+  let service: MessagesService;
+
+  beforeEach(() => {
+    service = new MessagesService();
+  });
+
+  it('returns a cursor when a filtered page exhausts the scan window', async () => {
+    const mocks = createNatsMocks();
+    mocks.streamInfo.mockResolvedValue({
+      state: { first_seq: 1, last_seq: 100, messages: 100 },
+    });
+    mocks.getMessage.mockImplementation(async (_stream: string, request: { seq: number }) =>
+      createStoredMsg(request.seq, `orders.${request.seq}`),
+    );
+
+    const result = await service.getMessages(mocks.jsm, 'ORDERS', {
+      limit: 5,
+      scan_limit: 10,
+      filter_subject: 'payments.>',
+    });
+
+    expect(result.messages).toHaveLength(0);
+    expect(result.scanned).toBe(10);
+    expect(result.has_more).toBe(true);
+    expect(result.next_seq).toBe(11);
+  });
+
+  it('returns default messages oldest first', async () => {
+    const mocks = createNatsMocks();
+    mocks.streamInfo.mockResolvedValue({
+      state: { first_seq: 1, last_seq: 10, messages: 10 },
+    });
+    mocks.getMessage.mockImplementation(async (_stream: string, request: { seq: number }) =>
+      createStoredMsg(request.seq, `orders.${request.seq}`),
+    );
+
+    const result = await service.getMessages(mocks.jsm, 'ORDERS', {
+      limit: 2,
+      scan_limit: 2,
+    });
+
+    expect(result.messages.map((message) => message.seq)).toEqual([1, 2]);
+    expect(result.scanned).toBe(2);
+    expect(result.has_more).toBe(true);
+    expect(result.next_seq).toBe(3);
+  });
+
+  it('returns latest messages newest first with the next sequence cursor', async () => {
+    const mocks = createNatsMocks();
+    mocks.streamInfo.mockResolvedValue({
+      state: { first_seq: 1, last_seq: 10, messages: 10 },
+    });
+    mocks.getMessage.mockImplementation(async (_stream: string, request: { seq: number }) =>
+      createStoredMsg(request.seq, `orders.${request.seq}`),
+    );
+
+    const result = await service.getMessages(mocks.jsm, 'ORDERS', {
+      limit: 2,
+      scan_limit: 2,
+      from_latest: true,
+    });
+
+    expect(result.messages.map((message) => message.seq)).toEqual([10, 9]);
+    expect(result.scanned).toBe(2);
+    expect(result.has_more).toBe(true);
+    expect(result.next_seq).toBe(8);
+  });
+});
 
 describe('MessagesService remediation', () => {
   let service: MessagesService;

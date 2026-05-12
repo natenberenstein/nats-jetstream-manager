@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GetMessagesParams, messageApi } from '@/lib/api';
 import {
   MessageDeleteRequest,
@@ -49,6 +49,7 @@ export function useMessages(
     queryFn: () => messageApi.getMessages(connectionId!, streamName!, params),
     enabled: !!connectionId && !!streamName,
     refetchInterval,
+    placeholderData: keepPreviousData,
   });
 }
 
