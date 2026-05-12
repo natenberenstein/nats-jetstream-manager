@@ -174,6 +174,15 @@ export class ValidateSchemaRequestDto {
   schema: JsonSchemaDefinition;
 }
 
+export class BuildIndexRequestDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  limit?: number = 2000;
+}
+
 // ─── Query DTOs ──────────────────────────────────────────────────────────────
 
 export class GetMessagesQueryDto {

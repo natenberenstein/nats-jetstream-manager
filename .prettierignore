@@ -3,6 +3,7 @@ dist
 .next
 out
 coverage
+frontend/next-env.d.ts
 *.min.js
 *.min.css
 pnpm-lock.yaml

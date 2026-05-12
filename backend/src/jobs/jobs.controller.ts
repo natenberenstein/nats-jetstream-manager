@@ -80,12 +80,13 @@ export class JobsController {
     jobId: string,
     conn: ConnectionInfo,
     streamName: string,
-    _limit?: number,
+    limit: number = 2000,
   ): Promise<void> {
     await this.jobsService.updateJob(jobId, {
       status: 'running',
       started_at: new Date(),
       message: `Building search index for stream ${streamName}`,
+      total: limit,
     });
 
     try {
@@ -93,6 +94,7 @@ export class JobsController {
         conn.jsm,
         connectionId,
         streamName,
+        limit,
       );
 
       // Check if cancellation was requested

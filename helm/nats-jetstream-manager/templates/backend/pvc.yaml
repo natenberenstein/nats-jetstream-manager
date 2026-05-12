@@ -1,4 +1,4 @@
-{{- if .Values.backend.persistence.enabled -}}
+{{- if and .Values.backend.persistence.enabled (ne .Values.backend.config.databaseType "postgres") -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

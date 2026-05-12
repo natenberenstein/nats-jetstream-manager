@@ -596,6 +596,7 @@ export class MessagesService {
     jsm: JetStreamManager,
     connectionId: string,
     streamName: string,
+    limit: number = 2000,
   ): Promise<BuildIndexResponseDto> {
     const streamInfo = await jsm.streams.info(streamName);
     const firstSeq = streamInfo.state.first_seq;
@@ -609,8 +610,10 @@ export class MessagesService {
     }
 
     const indexed: IndexedMessage[] = [];
+    const cappedLimit = Math.max(1, Math.floor(limit));
+    const startSeq = Math.max(firstSeq, lastSeq - cappedLimit + 1);
 
-    for (let seq = firstSeq; seq <= lastSeq; seq++) {
+    for (let seq = startSeq; seq <= lastSeq; seq++) {
       try {
         const sm = await jsm.streams.getMessage(streamName, { seq });
         const payload = decodePayload(sm.data);

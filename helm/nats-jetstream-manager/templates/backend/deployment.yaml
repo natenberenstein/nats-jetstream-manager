@@ -64,16 +64,20 @@ spec:
             {{- toYaml .Values.backend.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.backend.securityContext | nindent 12 }}
-          {{- if and .Values.backend.persistence.enabled (ne .Values.backend.config.databaseType "postgres") }}
+          {{- if ne .Values.backend.config.databaseType "postgres" }}
           volumeMounts:
             - name: data
               mountPath: /app/data
           {{- end }}
-      {{- if and .Values.backend.persistence.enabled (ne .Values.backend.config.databaseType "postgres") }}
+      {{- if ne .Values.backend.config.databaseType "postgres" }}
       volumes:
         - name: data
+          {{- if .Values.backend.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "nats-jetstream-manager.fullname" . }}-backend-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
       {{- end }}
       {{- with .Values.backend.nodeSelector }}
       nodeSelector:

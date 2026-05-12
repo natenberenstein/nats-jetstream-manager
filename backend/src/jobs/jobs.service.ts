@@ -86,7 +86,20 @@ export class JobsService {
 
   async updateJob(
     jobId: string,
-    updates: Partial<Pick<Job, 'status' | 'progress' | 'current' | 'total' | 'message' | 'error' | 'result_json' | 'started_at' | 'completed_at'>>,
+    updates: Partial<
+      Pick<
+        Job,
+        | 'status'
+        | 'progress'
+        | 'current'
+        | 'total'
+        | 'message'
+        | 'error'
+        | 'result_json'
+        | 'started_at'
+        | 'completed_at'
+      >
+    >,
   ): Promise<Job> {
     await this.jobRepo.update(jobId, updates);
     return this.jobRepo.findOneByOrFail({ id: jobId });

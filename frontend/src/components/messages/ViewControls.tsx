@@ -80,27 +80,36 @@ export function ViewControls({
         <div className="space-y-1 lg:col-span-3">
           <Label>Quick Toggles</Label>
           <div className="flex items-center gap-4 pt-2">
-            <label className="flex items-center gap-2 text-sm">
+            <Label htmlFor="view-live-tail" className="flex items-center gap-2 text-sm font-normal">
               <Checkbox
+                id="view-live-tail"
                 checked={liveMode}
                 onCheckedChange={(checked) => onLiveModeChange(checked === true)}
               />
               Live tail
-            </label>
-            <label className="flex items-center gap-2 text-sm">
+            </Label>
+            <Label
+              htmlFor="view-auto-scroll"
+              className="flex items-center gap-2 text-sm font-normal"
+            >
               <Checkbox
+                id="view-auto-scroll"
                 checked={autoScroll}
                 onCheckedChange={(checked) => onAutoScrollChange(checked === true)}
               />
               Auto-scroll
-            </label>
-            <label className="flex items-center gap-2 text-sm">
+            </Label>
+            <Label
+              htmlFor="view-mask-sensitive"
+              className="flex items-center gap-2 text-sm font-normal"
+            >
               <Checkbox
+                id="view-mask-sensitive"
                 checked={maskSensitive}
                 onCheckedChange={(checked) => onMaskSensitiveChange(checked === true)}
               />
               Mask sensitive
-            </label>
+            </Label>
           </div>
         </div>
       </CardContent>
