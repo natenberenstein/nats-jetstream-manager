@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.6.0...nats-jetstream-manager-v1.7.0) (2026-05-12)
+
+
+### Features
+
+* refine topology graph filters ([604bd18](https://github.com/natenberenstein/nats-jetstream-manager/commit/604bd189962982f655dbec6caee71f7f24dcad3a))
+* refine topology graph filters ([9621898](https://github.com/natenberenstein/nats-jetstream-manager/commit/9621898225b8368e53c975a8d9812d3afb0fc12f))
+
 ## [1.6.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/nats-jetstream-manager-v1.5.0...nats-jetstream-manager-v1.6.0) (2026-05-12)
 
 
