@@ -1,220 +1,281 @@
 # NATS JetStream Manager
 
-A full-stack web application for managing and monitoring NATS JetStream clusters.
+A full-stack TypeScript web application for managing, inspecting, and monitoring NATS
+JetStream clusters.
 
 ![NATS JetStream Manager](https://img.shields.io/badge/NATS-JetStream-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green)
-![Next.js](https://img.shields.io/badge/Next.js-14-black)
-![React](https://img.shields.io/badge/React-18-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)
+![NestJS](https://img.shields.io/badge/NestJS-11-red)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![React](https://img.shields.io/badge/React-19-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+
+## Overview
+
+NATS JetStream Manager is an npm workspace with two applications:
+
+- `backend/`: NestJS API built on NATS.js, TypeORM, scheduled collectors, Swagger, and pino
+  logging.
+- `frontend/`: Next.js App Router dashboard built with React, Tailwind CSS, shadcn/Radix UI
+  primitives, TanStack Query/Table, Recharts, XYFlow, and Lucide icons.
+
+The app connects to a live NATS server or cluster from the UI/API. The backend keeps active NATS
+connections in memory, so connection IDs are process-local and do not survive backend restarts.
 
 ## Features
 
-### Backend (FastAPI + nats-py)
+### Backend
 
-- **Multi-cluster Support**: Connect to multiple NATS clusters simultaneously
-- **Stream Management**: Full CRUD operations for JetStream streams
-- **Consumer Management**: Create, view, and delete consumers with lag/backlog analytics
-- **Message Operations**: Publish, batch publish, replay, search, and retrieve messages with schema validation
-- **Authentication & RBAC**: User signup/login, role-based access control (Admin/Viewer/User), and invite system
-- **Cluster Overview**: Cluster topology and status monitoring
-- **System Observability**: Aggregate system metrics
-- **Background Jobs**: Async job management for index building and other tasks
-- **Database Flexibility**: SQLAlchemy ORM with support for SQLite (default) and PostgreSQL
-- **Auto-cleanup**: Automatic connection pool management with lifespan handling
-- **API Documentation**: Auto-generated Swagger/ReDoc documentation
+- Connection lifecycle: test, create, list, inspect, and disconnect NATS JetStream connections.
+- Stream operations: create, update, delete, purge, inspect state, and analyze subjects/topology.
+- Consumer operations: create, update, delete, inspect, and view lag/backlog diagnostics.
+- Message tools: publish, batch publish, retrieve, replay, delete, schema validate, and indexed
+  search.
+- Pull-consumer remediation: fetch pending messages and apply ack, nak, term, or working actions.
+- Cluster and system views: topology, account/JetStream details, health checks, and observability
+  signals.
+- Metrics collection: scheduled stream and consumer snapshots with retention cleanup.
+- Health history: scheduled connection checks and uptime summaries.
+- JetStream storage management: KV buckets and object stores.
+- Operations support: background jobs and audit logging for mutating actions.
+- Database support: SQLite by default with PostgreSQL available through TypeORM.
 
-### Frontend (Next.js + TypeScript)
+### Frontend
 
-- **Modern UI**: Clean, responsive interface built with Tailwind CSS and Shadcn/ui components
-- **Real-time Updates**: Auto-refresh with TanStack React Query
-- **Role-based UI**: Admin/Viewer/User interfaces with protected routes
-- **Dashboard**: Cluster stats, stream counts, message volume, and storage at a glance
-- **Message Search**: Full message search and schema validation
-- **Observability**: System metrics and monitoring page
-- **User Management**: Admin panel for users, roles, and invitations
-- **Dark Mode**: Built-in dark mode support
-- **Form Validation**: React Hook Form + Zod for type-safe form handling
-- **Data Tables**: TanStack React Table for sortable, filterable data views
+- Dashboard with sidebar navigation, breadcrumbs, command palette, dark mode, and responsive
+  layouts.
+- Cluster, observability, metrics, and health pages for operational monitoring.
+- Stream, subject, topology, consumer, and message workflows for JetStream inspection and changes.
+- Message payload viewing, publishing, replay, deletion, schema validation, diffing, and
+  remediation controls.
+- KV bucket and object store management.
+- Config diff and audit log views.
+- TanStack Query-based caching and invalidation for backend state.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- Node.js 20+ (for local development)
-- Python 3.11+ (for local development)
+- Node.js 20+
+- npm
+- Docker and Docker Compose, if you want the included local NATS cluster
 
-### Using Docker Compose (Recommended)
+### Run Locally
 
-1. Clone the repository:
+Install dependencies from the repository root:
 
 ```bash
-git clone <repo-url>
-cd nats-jetstream-manager
+npm install
 ```
 
-2. Start all services:
+Start a local three-node NATS JetStream cluster:
 
 ```bash
 docker-compose up -d
 ```
 
-3. Access the application:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Docs: http://localhost:8000/docs
-
-4. Start a NATS server separately (commented out in docker-compose by default):
+Start the backend and frontend:
 
 ```bash
-docker run -p 4222:4222 -p 8222:8222 nats:latest -js -m 8222
-```
-
-5. Connect to NATS:
-   - Open http://localhost:3000
-   - Sign up or log in
-   - Add a connection using `nats://localhost:4222`
-
-### Local Development
-
-#### Backend (with uv)
-
-```bash
-cd backend
-
-# One-time setup (creates venv + installs dev dependencies)
-make setup
-
-# Run the server
-make run
-
-# Or manually:
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev]"
-uvicorn app.main:app --reload
-```
-
-#### Frontend
-
-```bash
-cd frontend
-npm install
 npm run dev
 ```
 
-## API Endpoints
+Open the app and API:
 
-### Authentication & Users
+- Frontend: <http://localhost:3000>
+- Backend API: <http://localhost:8000/api/v1>
+- Swagger docs: <http://localhost:8000/docs>
+- Health check: <http://localhost:8000/health>
 
-| Method | Endpoint                  | Description              |
-| ------ | ------------------------- | ------------------------ |
-| POST   | `/api/v1/auth/signup`     | User registration        |
-| POST   | `/api/v1/auth/login`      | User login               |
-| POST   | `/api/v1/auth/logout`     | User logout              |
-| GET    | `/api/v1/auth/me`         | Get current user         |
-| PUT    | `/api/v1/auth/me`         | Update profile           |
-| GET    | `/api/v1/users`           | List users (admin)       |
-| PATCH  | `/api/v1/users/{id}/role` | Update user role (admin) |
-| POST   | `/api/v1/invites`         | Create invite (admin)    |
-| GET    | `/api/v1/invites`         | List invites (admin)     |
-| POST   | `/api/v1/invites/accept`  | Accept invite            |
+Connect to the local NATS cluster with one of these URLs:
 
-### Connections
+- `nats://localhost:4222`
+- `nats://localhost:4223`
+- `nats://localhost:4224`
 
-| Method | Endpoint                          | Description               |
-| ------ | --------------------------------- | ------------------------- |
-| GET    | `/api/v1/connections`             | List connections          |
-| POST   | `/api/v1/connections/test`        | Test connection           |
-| POST   | `/api/v1/connections/connect`     | Create connection (admin) |
-| GET    | `/api/v1/connections/{id}/status` | Connection status         |
-| DELETE | `/api/v1/connections/{id}`        | Delete connection (admin) |
+The local NATS monitoring ports are `8222`, `8223`, and `8224`.
 
-### Streams
+## Development Commands
 
-| Method | Endpoint                                        | Description           |
-| ------ | ----------------------------------------------- | --------------------- |
-| GET    | `/api/v1/connections/{id}/streams`              | List streams          |
-| POST   | `/api/v1/connections/{id}/streams`              | Create stream (admin) |
-| GET    | `/api/v1/connections/{id}/streams/{name}`       | Get stream details    |
-| PUT    | `/api/v1/connections/{id}/streams/{name}`       | Update stream (admin) |
-| DELETE | `/api/v1/connections/{id}/streams/{name}`       | Delete stream (admin) |
-| POST   | `/api/v1/connections/{id}/streams/{name}/purge` | Purge stream (admin)  |
+Run these commands from the repository root unless noted otherwise.
 
-### Consumers
+| Command                                | Description                                      |
+| -------------------------------------- | ------------------------------------------------ |
+| `npm install`                          | Install root and workspace dependencies.         |
+| `npm run dev`                          | Run backend and frontend concurrently.           |
+| `npm run dev:backend`                  | Start the NestJS backend in watch mode.          |
+| `npm run dev:frontend`                 | Start the Next.js frontend.                      |
+| `npm run build`                        | Build all workspaces.                            |
+| `npm run lint`                         | Run ESLint for all workspaces with auto-fix.     |
+| `npm run format`                       | Format source files with Prettier.               |
+| `npm run format:check`                 | Check Prettier formatting without writing files. |
+| `npm run test --workspace=backend`     | Run backend Jest tests.                          |
+| `npm run test:cov --workspace=backend` | Run backend Jest tests with coverage.            |
+| `docker-compose up -d`                 | Start the local NATS JetStream cluster only.     |
 
-| Method | Endpoint                                                        | Description             |
-| ------ | --------------------------------------------------------------- | ----------------------- |
-| GET    | `/api/v1/connections/{id}/streams/{stream}/consumers`           | List consumers          |
-| GET    | `/api/v1/connections/{id}/streams/{stream}/consumers/analytics` | Lag/backlog analytics   |
-| POST   | `/api/v1/connections/{id}/streams/{stream}/consumers`           | Create consumer (admin) |
-| GET    | `/api/v1/connections/{id}/streams/{stream}/consumers/{name}`    | Consumer details        |
-| DELETE | `/api/v1/connections/{id}/streams/{stream}/consumers/{name}`    | Delete consumer (admin) |
+Workspace-specific commands are also available:
 
-### Messages
+```bash
+npm run start:dev --workspace=backend
+npm run build --workspace=backend
+npm run lint --workspace=backend
+npm run dev --workspace=frontend
+npm run build --workspace=frontend
+npm run lint --workspace=frontend
+```
 
-| Method | Endpoint                                                   | Description             |
-| ------ | ---------------------------------------------------------- | ----------------------- |
-| POST   | `/api/v1/connections/{id}/messages/publish`                | Publish message (admin) |
-| POST   | `/api/v1/connections/{id}/messages/batch-publish`          | Batch publish (admin)   |
-| POST   | `/api/v1/connections/{id}/messages/replay`                 | Replay messages (admin) |
-| POST   | `/api/v1/connections/{id}/messages/validate-schema`        | Validate schema         |
-| POST   | `/api/v1/connections/{id}/messages/search`                 | Search messages         |
-| GET    | `/api/v1/connections/{id}/streams/{stream}/messages`       | Get messages            |
-| GET    | `/api/v1/connections/{id}/streams/{stream}/messages/{seq}` | Get message by sequence |
+## Project Structure
 
-### Cluster & System
+```text
+.
+├── backend/
+│   ├── src/
+│   │   ├── audit/
+│   │   ├── cluster/
+│   │   ├── common/
+│   │   ├── connections/
+│   │   ├── consumers/
+│   │   ├── database/entities/
+│   │   ├── health-history/
+│   │   ├── jobs/
+│   │   ├── kv/
+│   │   ├── messages/
+│   │   ├── metrics/
+│   │   ├── objectstore/
+│   │   ├── streams/
+│   │   └── system/
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   ├── components/
+│   │   ├── contexts/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   └── workers/
+│   └── Dockerfile
+├── helm/nats-jetstream-manager/
+├── docker-compose.yml
+└── package.json
+```
 
-| Method | Endpoint                                        | Description               |
-| ------ | ----------------------------------------------- | ------------------------- |
-| GET    | `/api/v1/connections/{id}/cluster/overview`     | Cluster topology & status |
-| GET    | `/api/v1/connections/{id}/system/observability` | System metrics            |
+## API Surface
 
-### Background Jobs
+All application API routes are under `/api/v1` except `/docs` and `/health`.
 
-| Method | Endpoint                                        | Description           |
-| ------ | ----------------------------------------------- | --------------------- |
-| POST   | `/api/v1/connections/{id}/jobs/index-build`     | Start index build job |
-| GET    | `/api/v1/connections/{id}/jobs`                 | List jobs             |
-| GET    | `/api/v1/connections/{id}/jobs/{job_id}`        | Job status            |
-| POST   | `/api/v1/connections/{id}/jobs/{job_id}/cancel` | Cancel job (admin)    |
+| Area         | Routes                                                                                               |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| Connections  | `/connections`, `/connections/test`, `/connections/connect`, `/connections/:id/status`               |
+| Streams      | `/connections/:connectionId/streams/*`                                                               |
+| Consumers    | `/connections/:connectionId/streams/:streamName/consumers/*`                                         |
+| Diagnostics  | `/connections/:connectionId/consumers/diagnostics`                                                   |
+| Messages     | `/connections/:connectionId/messages/*`, `/connections/:connectionId/streams/:streamName/messages/*` |
+| Remediation  | `/connections/:connectionId/streams/:streamName/consumers/:consumerName/remediation/*`               |
+| Cluster      | `/connections/:connectionId/cluster/overview`                                                        |
+| System       | `/connections/:connectionId/system/observability`                                                    |
+| Metrics      | `/connections/:connectionId/metrics/*`                                                               |
+| Health       | `/connections/:connectionId/health/history`, `/connections/:connectionId/health/uptime`              |
+| Jobs         | `/connections/:connectionId/jobs/*`                                                                  |
+| KV           | `/connections/:connectionId/kv/*`                                                                    |
+| Object Store | `/connections/:connectionId/objectstore/*`                                                           |
+| Audit        | `/audit`                                                                                             |
 
-### Health
-
-| Method | Endpoint  | Description  |
-| ------ | --------- | ------------ |
-| GET    | `/health` | Health check |
-| GET    | `/`       | API info     |
+Swagger documentation is generated from the NestJS application at `/docs`.
 
 ## Configuration
 
-### Backend Environment Variables
+### Backend
 
-```env
-ENVIRONMENT=development
-LOG_LEVEL=info
-CORS_ORIGINS=http://localhost:3000
-MAX_CONNECTIONS=100
-CONNECTION_TIMEOUT=300
-DATABASE_DRIVER=sqlite              # or "postgresql"
-DATABASE_PATH=./data/nats_manager.db # SQLite path (when using sqlite)
-DATABASE_URL=postgresql://...        # PostgreSQL URL (when using postgresql)
-```
+The backend reads environment variables through Nest config.
 
-### Frontend Environment Variables
+| Variable                  | Default                    | Description                                            |
+| ------------------------- | -------------------------- | ------------------------------------------------------ |
+| `PORT`                    | `8000`                     | Backend HTTP port.                                     |
+| `NODE_ENV`                | unset                      | Enables production logging behavior when `production`. |
+| `LOG_LEVEL`               | `debug` local, `info` prod | pino log level.                                        |
+| `CORS_ORIGINS`            | `http://localhost:3000`    | Comma-separated allowed frontend origins.              |
+| `DATABASE_TYPE`           | `sqlite`                   | `sqlite` or `postgres`.                                |
+| `DATABASE_PATH`           | `./data/nats_manager.db`   | SQLite database path.                                  |
+| `DATABASE_HOST`           | `localhost`                | PostgreSQL host.                                       |
+| `DATABASE_PORT`           | `5432`                     | PostgreSQL port.                                       |
+| `DATABASE_USERNAME`       | `postgres`                 | PostgreSQL username.                                   |
+| `DATABASE_PASSWORD`       | empty                      | PostgreSQL password.                                   |
+| `DATABASE_NAME`           | `nats_manager`             | PostgreSQL database name.                              |
+| `DATABASE_SSL`            | `false`                    | Use PostgreSQL SSL with `rejectUnauthorized: false`.   |
+| `CONNECTION_TIMEOUT`      | `300`                      | Inactive NATS connection timeout in seconds.           |
+| `METRICS_RETENTION_HOURS` | `24`                       | Stream and consumer metric retention window.           |
+| `HEALTH_RETENTION_DAYS`   | `7`                        | Health-history retention window.                       |
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
+### Frontend
 
-### Kubernetes (Helm)
+| Variable              | Default                 | Description       |
+| --------------------- | ----------------------- | ----------------- |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend base URL. |
+
+## Database
+
+SQLite is the default development database. The backend creates the SQLite directory if it does not
+exist and uses TypeORM `synchronize: true` to keep local tables aligned with entity definitions.
+
+Set `DATABASE_TYPE=postgres` and the PostgreSQL variables above to run against PostgreSQL. PostgreSQL
+is the safer choice for replicated backend deployments.
+
+## Docker and Kubernetes
+
+`docker-compose.yml` starts a local NATS JetStream cluster for development. It does not start the
+backend or frontend application containers.
+
+Application images are built with:
+
+- `backend/Dockerfile`: multi-stage NestJS build that runs `node dist/main` as a non-root user.
+- `frontend/Dockerfile`: standalone Next.js build that injects `NEXT_PUBLIC_API_URL` at container
+  startup through `frontend/docker-entrypoint.sh`.
+
+Install the Helm chart:
 
 ```bash
-helm install nats-manager ./helm/nats-jetstream-manager -f values.yaml
+helm install nats-manager ./helm/nats-jetstream-manager
 ```
 
-The Helm chart includes deployments for frontend and backend, services, ingress, HPA, PDB, network policies, and configmaps.
+Render the chart before changing templates:
+
+```bash
+helm template test ./helm/nats-jetstream-manager
+```
+
+The chart includes separate backend and frontend deployments, services, ingress, configmaps, secrets,
+optional SQLite persistence, PostgreSQL settings, HPA, PDB, and network policy support.
+
+## Testing
+
+Backend tests use Jest with `ts-jest` and live near the code under test as `*.spec.ts` files.
+
+```bash
+npm run test --workspace=backend
+npm run test:cov --workspace=backend
+```
+
+There is no frontend test runner configured yet. Validate frontend changes with:
+
+```bash
+npm run lint --workspace=frontend
+npm run build --workspace=frontend
+```
+
+For cross-stack API changes, run backend tests and the frontend build.
+
+## Release and Publishing
+
+Release automation uses release-please from `.github/workflows/release-please.yml`. Docker image and
+Helm chart publishing workflows are in `.github/workflows/docker-publish.yml` and
+`.github/workflows/helm-publish.yml`.
+
+Commit messages are checked with Conventional Commits through commitlint and Husky.
+
+## Security Notes
+
+- Do not commit credentials, tokens, NATS secrets, database URLs, or local database files.
+- Prefer environment variables or Kubernetes secrets for sensitive configuration.
+- The frontend only uses `NEXT_PUBLIC_*` variables, which are exposed to browser code.
 
 ## License
 
