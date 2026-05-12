@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.2](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.8.1...v1.8.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* cap message search indexing ([502f2e7](https://github.com/natenberenstein/nats-jetstream-manager/commit/502f2e7c6da4165e178b1a38d35bc67a6957396c))
+* cap message search indexing ([1c85e5d](https://github.com/natenberenstein/nats-jetstream-manager/commit/1c85e5d951ea0975281ebcb6046d6b2d76195905))
+
 ## [1.8.1](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.8.0...v1.8.1) (2026-05-12)
 
 ### Bug Fixes
