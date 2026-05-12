@@ -9,8 +9,8 @@ logging, and Swagger documentation. The frontend is a Next.js 16 App Router app
 using React 19, Tailwind CSS, shadcn/Radix UI primitives, TanStack Query/Table,
 Recharts, XYFlow, and Lucide icons.
 
-Treat the source code, package scripts, and this file as the source of truth. The
-root `README.md` still contains some stale FastAPI/Python-era references.
+Treat the source code, package scripts, this file, and the root `README.md` as
+the source of truth for the current TypeScript application.
 
 ## Project Structure & Module Organization
 
