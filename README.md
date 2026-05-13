@@ -270,6 +270,16 @@ Release automation uses release-please from `.github/workflows/release-please.ym
 Helm chart publishing workflows are in `.github/workflows/docker-publish.yml` and
 `.github/workflows/helm-publish.yml`.
 
+Published Helm charts are available from:
+
+```bash
+helm repo add nats-jetstream-manager https://natenberenstein.github.io/nats-jetstream-manager
+helm install nats-jetstream-manager nats-jetstream-manager/nats-jetstream-manager
+```
+
+Argo CD can consume the published chart with `repoURL`,
+`chart: nats-jetstream-manager`, and `targetRevision` set to the chart version.
+
 Commit messages are checked with Conventional Commits through commitlint and Husky.
 
 ## Security Notes
