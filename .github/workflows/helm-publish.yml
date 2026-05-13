@@ -11,7 +11,7 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref }}
@@ -19,6 +19,7 @@ concurrency:
 
 env:
   CHART_DIR: helm/nats-jetstream-manager
+  HELM_REPO_URL: https://natenberenstein.github.io/nats-jetstream-manager
   OCI_REPO: oci://registry-1.docker.io/natenberenstein
 
 jobs:
@@ -107,6 +108,38 @@ jobs:
         run: |
           CHART_PKG=$(find dist -maxdepth 1 -name '*.tgz' -print -quit)
           helm push "$CHART_PKG" "$OCI_REPO"
+
+      - name: Publish chart repository
+        shell: bash
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages --depth=1
+            git worktree add pages FETCH_HEAD
+          else
+            git worktree add --detach pages
+            git -C pages checkout --orphan gh-pages
+            git -C pages rm -rf . || true
+          fi
+
+          cp dist/*.tgz pages/
+
+          if [[ -f pages/index.yaml ]]; then
+            helm repo index pages --url "$HELM_REPO_URL" --merge pages/index.yaml
+          else
+            helm repo index pages --url "$HELM_REPO_URL"
+          fi
+
+          touch pages/.nojekyll
+          git -C pages config user.name "github-actions[bot]"
+          git -C pages config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C pages add .
+
+          if git -C pages diff --cached --quiet; then
+            echo "Helm repository already contains chart ${{ steps.version.outputs.version }}"
+          else
+            git -C pages commit -m "Publish nats-jetstream-manager chart ${{ steps.version.outputs.version }}"
+            git -C pages push origin HEAD:gh-pages
+          fi
 
       - name: Logout
         if: always()
