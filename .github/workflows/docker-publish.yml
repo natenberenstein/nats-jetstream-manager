@@ -8,6 +8,9 @@ on:
       tag:
         description: Image tag to publish (e.g. 1.2.3)
         required: true
+      ref:
+        description: Git ref to checkout (defaults to v<tag>)
+        required: false
 
 permissions:
   contents: read
@@ -16,8 +19,79 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.event.release.tag_name || github.ref }}
   cancel-in-progress: false
 
+env:
+  CHART_DIR: helm/nats-jetstream-manager
+  OCI_REPO: oci://registry-1.docker.io/natenberenstein
+
 jobs:
+  resolve-version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      checkout_ref: ${{ steps.version.outputs.checkout_ref }}
+      is_latest: ${{ steps.version.outputs.is_latest }}
+      is_stable_semver: ${{ steps.version.outputs.is_stable_semver }}
+      semver: ${{ steps.version.outputs.semver }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Resolve version
+        id: version
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_REF: ${{ github.event.inputs.ref }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="$INPUT_TAG"
+          else
+            version="$RELEASE_TAG"
+          fi
+
+          version="${version#v}"
+
+          if [[ -z "$version" ]]; then
+            echo "Unable to resolve Docker image tag" >&2
+            exit 1
+          fi
+
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Docker image tag must be a SemVer version without build metadata" >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_REF" ]]; then
+            checkout_ref="$INPUT_REF"
+          else
+            checkout_ref="v$version"
+          fi
+
+          if [[ ! "$checkout_ref" =~ ^[0-9A-Za-z._/-]+$ ]]; then
+            echo "Checkout ref contains unsupported characters" >&2
+            exit 1
+          fi
+
+          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "semver=v$version" >> "$GITHUB_OUTPUT"
+
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "is_stable_semver=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_stable_semver=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "$EVENT_NAME" == "release" && "$RELEASE_PRERELEASE" != "true" ]]; then
+            echo "is_latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-push:
+    needs: resolve-version
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -33,9 +107,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        with:
+          ref: ${{ needs.resolve-version.outputs.checkout_ref }}
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
@@ -46,38 +119,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Resolve version
-        id: version
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            version="${{ inputs.tag }}"
-          else
-            version="${{ github.event.release.tag_name }}"
-          fi
-
-          version="${version#v}"
-
-          if [[ -z "$version" ]]; then
-            echo "Unable to resolve Docker image tag" >&2
-            exit 1
-          fi
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "semver=v$version" >> "$GITHUB_OUTPUT"
-
-          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "is_stable_semver=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_stable_semver=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          if [[ "${{ github.event_name }}" == "release" && "${{ github.event.release.prerelease }}" != "true" ]]; then
-            echo "is_latest=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_latest=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Generate Docker metadata
         id: meta
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
@@ -85,10 +126,10 @@ jobs:
           images: ${{ matrix.component.image }}
           flavor: latest=false
           tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.semver }},enable=${{ steps.version.outputs.is_stable_semver == 'true' }}
-            type=semver,pattern={{major}},value=${{ steps.version.outputs.semver }},enable=${{ steps.version.outputs.is_stable_semver == 'true' }}
-            type=raw,value=latest,enable=${{ steps.version.outputs.is_latest == 'true' }}
+            type=raw,value=${{ needs.resolve-version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.resolve-version.outputs.semver }},enable=${{ needs.resolve-version.outputs.is_stable_semver == 'true' }}
+            type=semver,pattern={{major}},value=${{ needs.resolve-version.outputs.semver }},enable=${{ needs.resolve-version.outputs.is_stable_semver == 'true' }}
+            type=raw,value=latest,enable=${{ needs.resolve-version.outputs.is_latest == 'true' }}
 
       - name: Build and push
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
@@ -101,3 +142,63 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.component.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component.name }}
+
+  publish-chart:
+    name: Publish Helm chart
+    needs:
+      - resolve-version
+      - build-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.resolve-version.outputs.checkout_ref }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: v3.16.2
+
+      - name: Verify chart version
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          chart_version="$(grep -E '^version:' "$CHART_DIR/Chart.yaml" | head -n1 | cut -d: -f2- | xargs)"
+          app_version="$(grep -E '^appVersion:' "$CHART_DIR/Chart.yaml" | head -n1 | cut -d: -f2- | xargs)"
+          chart_version="${chart_version%\"}"
+          chart_version="${chart_version#\"}"
+          app_version="${app_version%\"}"
+          app_version="${app_version#\"}"
+
+          if [[ "$chart_version" != "$EXPECTED_VERSION" ]]; then
+            echo "Chart version $chart_version does not match release $EXPECTED_VERSION" >&2
+            exit 1
+          fi
+
+          if [[ "$app_version" != "$EXPECTED_VERSION" ]]; then
+            echo "Chart appVersion $app_version does not match release $EXPECTED_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Lint chart
+        run: helm lint "$CHART_DIR"
+
+      - name: Login to Docker Hub (OCI)
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | helm registry login registry-1.docker.io -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Package chart
+        run: |
+          mkdir -p dist
+          helm package "$CHART_DIR" -d dist
+
+      - name: Push chart
+        run: |
+          CHART_PKG=$(find dist -maxdepth 1 -name '*.tgz' -print -quit)
+          helm push "$CHART_PKG" "$OCI_REPO"
+
+      - name: Logout
+        if: always()
+        run: helm registry logout registry-1.docker.io || true

@@ -1,19 +1,20 @@
 name: helm-publish
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
         description: Chart version to publish (e.g. 1.2.3)
         required: true
+      ref:
+        description: Git ref to checkout (defaults to v<tag>)
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.event.release.tag_name || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -25,24 +26,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup Helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
-        with:
-          version: v3.16.2
-
       - name: Resolve release version
         id: version
         shell: bash
+        env:
+          INPUT_REF: ${{ github.event.inputs.ref }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            version="${{ inputs.tag }}"
-          else
-            version="${{ github.event.release.tag_name }}"
-          fi
-
+          version="$INPUT_TAG"
           version="${version#v}"
 
           if [[ -z "$version" ]]; then
@@ -50,10 +41,39 @@ jobs:
             exit 1
           fi
 
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Chart version must be a SemVer version without build metadata" >&2
+            exit 1
+          fi
+
+          if [[ -n "$INPUT_REF" ]]; then
+            checkout_ref="$INPUT_REF"
+          else
+            checkout_ref="v$version"
+          fi
+
+          if [[ ! "$checkout_ref" =~ ^[0-9A-Za-z._/-]+$ ]]; then
+            echo "Checkout ref contains unsupported characters" >&2
+            exit 1
+          fi
+
+          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ steps.version.outputs.checkout_ref }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: v3.16.2
 
       - name: Verify chart version
         shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
         run: |
           chart_version="$(grep -E '^version:' "$CHART_DIR/Chart.yaml" | head -n1 | cut -d: -f2- | xargs)"
           app_version="$(grep -E '^appVersion:' "$CHART_DIR/Chart.yaml" | head -n1 | cut -d: -f2- | xargs)"
@@ -62,13 +82,13 @@ jobs:
           app_version="${app_version%\"}"
           app_version="${app_version#\"}"
 
-          if [[ "$chart_version" != "${{ steps.version.outputs.version }}" ]]; then
-            echo "Chart version $chart_version does not match release ${{ steps.version.outputs.version }}" >&2
+          if [[ "$chart_version" != "$EXPECTED_VERSION" ]]; then
+            echo "Chart version $chart_version does not match release $EXPECTED_VERSION" >&2
             exit 1
           fi
 
-          if [[ "$app_version" != "${{ steps.version.outputs.version }}" ]]; then
-            echo "Chart appVersion $app_version does not match release ${{ steps.version.outputs.version }}" >&2
+          if [[ "$app_version" != "$EXPECTED_VERSION" ]]; then
+            echo "Chart appVersion $app_version does not match release $EXPECTED_VERSION" >&2
             exit 1
           fi
 
