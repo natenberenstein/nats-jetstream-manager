@@ -74,7 +74,9 @@ export class MetricsService {
       if (!connItem.connected) continue;
 
       try {
-        const conn = this.connectionsService.getConnection(connItem.connection_id);
+        const conn = this.connectionsService.getConnection(connItem.connection_id, {
+          touch: false,
+        });
         const streams = await conn.jsm.streams.list().next();
 
         for (const stream of streams) {

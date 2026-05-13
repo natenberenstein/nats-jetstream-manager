@@ -32,6 +32,10 @@ export interface ConnectionListItem {
   last_accessed: string;
 }
 
+export interface GetConnectionOptions {
+  touch?: boolean;
+}
+
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
   private readonly logger = new Logger(ConnectionsService.name);
@@ -105,14 +109,20 @@ export class ConnectionsService implements OnModuleDestroy {
     };
   }
 
-  getConnection(connectionId: string): ConnectionInfo {
+  getConnection(connectionId: string, options: GetConnectionOptions = {}): ConnectionInfo {
     const conn = this.connections.get(connectionId);
     if (!conn) {
       throw new BadRequestException(`Connection ${connectionId} not found or has expired`);
     }
 
-    conn.lastAccessed = new Date();
+    if (options.touch !== false) {
+      conn.lastAccessed = new Date();
+    }
     return conn;
+  }
+
+  peekConnection(connectionId: string): ConnectionInfo | null {
+    return this.connections.get(connectionId) ?? null;
   }
 
   async removeConnection(connectionId: string): Promise<void> {

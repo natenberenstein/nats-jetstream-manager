@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { StorageType, KvStatus, KvEntry } from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
+import { isNatsNotFound } from '../common/nats/errors';
 import { KvCreateDto } from './dto/kv.dto';
 
 const NANOS_PER_MILLI = 1_000_000;
@@ -65,7 +66,7 @@ export class KvService {
       const status = await kv.status();
       return this.convertKvStatus(status);
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`KV bucket '${bucket}' not found`);
       }
       throw error;
@@ -104,7 +105,7 @@ export class KvService {
       this.logger.log(`KV bucket '${bucket}' destroyed on connection ${connectionId}`);
       return { success: result, deleted_bucket: bucket };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`KV bucket '${bucket}' not found`);
       }
       throw error;
@@ -123,7 +124,7 @@ export class KvService {
       }
       return { keys, total: keys.length };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`KV bucket '${bucket}' not found`);
       }
       throw error;
@@ -142,7 +143,7 @@ export class KvService {
       return this.convertKvEntry(entry);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`KV bucket '${bucket}' not found`);
       }
       throw error;
@@ -163,7 +164,7 @@ export class KvService {
       this.logger.log(`Key '${key}' set in bucket '${bucket}' on connection ${connectionId}`);
       return { revision };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`KV bucket '${bucket}' not found`);
       }
       throw error;
@@ -183,7 +184,7 @@ export class KvService {
       this.logger.log(`Key '${key}' deleted from bucket '${bucket}' on connection ${connectionId}`);
       return { success: true };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`KV bucket '${bucket}' not found`);
       }
       throw error;
@@ -207,7 +208,7 @@ export class KvService {
       const recent = entries.slice(-100);
       return { entries: recent, total: recent.length };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`KV bucket '${bucket}' not found`);
       }
       throw error;
@@ -223,7 +224,7 @@ export class KvService {
       this.logger.log(`Key '${key}' purged from bucket '${bucket}' on connection ${connectionId}`);
       return { success: true };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`KV bucket '${bucket}' not found`);
       }
       throw error;

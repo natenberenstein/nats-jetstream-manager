@@ -2,12 +2,13 @@
 
 import { useQuery, useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { consumerApi, metricsApi } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
 import { ConsumerConfig, ConsumerInfo } from '@/lib/types';
 import { StreamConsumer } from '@/lib/subject-analysis';
 
 export function useConsumers(connectionId: string | null, streamName: string | null) {
   return useQuery({
-    queryKey: ['consumers', connectionId, streamName],
+    queryKey: queryKeys.consumers.list(connectionId, streamName),
     queryFn: () => consumerApi.list(connectionId!, streamName!),
     enabled: !!connectionId && !!streamName,
     refetchInterval: 5000,
@@ -17,7 +18,7 @@ export function useConsumers(connectionId: string | null, streamName: string | n
 export function useAllConsumers(connectionId: string | null, streamNames: string[]) {
   const results = useQueries({
     queries: streamNames.map((streamName) => ({
-      queryKey: ['consumers', connectionId, streamName],
+      queryKey: queryKeys.consumers.list(connectionId, streamName),
       queryFn: () => consumerApi.list(connectionId!, streamName),
       enabled: !!connectionId && streamNames.length > 0,
       refetchInterval: 5000,
@@ -41,7 +42,7 @@ export function useAllConsumers(connectionId: string | null, streamNames: string
 
 export function useConsumerAnalytics(connectionId: string | null, streamName: string | null) {
   return useQuery({
-    queryKey: ['consumer-analytics', connectionId, streamName],
+    queryKey: queryKeys.consumers.analytics(connectionId, streamName),
     queryFn: () => consumerApi.analytics(connectionId!, streamName!),
     enabled: !!connectionId && !!streamName,
     refetchInterval: 30_000,
@@ -50,7 +51,7 @@ export function useConsumerAnalytics(connectionId: string | null, streamName: st
 
 export function useConsumerDiagnostics(connectionId: string | null, streamName?: string | null) {
   return useQuery({
-    queryKey: ['consumer-diagnostics', connectionId, streamName ?? null],
+    queryKey: queryKeys.consumers.diagnostics(connectionId, streamName),
     queryFn: () => consumerApi.diagnostics(connectionId!, streamName || undefined),
     enabled: !!connectionId,
     refetchInterval: 10_000,
@@ -63,7 +64,7 @@ export function useConsumer(
   consumerName: string | null,
 ) {
   return useQuery({
-    queryKey: ['consumer', connectionId, streamName, consumerName],
+    queryKey: queryKeys.consumers.detail(connectionId, streamName, consumerName),
     queryFn: () => consumerApi.get(connectionId!, streamName!, consumerName!),
     enabled: !!connectionId && !!streamName && !!consumerName,
     refetchInterval: 5000,
@@ -81,8 +82,10 @@ export function useCreateConsumer(connectionId: string | null, streamName: strin
       return consumerApi.create(connectionId, streamName, config);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consumers', connectionId, streamName] });
-      queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.consumers.list(connectionId, streamName),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.streams.list(connectionId) });
     },
   });
 }
@@ -104,8 +107,10 @@ export function useUpdateConsumer(connectionId: string | null, streamName: strin
       return consumerApi.update(connectionId, streamName, consumerName, config);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consumers', connectionId, streamName] });
-      queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.consumers.list(connectionId, streamName),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.streams.list(connectionId) });
     },
   });
 }
@@ -116,7 +121,7 @@ export function useConsumerMetrics(
   window = 60,
 ) {
   return useQuery({
-    queryKey: ['consumer-metrics', connectionId, streamName, window],
+    queryKey: queryKeys.consumers.metrics(connectionId, streamName, window),
     queryFn: () => metricsApi.getAllConsumerMetrics(connectionId!, streamName!, window),
     enabled: !!connectionId && !!streamName,
     refetchInterval: 30_000,
@@ -130,7 +135,7 @@ export function useConsumerMetric(
   window = 60,
 ) {
   return useQuery({
-    queryKey: ['consumer-metric', connectionId, streamName, consumerName, window],
+    queryKey: queryKeys.consumers.metric(connectionId, streamName, consumerName, window),
     queryFn: () => metricsApi.getConsumerMetrics(connectionId!, streamName!, consumerName!, window),
     enabled: !!connectionId && !!streamName && !!consumerName,
     refetchInterval: 30_000,
@@ -148,8 +153,10 @@ export function useDeleteConsumer(connectionId: string | null, streamName: strin
       return consumerApi.delete(connectionId, streamName, consumerName);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consumers', connectionId, streamName] });
-      queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.consumers.list(connectionId, streamName),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.streams.list(connectionId) });
     },
   });
 }

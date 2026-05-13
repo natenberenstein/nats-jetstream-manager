@@ -7,6 +7,7 @@ import {
   StreamConfig as NatsStreamConfig,
 } from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
+import { isNatsNotFound } from '../common/nats/errors';
 import { StreamCreateDto, StreamUpdateDto } from './dto/stream.dto';
 
 const NANOS_PER_SECOND = 1_000_000_000;
@@ -101,7 +102,7 @@ export class StreamsService {
       const si = await jsm.streams.info(name);
       return this.convertStreamInfo(si);
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('stream not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Stream '${name}' not found`);
       }
       throw error;
@@ -131,7 +132,7 @@ export class StreamsService {
     try {
       currentInfo = await jsm.streams.info(name);
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('stream not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Stream '${name}' not found`);
       }
       throw error;
@@ -200,7 +201,7 @@ export class StreamsService {
       this.logger.log(`Stream '${name}' deleted on connection ${connectionId}`);
       return { success: result, deleted_stream: name };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('stream not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Stream '${name}' not found`);
       }
       throw error;
@@ -220,7 +221,7 @@ export class StreamsService {
       );
       return { success: info.success, purged: info.success };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('stream not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Stream '${name}' not found`);
       }
       throw error;

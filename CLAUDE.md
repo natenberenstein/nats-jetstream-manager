@@ -133,4 +133,6 @@ All routes under `/api/v1/`. Key resource groupings:
 
 ## Notes
 
-- The root `README.md` is outdated — it references FastAPI/Python, but the backend has been rewritten in NestJS/TypeScript. Do not rely on it for architecture guidance.
+- The root `README.md`, `AGENTS.md`, package scripts, and active TypeScript source are the source
+  of truth for the current NestJS/Next.js application. Ignore stale Python bytecode or generated
+  build artifacts if they appear locally.
