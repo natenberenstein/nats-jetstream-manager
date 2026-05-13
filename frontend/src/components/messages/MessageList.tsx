@@ -662,94 +662,17 @@ export function MessageList({
   return (
     <Card className={cn('overflow-hidden', className)}>
       <CardHeader className="space-y-4 border-b">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-            <div className="w-full sm:w-72">
-              <Label className="sr-only">Stream</Label>
-              <Select
-                value={selectedStream ?? undefined}
-                onValueChange={onSelectStream}
-                disabled={streamNames.length === 0}
-              >
-                <SelectTrigger aria-label="Stream">
-                  <SelectValue placeholder="Select stream" />
-                </SelectTrigger>
-                <SelectContent>
-                  {streamNames.map((streamName) => (
-                    <SelectItem key={streamName} value={streamName}>
-                      {streamName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="min-w-0">
-              <CardTitle className="truncate text-lg">Messages</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {messagesData
-                  ? `${currentMessages.length} shown of ${messagesData.total} stored messages`
-                  : 'Filter and inspect stream messages'}
-              </p>
-              {scannedLabel && <p className="mt-1 text-xs text-muted-foreground">{scannedLabel}</p>}
-            </div>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <CardTitle className="truncate text-lg">Messages</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {messagesData
+                ? `${currentMessages.length} shown of ${messagesData.total} stored messages`
+                : 'Filter and inspect stream messages'}
+            </p>
+            {scannedLabel && <p className="mt-1 text-xs text-muted-foreground">{scannedLabel}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              onClick={onLatestMessages}
-              disabled={!selectedStream}
-              variant={latestMode ? 'default' : 'outline'}
-              size="sm"
-              aria-pressed={latestMode}
-            >
-              <ListRestart className="h-4 w-4" />
-              Latest
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" disabled={!selectedStream}>
-                  <Hash className="h-4 w-4" />
-                  Jump
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72" align="end">
-                <JumpToSequenceControl
-                  selectedStream={selectedStream}
-                  firstSeq={messagesData?.first_seq}
-                  lastSeq={messagesData?.last_seq}
-                  onGoToSequence={onGoToSequence}
-                />
-              </PopoverContent>
-            </Popover>
-            <div className="flex h-9 items-center gap-2 rounded-md border bg-background px-2.5">
-              <span className="text-xs text-muted-foreground" aria-hidden>
-                Live
-              </span>
-              <Slider
-                value={[liveIntervalMs]}
-                min={500}
-                max={10000}
-                step={500}
-                onValueChange={([v]) => onLiveIntervalChange(v)}
-                className="w-24"
-                aria-label="Live tail interval"
-              />
-              <span className="w-8 text-right font-mono text-xs tabular-nums">
-                {(liveIntervalMs / 1000).toFixed(liveIntervalMs % 1000 === 0 ? 0 : 1)}s
-              </span>
-            </div>
-            <Button
-              onClick={() => onLiveModeChange(!liveMode)}
-              disabled={!selectedStream}
-              variant={liveMode ? 'default' : 'outline'}
-              size="sm"
-            >
-              {liveMode ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              {liveMode ? 'Pause' : 'Live'}
-            </Button>
-            <Button onClick={onRefetch} disabled={!selectedStream} variant="outline" size="sm">
-              <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
-              Refresh
-            </Button>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -838,224 +761,328 @@ export function MessageList({
           </div>
         )}
 
-        <div className="rounded-md border bg-muted/20 p-3">
-          <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(220px,1.2fr)_minmax(220px,1fr)_190px_auto]">
-            <div className="relative">
-              <GitBranch className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                aria-label="Subject pattern"
-                placeholder="Subject pattern"
-                value={filterSubject}
-                onChange={(event) => onFilterSubjectChange(event.target.value)}
-                className="pl-8"
-              />
-            </div>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                aria-label="Payload contains"
-                placeholder="Payload contains"
-                value={payloadContains}
-                onChange={(event) => onPayloadContainsChange(event.target.value)}
-                className="pl-8"
-              />
-            </div>
-            <Popover open={customDateOpen} onOpenChange={handleCustomDateOpenChange}>
-              <PopoverAnchor asChild>
-                <div>
-                  <Select
-                    value={selectedDatePreset}
-                    onValueChange={handleDatePresetSelect}
-                    onOpenChange={handleDateSelectOpenChange}
-                  >
-                    <SelectTrigger aria-label="Date preset" className="gap-2">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(datePresetLabels).map(([value, label]) => (
-                        <SelectItem
-                          key={value}
-                          value={value}
-                          onPointerDown={
-                            value === 'custom' ? handleCustomDateOptionInteract : undefined
-                          }
-                          onKeyDown={value === 'custom' ? handleCustomDateOptionKeyDown : undefined}
-                        >
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </PopoverAnchor>
-              <PopoverContent
-                className="w-auto max-w-[calc(100vw-2rem)] p-0"
-                align="start"
-                sideOffset={8}
-                onOpenAutoFocus={(event) => event.preventDefault()}
-                onFocusOutside={(event) => event.preventDefault()}
+        <div className="-mx-4 border-y bg-muted/20 px-4 py-4">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(220px,1fr)_minmax(300px,1fr)_minmax(420px,2fr)]">
+            <div className="min-w-0 space-y-2">
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                Stream
+              </Label>
+              <Select
+                value={selectedStream ?? undefined}
+                onValueChange={onSelectStream}
+                disabled={streamNames.length === 0}
               >
-                <div className="border-b px-4 py-3">
-                  <Label className="text-sm">Custom date range</Label>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatDateRangeLabel(draftDateRange)}
-                  </p>
+                <SelectTrigger aria-label="Stream" className="bg-background">
+                  <SelectValue placeholder="Select stream" />
+                </SelectTrigger>
+                <SelectContent>
+                  {streamNames.map((streamName) => (
+                    <SelectItem key={streamName} value={streamName}>
+                      {streamName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                Timeline
+              </Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={onLatestMessages}
+                  disabled={!selectedStream}
+                  variant={latestMode ? 'default' : 'outline'}
+                  size="sm"
+                  aria-pressed={latestMode}
+                >
+                  <ListRestart className="h-4 w-4" />
+                  Latest
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={!selectedStream}>
+                      <Hash className="h-4 w-4" />
+                      Jump
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72" align="start">
+                    <JumpToSequenceControl
+                      selectedStream={selectedStream}
+                      firstSeq={messagesData?.first_seq}
+                      lastSeq={messagesData?.last_seq}
+                      onGoToSequence={onGoToSequence}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  onClick={() => onLiveModeChange(!liveMode)}
+                  disabled={!selectedStream}
+                  variant={liveMode ? 'default' : 'outline'}
+                  size="sm"
+                >
+                  {liveMode ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {liveMode ? 'Pause' : 'Live'}
+                </Button>
+                <Button onClick={onRefetch} disabled={!selectedStream} variant="outline" size="sm">
+                  <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+                  Refresh
+                </Button>
+              </div>
+              <div className="flex h-9 w-full items-center gap-2 rounded-md border bg-background px-2.5 sm:max-w-xs">
+                <Clock3 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground" aria-hidden>
+                  Interval
+                </span>
+                <Slider
+                  value={[liveIntervalMs]}
+                  min={500}
+                  max={10000}
+                  step={500}
+                  onValueChange={([v]) => onLiveIntervalChange(v)}
+                  className="min-w-20 flex-1"
+                  aria-label="Live tail interval"
+                />
+                <span className="w-8 text-right font-mono text-xs tabular-nums">
+                  {(liveIntervalMs / 1000).toFixed(liveIntervalMs % 1000 === 0 ? 0 : 1)}s
+                </span>
+              </div>
+            </div>
+
+            <div className="min-w-0 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                  Filters
+                </Label>
+                {activeFilters.length > 0 && (
+                  <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
+                    Clear all
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_190px_auto]">
+                <div className="relative">
+                  <GitBranch className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    aria-label="Subject pattern"
+                    placeholder="Subject pattern"
+                    value={filterSubject}
+                    onChange={(event) => onFilterSubjectChange(event.target.value)}
+                    className="bg-background pl-8"
+                  />
                 </div>
                 <div className="relative">
-                  <Calendar
-                    mode="range"
-                    defaultMonth={draftDateRange?.from ?? dateRange?.from}
-                    selected={draftDateRange}
-                    onSelect={setDraftDateRange}
-                    numberOfMonths={2}
-                    classNames={{
-                      month_caption:
-                        'relative flex h-8 w-full items-center justify-center px-10 pt-0',
-                      caption_label: 'pointer-events-none text-sm font-medium',
-                      nav: 'contents',
-                      button_previous:
-                        'absolute left-1 top-0 z-20 flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background p-0 opacity-70 hover:bg-accent hover:text-accent-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-                      button_next:
-                        'absolute right-1 top-0 z-20 flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background p-0 opacity-70 hover:bg-accent hover:text-accent-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-                    }}
+                  <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    aria-label="Payload contains"
+                    placeholder="Payload contains"
+                    value={payloadContains}
+                    onChange={(event) => onPayloadContainsChange(event.target.value)}
+                    className="bg-background pl-8"
                   />
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t p-3">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearCustomDateRange}
-                    disabled={!dateRange?.from && !draftDateRange?.from}
+                <Popover open={customDateOpen} onOpenChange={handleCustomDateOpenChange}>
+                  <PopoverAnchor asChild>
+                    <div>
+                      <Select
+                        value={selectedDatePreset}
+                        onValueChange={handleDatePresetSelect}
+                        onOpenChange={handleDateSelectOpenChange}
+                      >
+                        <SelectTrigger aria-label="Date preset" className="gap-2 bg-background">
+                          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(datePresetLabels).map(([value, label]) => (
+                            <SelectItem
+                              key={value}
+                              value={value}
+                              onPointerDown={
+                                value === 'custom' ? handleCustomDateOptionInteract : undefined
+                              }
+                              onKeyDown={
+                                value === 'custom' ? handleCustomDateOptionKeyDown : undefined
+                              }
+                            >
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </PopoverAnchor>
+                  <PopoverContent
+                    className="w-auto max-w-[calc(100vw-2rem)] p-0"
+                    align="start"
+                    sideOffset={8}
+                    onOpenAutoFocus={(event) => event.preventDefault()}
+                    onFocusOutside={(event) => event.preventDefault()}
                   >
-                    Clear
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancelCustomDateRange}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleApplyCustomDateRange}
-                      disabled={!draftDateRange?.from}
-                    >
-                      Apply
-                    </Button>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  {advancedFilterCount > 0 ? `Advanced · ${advancedFilterCount}` : 'Advanced'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[420px] max-w-[calc(100vw-2rem)]" align="end">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Header match</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        placeholder="Header key"
-                        value={headerKey}
-                        onChange={(event) => onHeaderKeyChange(event.target.value)}
-                      />
-                      <Input
-                        placeholder="Header value"
-                        value={headerValue}
-                        onChange={(event) => onHeaderValueChange(event.target.value)}
+                    <div className="border-b px-4 py-3">
+                      <Label className="text-sm">Custom date range</Label>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDateRangeLabel(draftDateRange)}
+                      </p>
+                    </div>
+                    <div className="relative">
+                      <Calendar
+                        mode="range"
+                        defaultMonth={draftDateRange?.from ?? dateRange?.from}
+                        selected={draftDateRange}
+                        onSelect={setDraftDateRange}
+                        numberOfMonths={2}
+                        classNames={{
+                          month_caption:
+                            'relative flex h-8 w-full items-center justify-center px-10 pt-0',
+                          caption_label: 'pointer-events-none text-sm font-medium',
+                          nav: 'contents',
+                          button_previous:
+                            'absolute left-1 top-0 z-20 flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background p-0 opacity-70 hover:bg-accent hover:text-accent-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                          button_next:
+                            'absolute right-1 top-0 z-20 flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background p-0 opacity-70 hover:bg-accent hover:text-accent-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                        }}
                       />
                     </div>
-                  </div>
-                  <SequenceRangeControl
-                    selectedStream={selectedStream}
-                    seqStart={seqStart}
-                    seqEnd={seqEnd}
-                    firstSeq={messagesData?.first_seq}
-                    lastSeq={messagesData?.last_seq}
-                    onSequenceRangeChange={onSequenceRangeChange}
-                    onClearSequenceFilter={() => onClearFilter('sequence')}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {subjectSuggestions.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <GitBranch className="h-3 w-3" />
-                Subject suggestions
-              </span>
-              {subjectSuggestions.slice(0, 8).map((suggestedSubject) => {
-                const isSelected = filterSubject === suggestedSubject;
-
-                return (
-                  <Button
-                    key={suggestedSubject}
-                    type="button"
-                    variant={isSelected ? 'default' : 'outline'}
-                    size="sm"
-                    className="h-7 max-w-[14rem] min-w-0 justify-start rounded-md px-2 text-xs"
-                    onClick={() => onFilterSubjectChange(suggestedSubject)}
-                    title={`Filter by ${suggestedSubject}`}
-                    aria-pressed={isSelected}
-                  >
-                    {isSelected && <CheckCircle2 className="h-3 w-3 shrink-0" />}
-                    <span className="min-w-0 truncate font-mono">{suggestedSubject}</span>
-                  </Button>
-                );
-              })}
-            </div>
-          )}
-
-          {activeFilters.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {activeFilters.map((filter) => (
-                <Badge
-                  key={filter.key}
-                  variant="outline"
-                  className="max-w-full gap-1 rounded-md pr-1"
-                >
-                  {filter.key === 'date' && datePreset === 'custom' ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-auto max-w-[16rem] justify-start truncate rounded-sm p-0 text-left text-xs font-semibold hover:bg-transparent hover:text-foreground"
-                      onClick={openCustomDateRange}
-                      aria-label={`Edit ${filter.label}`}
-                    >
-                      {filter.label}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t p-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClearCustomDateRange}
+                        disabled={!dateRange?.from && !draftDateRange?.from}
+                      >
+                        Clear
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCancelCustomDateRange}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleApplyCustomDateRange}
+                          disabled={!draftDateRange?.from}
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="justify-center gap-2 bg-background">
+                      <SlidersHorizontal className="h-4 w-4" />
+                      {advancedFilterCount > 0 ? `Advanced · ${advancedFilterCount}` : 'Advanced'}
                     </Button>
-                  ) : (
-                    <span className="max-w-[16rem] truncate">{filter.label}</span>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4 rounded-sm p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                    onClick={() => onClearFilter(filter.key)}
-                    aria-label={`Clear ${filter.label}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </Badge>
-              ))}
-              <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
-                Clear all
-              </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[420px] max-w-[calc(100vw-2rem)]" align="end">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Header match</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            placeholder="Header key"
+                            value={headerKey}
+                            onChange={(event) => onHeaderKeyChange(event.target.value)}
+                          />
+                          <Input
+                            placeholder="Header value"
+                            value={headerValue}
+                            onChange={(event) => onHeaderValueChange(event.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <SequenceRangeControl
+                        selectedStream={selectedStream}
+                        seqStart={seqStart}
+                        seqEnd={seqEnd}
+                        firstSeq={messagesData?.first_seq}
+                        lastSeq={messagesData?.last_seq}
+                        onSequenceRangeChange={onSequenceRangeChange}
+                        onClearSequenceFilter={() => onClearFilter('sequence')}
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {activeFilters.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeFilters.map((filter) => (
+                    <Badge
+                      key={filter.key}
+                      variant="outline"
+                      className="max-w-full gap-1 rounded-md bg-background pr-1"
+                    >
+                      {filter.key === 'date' && datePreset === 'custom' ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-auto max-w-[16rem] justify-start truncate rounded-sm p-0 text-left text-xs font-semibold hover:bg-transparent hover:text-foreground"
+                          onClick={openCustomDateRange}
+                          aria-label={`Edit ${filter.label}`}
+                        >
+                          {filter.label}
+                        </Button>
+                      ) : (
+                        <span className="max-w-[16rem] truncate">{filter.label}</span>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 rounded-sm p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                        onClick={() => onClearFilter(filter.key)}
+                        aria-label={`Clear ${filter.label}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {subjectSuggestions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                  <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                    <GitBranch className="h-3 w-3" />
+                    Suggestions
+                  </span>
+                  {subjectSuggestions.slice(0, 8).map((suggestedSubject) => {
+                    const isSelected = filterSubject === suggestedSubject;
+
+                    return (
+                      <Button
+                        key={suggestedSubject}
+                        type="button"
+                        variant={isSelected ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(
+                          'h-7 max-w-[14rem] min-w-0 justify-start rounded-md px-2 text-xs',
+                          !isSelected && 'bg-background',
+                        )}
+                        onClick={() => onFilterSubjectChange(suggestedSubject)}
+                        title={`Filter by ${suggestedSubject}`}
+                        aria-pressed={isSelected}
+                      >
+                        {isSelected && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                        <span className="min-w-0 truncate font-mono">{suggestedSubject}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {bookmarks.length > 0 && (
