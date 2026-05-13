@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.8.2...v1.9.0) (2026-05-13)
+
+
+### Features
+
+* publish helm chart repository ([daa9386](https://github.com/natenberenstein/nats-jetstream-manager/commit/daa93862c2559bd452861f37130e29571322449f))
+
+
+### Bug Fixes
+
+* ignore generated changelog in prettier ([7eee35d](https://github.com/natenberenstein/nats-jetstream-manager/commit/7eee35d0e2b5798cd68523b9ae7aa709785a01bb))
+* ignore generated changelog in prettier ([6958977](https://github.com/natenberenstein/nats-jetstream-manager/commit/6958977f4988efa6b6d99320a37f5ff54b988f14))
+
 ## [1.8.2](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.8.1...v1.8.2) (2026-05-12)
 
 ### Bug Fixes
