@@ -58,6 +58,8 @@ jobs:
               - 'package-lock.json'
               - '.github/workflows/**'
             format:
+              - '.prettierignore'
+              - '.prettierrc'
               - '**/*.ts'
               - '**/*.tsx'
               - '**/*.js'
@@ -102,7 +104,7 @@ jobs:
 
       - name: Check workflow formatting
         if: needs.changes.outputs.workflows == 'true'
-        run: npm exec prettier -- --check ".github/**/*.yml"
+        run: npm exec prettier -- --check ".github/**/*.{yml,yaml}"
 
   backend:
     name: Backend
@@ -122,7 +124,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --workspace=backend --include-workspace-root
 
       - name: Lint backend
         run: npm run lint:check --workspace=backend
@@ -151,7 +153,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --workspace=frontend --include-workspace-root
 
       - name: Lint frontend
         run: npm run lint:check --workspace=frontend
@@ -178,7 +180,12 @@ jobs:
         run: helm lint helm/nats-jetstream-manager
 
       - name: Render chart
-        run: helm template test helm/nats-jetstream-manager
+        run: helm template test helm/nats-jetstream-manager > /tmp/rendered-chart.yaml
+
+      - name: Verify default image repositories
+        run: |
+          grep -F "image: natenberenstein/nats-jetstream-manager-backend:" /tmp/rendered-chart.yaml
+          grep -F "image: natenberenstein/nats-jetstream-manager-frontend:" /tmp/rendered-chart.yaml
 
   docker:
     name: Docker
@@ -209,3 +216,38 @@ jobs:
           platforms: linux/amd64
           push: false
           tags: nats-jetstream-manager-${{ matrix.component.name }}:ci
+          cache-from: type=gha,scope=ci-${{ matrix.component.name }}
+          cache-to: type=gha,mode=max,scope=ci-${{ matrix.component.name }}
+
+  ci-result:
+    name: CI Result
+    needs:
+      - changes
+      - format
+      - backend
+      - frontend
+      - helm
+      - docker
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check job results
+        shell: bash
+        run: |
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "changes job result was ${{ needs.changes.result }}" >&2
+            exit 1
+          fi
+
+          for result in \
+            "${{ needs.format.result }}" \
+            "${{ needs.backend.result }}" \
+            "${{ needs.frontend.result }}" \
+            "${{ needs.helm.result }}" \
+            "${{ needs.docker.result }}"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "A CI job finished with result: $result" >&2
+              exit 1
+            fi
+          done

@@ -19,7 +19,7 @@ serviceAccount:
 # ------------------------------------------------------------
 backend:
   image:
-    repository: nats-jetstream-manager/backend
+    repository: natenberenstein/nats-jetstream-manager-backend
     tag: '' # defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
 
@@ -106,7 +106,7 @@ backend:
 # ------------------------------------------------------------
 frontend:
   image:
-    repository: nats-jetstream-manager/frontend
+    repository: natenberenstein/nats-jetstream-manager-frontend
     tag: '' # defaults to .Chart.AppVersion
     pullPolicy: IfNotPresent
 
