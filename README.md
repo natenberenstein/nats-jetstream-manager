@@ -201,6 +201,7 @@ The backend reads environment variables through Nest config.
 | `DATABASE_PASSWORD`       | empty                      | PostgreSQL password.                                   |
 | `DATABASE_NAME`           | `nats_manager`             | PostgreSQL database name.                              |
 | `DATABASE_SSL`            | `false`                    | Use PostgreSQL SSL with `rejectUnauthorized: false`.   |
+| `TYPEORM_SYNCHRONIZE`     | local `true`, prod `false` | Auto-sync entity definitions to the database schema.   |
 | `CONNECTION_TIMEOUT`      | `300`                      | Inactive NATS connection timeout in seconds.           |
 | `METRICS_RETENTION_HOURS` | `24`                       | Stream and consumer metric retention window.           |
 | `HEALTH_RETENTION_DAYS`   | `7`                        | Health-history retention window.                       |

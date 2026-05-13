@@ -7,6 +7,12 @@ dist/
 .next/
 out/
 .vercel
+*.tsbuildinfo
+
+# Python leftovers from the previous backend implementation
+__pycache__/
+*.py[cod]
+.pytest_cache/
 
 # Environment
 .env
@@ -30,4 +36,5 @@ coverage/
 # Project specific
 backend/.env
 backend/data/
+backend/uv.lock
 frontend/.env.local

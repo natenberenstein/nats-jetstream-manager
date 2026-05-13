@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { StorageType, DiscardPolicy, ObjectStoreStatus, ObjectInfo } from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
+import { isNatsNotFound } from '../common/nats/errors';
 import { ObjectStoreCreateDto } from './dto/objectstore.dto';
 
 const STORAGE_MAP: Record<string, StorageType> = {
@@ -67,7 +68,7 @@ export class ObjectStoreService {
       const status = await os.status();
       return this.convertObjectStoreStatus(status);
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Object store '${bucket}' not found`);
       }
       throw error;
@@ -88,7 +89,7 @@ export class ObjectStoreService {
     try {
       await jsm.streams.info(streamName);
     } catch (err: unknown) {
-      if ((err as Error).message === 'stream not found') {
+      if (isNatsNotFound(err)) {
         await jsm.streams.add({
           name: streamName,
           subjects: [`$O.${dto.name}.C.>`, `$O.${dto.name}.M.>`],
@@ -125,7 +126,7 @@ export class ObjectStoreService {
       this.logger.log(`Object store '${bucket}' destroyed on connection ${connectionId}`);
       return { success: result, deleted_bucket: bucket };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Object store '${bucket}' not found`);
       }
       throw error;
@@ -146,7 +147,7 @@ export class ObjectStoreService {
         .map((item) => this.convertObjectInfo(item));
       return { objects, total: objects.length };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Object store '${bucket}' not found`);
       }
       throw error;
@@ -169,7 +170,7 @@ export class ObjectStoreService {
       return this.convertObjectInfo(info);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Object store '${bucket}' not found`);
       }
       throw error;
@@ -193,7 +194,7 @@ export class ObjectStoreService {
       return { name, data };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Object store '${bucket}' not found`);
       }
       throw error;
@@ -218,7 +219,7 @@ export class ObjectStoreService {
       this.logger.log(`Object '${name}' stored in '${bucket}' on connection ${connectionId}`);
       return this.convertObjectInfo(info);
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Object store '${bucket}' not found`);
       }
       throw error;
@@ -238,7 +239,7 @@ export class ObjectStoreService {
       this.logger.log(`Object '${name}' deleted from '${bucket}' on connection ${connectionId}`);
       return { success: true };
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('not found')) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(`Object store '${bucket}' not found`);
       }
       throw error;

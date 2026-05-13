@@ -3,10 +3,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { jobApi } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
 
 export function useJobs(connectionId: string | null, enabled = true) {
   return useQuery({
-    queryKey: ['jobs', connectionId],
+    queryKey: queryKeys.jobs.list(connectionId),
     queryFn: () => jobApi.list(connectionId!),
     enabled: !!connectionId && enabled,
     refetchInterval: enabled ? 2000 : false,

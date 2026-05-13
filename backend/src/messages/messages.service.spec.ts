@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { JsMsg, StoredMsg } from 'nats';
 import { MessagesService } from './messages.service';
 import { MessageRemediationAction } from './dto/message.dto';
+import { IndexBuildCancelledError } from './message-index.service';
 
 function createDelivery(messages: JsMsg[]) {
   return {
@@ -192,6 +193,32 @@ describe('MessagesService search index', () => {
     expect(mocks.getMessage).toHaveBeenCalledTimes(3);
     expect(mocks.getMessage).toHaveBeenNthCalledWith(1, 'ORDERS', { seq: 8 });
     expect(search.matches.map((message) => message.seq)).toEqual([8, 9, 10]);
+  });
+
+  it('reports progress and cancels long index builds', async () => {
+    const mocks = createNatsMocks();
+    mocks.streamInfo.mockResolvedValue({
+      state: { first_seq: 1, last_seq: 120, messages: 120 },
+    });
+    mocks.getMessage.mockImplementation(async (_stream: string, request: { seq: number }) =>
+      createStoredMsg(request.seq, `orders.${request.seq}`),
+    );
+    const onProgress = jest.fn().mockResolvedValue(undefined);
+    const shouldCancel = jest
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    await expect(
+      service.buildSearchIndex(mocks.jsm, 'conn', 'ORDERS', 120, {
+        onProgress,
+        shouldCancel,
+      }),
+    ).rejects.toBeInstanceOf(IndexBuildCancelledError);
+
+    expect(onProgress).toHaveBeenCalledWith({ current: 50, total: 120, indexed: 50 });
+    expect(shouldCancel).toHaveBeenCalledTimes(3);
   });
 });
 

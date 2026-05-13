@@ -371,7 +371,7 @@ export const messageApi = {
 
   buildIndex: (connectionId: string, streamName: string, limit = 2000) =>
     fetchApi<{ stream_name: string; indexed_messages: number }>(
-      `/connections/${connectionId}/streams/${streamName}/messages/index/build`,
+      `/connections/${connectionId}/streams/${encodeURIComponent(streamName)}/messages/index/build`,
       {
         method: 'POST',
         body: JSON.stringify({ limit }),
@@ -380,13 +380,13 @@ export const messageApi = {
 
   searchIndex: (connectionId: string, streamName: string, query: string, limit = 100) =>
     fetchApi<MessageIndexSearchResponse>(
-      `/connections/${connectionId}/streams/${streamName}/messages/index/search?query=${encodeURIComponent(query)}&limit=${limit}`,
+      `/connections/${connectionId}/streams/${encodeURIComponent(streamName)}/messages/index/search?query=${encodeURIComponent(query)}&limit=${limit}`,
     ),
 
   validateSchema: (connectionId: string, schema: Record<string, unknown>, payload: unknown) =>
     fetchApi<SchemaValidationResponse>(`/connections/${connectionId}/messages/validate-schema`, {
       method: 'POST',
-      body: JSON.stringify({ schema, payload }),
+      body: JSON.stringify({ schema, data: payload }),
     }),
 };
 

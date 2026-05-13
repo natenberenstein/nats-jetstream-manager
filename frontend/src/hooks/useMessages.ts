@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GetMessagesParams, messageApi } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
 import {
   MessageDeleteRequest,
   MessagePublishRequest,
@@ -16,25 +17,35 @@ function invalidateMessageState(
   streamName?: string,
   consumerName?: string,
 ) {
-  queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
-  queryClient.invalidateQueries({ queryKey: ['all-stream-metrics', connectionId] });
-  queryClient.invalidateQueries({ queryKey: ['consumer-diagnostics', connectionId] });
+  queryClient.invalidateQueries({ queryKey: queryKeys.streams.list(connectionId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.streamMetrics.all(connectionId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.consumers.diagnostics(connectionId) });
 
   if (!streamName) return;
-  queryClient.invalidateQueries({ queryKey: ['stream', connectionId, streamName] });
-  queryClient.invalidateQueries({ queryKey: ['messages', connectionId, streamName] });
-  queryClient.invalidateQueries({ queryKey: ['message', connectionId, streamName] });
-  queryClient.invalidateQueries({ queryKey: ['stream-metrics', connectionId, streamName] });
-  queryClient.invalidateQueries({ queryKey: ['consumers', connectionId, streamName] });
-  queryClient.invalidateQueries({ queryKey: ['consumer-analytics', connectionId, streamName] });
-  queryClient.invalidateQueries({ queryKey: ['consumer-metrics', connectionId, streamName] });
+  queryClient.invalidateQueries({ queryKey: queryKeys.streams.detail(connectionId, streamName) });
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.messages.byStream(connectionId, streamName),
+  });
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.messages.detailByStream(connectionId, streamName),
+  });
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.streamMetrics.detail(connectionId, streamName),
+  });
+  queryClient.invalidateQueries({ queryKey: queryKeys.consumers.list(connectionId, streamName) });
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.consumers.analytics(connectionId, streamName),
+  });
+  queryClient.invalidateQueries({
+    queryKey: queryKeys.consumers.metrics(connectionId, streamName),
+  });
 
   if (!consumerName) return;
   queryClient.invalidateQueries({
-    queryKey: ['consumer', connectionId, streamName, consumerName],
+    queryKey: queryKeys.consumers.detail(connectionId, streamName, consumerName),
   });
   queryClient.invalidateQueries({
-    queryKey: ['consumer-metric', connectionId, streamName, consumerName],
+    queryKey: queryKeys.consumers.metric(connectionId, streamName, consumerName),
   });
 }
 
@@ -45,7 +56,7 @@ export function useMessages(
   refetchInterval: number | false = false,
 ) {
   return useQuery({
-    queryKey: ['messages', connectionId, streamName, params],
+    queryKey: queryKeys.messages.list(connectionId, streamName, params),
     queryFn: () => messageApi.getMessages(connectionId!, streamName!, params),
     enabled: !!connectionId && !!streamName,
     refetchInterval,
@@ -59,7 +70,7 @@ export function useMessage(
   seq: number | null,
 ) {
   return useQuery({
-    queryKey: ['message', connectionId, streamName, seq],
+    queryKey: queryKeys.messages.detail(connectionId, streamName, seq),
     queryFn: () => messageApi.getMessage(connectionId!, streamName!, seq!),
     enabled: !!connectionId && !!streamName && seq !== null,
   });
@@ -71,7 +82,7 @@ export function usePublishMessage(connectionId: string | null) {
   return useMutation({
     mutationFn: (request: MessagePublishRequest) => messageApi.publish(connectionId!, request),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.streams.list(connectionId) });
     },
   });
 }
@@ -90,7 +101,7 @@ export function usePublishBatch(connectionId: string | null) {
       headers?: Record<string, string>;
     }) => messageApi.publishBatch(connectionId!, subject, messages, headers),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['streams', connectionId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.streams.list(connectionId) });
     },
   });
 }

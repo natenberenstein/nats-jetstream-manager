@@ -17,6 +17,7 @@ import { JobsService } from './jobs.service';
 import { IndexBuildJobDto } from './dto/job.dto';
 import { ConnectionsService, ConnectionInfo } from '../connections/connections.service';
 import { MessagesService } from '../messages/messages.service';
+import { IndexBuildCancelledError } from '../messages/message-index.service';
 
 @ApiTags('Jobs')
 @Controller('connections/:connectionId/jobs')
@@ -95,18 +96,22 @@ export class JobsController {
         connectionId,
         streamName,
         limit,
+        {
+          onProgress: async ({ current, total, indexed }) => {
+            const progress = total > 0 ? Math.min(99, Math.floor((current / total) * 100)) : 0;
+            await this.jobsService.updateJob(jobId, {
+              progress,
+              current,
+              total,
+              message: `Indexed ${indexed} messages from ${current}/${total} scanned sequences`,
+            });
+          },
+          shouldCancel: async () => {
+            const currentJob = await this.jobsService.getJob(connectionId, jobId);
+            return currentJob.cancel_requested;
+          },
+        },
       );
-
-      // Check if cancellation was requested
-      const currentJob = await this.jobsService.getJob(connectionId, jobId);
-      if (currentJob.cancel_requested) {
-        await this.jobsService.updateJob(jobId, {
-          status: 'cancelled',
-          completed_at: new Date(),
-          message: 'Job was cancelled',
-        });
-        return;
-      }
 
       await this.jobsService.updateJob(jobId, {
         status: 'completed',
@@ -116,6 +121,15 @@ export class JobsController {
         result_json: JSON.stringify(result ?? {}),
       });
     } catch (error: unknown) {
+      if (error instanceof IndexBuildCancelledError) {
+        await this.jobsService.updateJob(jobId, {
+          status: 'cancelled',
+          completed_at: new Date(),
+          message: `Job was cancelled after indexing ${error.indexedMessages} messages`,
+        });
+        return;
+      }
+
       await this.jobsService.updateJob(jobId, {
         status: 'failed',
         error: (error as Error).message,

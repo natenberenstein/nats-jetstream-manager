@@ -50,7 +50,9 @@ export class HealthHistoryService {
 
     for (const connItem of connections) {
       try {
-        const conn = this.connectionsService.getConnection(connItem.connection_id);
+        const conn = this.connectionsService.getConnection(connItem.connection_id, {
+          touch: false,
+        });
         let jetstreamOk = false;
         let status: 'up' | 'down' = 'down';
         let error: string | undefined;

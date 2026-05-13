@@ -1,407 +1,82 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { JetStreamClient, JetStreamManager } from 'nats';
 import {
-  JetStreamClient,
-  JetStreamManager,
-  JsMsg,
-  StoredMsg,
-  StringCodec,
-  headers as natsHeaders,
-  MsgHdrs,
-} from 'nats';
-import { randomUUID } from 'crypto';
-import {
-  MessagePublishRequestDto,
-  MessagePublishResponseDto,
-  MessagePublishBatchResponseDto,
-  MessageDataDto,
-  MessagesResponseDto,
+  BuildIndexResponseDto,
   GetMessagesQueryDto,
-  MessageReplayRequestDto,
-  MessageReplayResponseDto,
-  MessageRemediationAction,
-  MessageRemediationActionRequestDto,
-  MessageRemediationActionResultDto,
-  MessageRemediationActionResponseDto,
-  MessageRemediationFetchRequestDto,
-  MessageRemediationFetchResponseDto,
-  MessageRemediationMessageDto,
+  JsonSchemaDefinition,
+  MessageDataDto,
   MessageDeleteRequestDto,
   MessageDeleteResponseDto,
   MessageIndexSearchResponseDto,
-  IndexedMessageMatchDto,
+  MessagePublishBatchResponseDto,
+  MessagePublishRequestDto,
+  MessagePublishResponseDto,
+  MessageRemediationActionRequestDto,
+  MessageRemediationActionResponseDto,
+  MessageRemediationFetchRequestDto,
+  MessageRemediationFetchResponseDto,
+  MessageReplayRequestDto,
+  MessageReplayResponseDto,
+  MessagesResponseDto,
   ValidateSchemaResponseDto,
-  JsonSchemaDefinition,
-  BuildIndexResponseDto,
 } from './dto/message.dto';
-
-// ─── Internal types ──────────────────────────────────────────────────────────
-
-interface IndexedMessage {
-  seq: number;
-  subject: string;
-  payload: string;
-  headers: Record<string, string>;
-}
-
-interface IndexEntry {
-  messages: IndexedMessage[];
-  built_at: string;
-}
-
-interface RemediationSession {
-  id: string;
-  connectionId: string;
-  streamName: string;
-  consumerName: string;
-  messages: Map<number, JsMsg>;
-  expiresAtMs: number;
-  timer: ReturnType<typeof setTimeout>;
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const sc = StringCodec();
-const REMEDIATION_SESSION_TTL_MS = 2 * 60 * 1000;
-const MAX_REMEDIATION_BATCH_SIZE = 100;
-const DEFAULT_REMEDIATION_FETCH_EXPIRES_MS = 1000;
-const DEFAULT_REMEDIATION_ACK_TIMEOUT_MS = 2000;
-const DEFAULT_MESSAGE_SCAN_LIMIT = 2000;
-const MAX_MESSAGE_SCAN_LIMIT = 10000;
-
-/**
- * Convert a NATS subject pattern (with wildcards) to a RegExp.
- *   - `*`  matches exactly one token (between dots)
- *   - `>`  matches one or more tokens at the tail
- */
-function natsSubjectToRegex(pattern: string): RegExp {
-  const parts = pattern.split('.');
-  const regexParts = parts.map((part, _idx) => {
-    if (part === '>') {
-      // `>` is only valid as the last token
-      return '.+';
-    }
-    if (part === '*') {
-      return '[^.]+';
-    }
-    // Escape regex-special characters in the literal token
-    return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  });
-
-  return new RegExp(`^${regexParts.join('\\.')}$`);
-}
-
-function extractHeaders(hdrs: MsgHdrs | undefined): Record<string, string> | undefined {
-  if (!hdrs) return undefined;
-  const result: Record<string, string> = {};
-  for (const key of hdrs.keys()) {
-    result[key] = hdrs.get(key);
-  }
-  return Object.keys(result).length > 0 ? result : undefined;
-}
-
-function decodePayload(data: Uint8Array): string {
-  try {
-    return new TextDecoder().decode(data);
-  } catch {
-    return '';
-  }
-}
-
-function tryParseJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-}
-
-function isNatsNotFound(error: unknown): boolean {
-  const message = (error as Error).message?.toLowerCase() ?? '';
-  return message.includes('not found') || message.includes('consumer not found');
-}
-
-function parseOptionalTime(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? undefined : parsed;
-}
-
-function storedMessageTimeMs(sm: StoredMsg): number | undefined {
-  if (!sm.time) return undefined;
-  if (sm.time instanceof Date) return sm.time.getTime();
-  const parsed = Date.parse(String(sm.time));
-  return Number.isNaN(parsed) ? undefined : parsed;
-}
-
-// ─── Service ─────────────────────────────────────────────────────────────────
+import { MessagePublisherService } from './message-publisher.service';
+import { MessageReaderService } from './message-reader.service';
+import { MessageReplayService } from './message-replay.service';
+import { MessageRemediationService } from './message-remediation.service';
+import { BuildSearchIndexOptions, MessageIndexService } from './message-index.service';
+import { MessageDeleteService } from './message-delete.service';
+import { SchemaValidationService } from './schema-validation.service';
 
 @Injectable()
 export class MessagesService {
-  private readonly logger = new Logger(MessagesService.name);
+  constructor(
+    private readonly publisher: MessagePublisherService = new MessagePublisherService(),
+    private readonly reader: MessageReaderService = new MessageReaderService(),
+    private readonly replay: MessageReplayService = new MessageReplayService(),
+    private readonly remediation: MessageRemediationService = new MessageRemediationService(),
+    private readonly index: MessageIndexService = new MessageIndexService(),
+    private readonly deletion: MessageDeleteService = new MessageDeleteService(),
+    private readonly schemaValidation: SchemaValidationService = new SchemaValidationService(),
+  ) {}
 
-  /**
-   * In-memory search index keyed by "connectionId:streamName".
-   */
-  private readonly searchIndex = new Map<string, IndexEntry>();
-
-  /**
-   * Short-lived server-side sessions holding live JsMsg handles for ack operations.
-   */
-  private readonly remediationSessions = new Map<string, RemediationSession>();
-
-  // ── Publish ──────────────────────────────────────────────────────────────
-
-  async publishMessage(
+  publishMessage(
     js: JetStreamClient,
     request: MessagePublishRequestDto,
   ): Promise<MessagePublishResponseDto> {
-    const payload = typeof request.data === 'string' ? request.data : JSON.stringify(request.data);
-
-    let h: MsgHdrs | undefined;
-    if (request.headers && Object.keys(request.headers).length > 0) {
-      h = natsHeaders();
-      for (const [key, value] of Object.entries(request.headers)) {
-        h.set(key, value);
-      }
-    }
-
-    const pa = await js.publish(request.subject, sc.encode(payload), {
-      headers: h,
-    });
-
-    return {
-      stream: pa.stream,
-      seq: pa.seq,
-      duplicate: pa.duplicate,
-    };
+    return this.publisher.publishMessage(js, request);
   }
 
-  async publishBatch(
+  publishBatch(
     js: JetStreamClient,
     messages: MessagePublishRequestDto[],
   ): Promise<MessagePublishBatchResponseDto> {
-    const results: MessagePublishResponseDto[] = [];
-
-    for (const msg of messages) {
-      const result = await this.publishMessage(js, msg);
-      results.push(result);
-    }
-
-    return {
-      published: results.length,
-      results,
-    };
+    return this.publisher.publishBatch(js, messages);
   }
 
-  // ── Read ─────────────────────────────────────────────────────────────────
-
-  async getMessages(
+  getMessages(
     jsm: JetStreamManager,
     streamName: string,
     query: GetMessagesQueryDto,
   ): Promise<MessagesResponseDto> {
-    const {
-      limit = 50,
-      seq_start,
-      seq_end,
-      include_payload = true,
-      preview_bytes,
-      scan_limit,
-      from_latest = false,
-      filter_subject,
-      header_key,
-      header_value,
-      payload_contains,
-      from_time,
-      to_time,
-    } = query;
-    const fromTimeMs = parseOptionalTime(from_time);
-    const toTimeMs = parseOptionalTime(to_time);
-    const scanLimit = Math.min(
-      Math.max(scan_limit ?? Math.max(limit * 20, DEFAULT_MESSAGE_SCAN_LIMIT), limit),
-      MAX_MESSAGE_SCAN_LIMIT,
-    );
-
-    // Get stream info to know the sequence range
-    const streamInfo = await jsm.streams.info(streamName);
-    const firstSeq = streamInfo.state.first_seq;
-    const lastSeq = streamInfo.state.last_seq;
-    const totalMessages = streamInfo.state.messages;
-
-    if (totalMessages === 0) {
-      return {
-        messages: [],
-        total: 0,
-        has_more: false,
-        next_seq: null,
-        scanned: 0,
-        scan_limit: scanLimit,
-      };
-    }
-
-    // Determine the iteration range
-    let startSeq: number;
-    let endSeq: number;
-
-    if (from_latest) {
-      // Work backwards from the end
-      endSeq = seq_end ?? lastSeq;
-      startSeq = seq_start ?? firstSeq;
-    } else {
-      startSeq = seq_start ?? firstSeq;
-      endSeq = seq_end ?? lastSeq;
-    }
-
-    // Clamp to valid range
-    startSeq = Math.max(startSeq, firstSeq);
-    endSeq = Math.min(endSeq, lastSeq);
-
-    // Build subject filter regex if needed
-    let subjectRegex: RegExp | null = null;
-    if (filter_subject) {
-      subjectRegex = natsSubjectToRegex(filter_subject);
-    }
-
-    const messages: MessageDataDto[] = [];
-    let nextSeq: number | null = null;
-    let scanned = 0;
-
-    if (from_latest) {
-      // Iterate backwards
-      let cursor = endSeq;
-      while (cursor >= startSeq && messages.length < limit && scanned < scanLimit) {
-        const msg = await this.fetchAndFilterMessage(
-          jsm,
-          streamName,
-          cursor,
-          include_payload,
-          preview_bytes,
-          subjectRegex,
-          header_key,
-          header_value,
-          payload_contains,
-          fromTimeMs,
-          toTimeMs,
-        );
-        if (msg) {
-          messages.push(msg);
-        }
-        scanned += 1;
-        cursor -= 1;
-      }
-      nextSeq = cursor >= startSeq ? cursor : null;
-    } else {
-      // Iterate forwards
-      let cursor = startSeq;
-      while (cursor <= endSeq && messages.length < limit && scanned < scanLimit) {
-        const msg = await this.fetchAndFilterMessage(
-          jsm,
-          streamName,
-          cursor,
-          include_payload,
-          preview_bytes,
-          subjectRegex,
-          header_key,
-          header_value,
-          payload_contains,
-          fromTimeMs,
-          toTimeMs,
-        );
-        if (msg) {
-          messages.push(msg);
-        }
-        scanned += 1;
-        cursor += 1;
-      }
-      // Continue from the next unscanned sequence, even when filters matched no messages.
-      nextSeq = cursor <= endSeq ? cursor : null;
-    }
-
-    return {
-      messages,
-      total: totalMessages,
-      has_more: nextSeq !== null,
-      next_seq: nextSeq,
-      first_seq: firstSeq,
-      last_seq: lastSeq,
-      scanned,
-      scan_limit: scanLimit,
-      range_start: startSeq,
-      range_end: endSeq,
-    };
+    return this.reader.getMessages(jsm, streamName, query);
   }
 
-  async getMessage(
-    jsm: JetStreamManager,
-    streamName: string,
-    seq: number,
-  ): Promise<MessageDataDto> {
-    try {
-      const sm = await jsm.streams.getMessage(streamName, { seq });
-      return this.mapStoredMessage(sm, true);
-    } catch {
-      throw new NotFoundException(`Message with sequence ${seq} not found in stream ${streamName}`);
-    }
+  getMessage(jsm: JetStreamManager, streamName: string, seq: number): Promise<MessageDataDto> {
+    return this.reader.getMessage(jsm, streamName, seq);
   }
 
-  // ── Replay ───────────────────────────────────────────────────────────────
-
-  async replayMessage(
+  replayMessage(
     js: JetStreamClient,
     jsm: JetStreamManager,
     streamName: string,
     seq: number,
     request: MessageReplayRequestDto,
   ): Promise<MessageReplayResponseDto> {
-    // Fetch the original message
-    let sm: StoredMsg;
-    try {
-      sm = await jsm.streams.getMessage(streamName, { seq });
-    } catch {
-      throw new NotFoundException(`Message with sequence ${seq} not found in stream ${streamName}`);
-    }
-
-    // Build headers for the replayed message
-    let h: MsgHdrs | undefined;
-    const shouldHaveHeaders =
-      (request.copy_headers && sm.header) ||
-      (request.extra_headers && Object.keys(request.extra_headers).length > 0);
-
-    if (shouldHaveHeaders) {
-      h = natsHeaders();
-
-      // Copy original headers if requested
-      if (request.copy_headers && sm.header) {
-        for (const key of sm.header.keys()) {
-          h.set(key, sm.header.get(key));
-        }
-      }
-
-      // Apply extra headers (may overwrite copied ones)
-      if (request.extra_headers) {
-        for (const [key, value] of Object.entries(request.extra_headers)) {
-          h.set(key, value);
-        }
-      }
-    }
-
-    // Publish to the target subject with the original payload
-    const pa = await js.publish(request.target_subject, sm.data, {
-      headers: h,
-    });
-
-    return {
-      source_stream: streamName,
-      source_seq: seq,
-      target_subject: request.target_subject,
-      published_stream: pa.stream,
-      published_seq: pa.seq,
-    };
+    return this.replay.replayMessage(js, jsm, streamName, seq, request);
   }
 
-  // ── Remediation ──────────────────────────────────────────────────────────
-
-  async fetchRemediationMessages(
+  fetchRemediationMessages(
     js: JetStreamClient,
     jsm: JetStreamManager,
     connectionId: string,
@@ -409,240 +84,42 @@ export class MessagesService {
     consumerName: string,
     request: MessageRemediationFetchRequestDto,
   ): Promise<MessageRemediationFetchResponseDto> {
-    const batchSize = Math.min(Math.max(request.batch_size ?? 25, 1), MAX_REMEDIATION_BATCH_SIZE);
-    const expiresMs = request.expires_ms ?? DEFAULT_REMEDIATION_FETCH_EXPIRES_MS;
-    const previewBytes = request.preview_bytes ?? 2048;
-
-    let consumerInfo: Awaited<ReturnType<JetStreamManager['consumers']['info']>>;
-    try {
-      consumerInfo = await jsm.consumers.info(streamName, consumerName);
-    } catch (error: unknown) {
-      if (isNatsNotFound(error)) {
-        throw new NotFoundException(
-          `Consumer '${consumerName}' not found on stream '${streamName}'`,
-        );
-      }
-      throw error;
-    }
-
-    if (consumerInfo.config?.deliver_subject) {
-      throw new BadRequestException(
-        `Consumer '${consumerName}' is a push consumer; remediation fetch requires a pull consumer`,
-      );
-    }
-
-    const consumer = await js.consumers.get(streamName, consumerName).catch((error: unknown) => {
-      if (isNatsNotFound(error)) {
-        throw new NotFoundException(
-          `Consumer '${consumerName}' not found on stream '${streamName}'`,
-        );
-      }
-      throw error;
-    });
-
-    const delivered = await consumer.fetch({
-      max_messages: batchSize,
-      expires: expiresMs,
-    });
-
-    const messages: MessageRemediationMessageDto[] = [];
-    const handles = new Map<number, JsMsg>();
-
-    try {
-      for await (const msg of delivered) {
-        const streamSeq = msg.info.streamSequence;
-        handles.set(streamSeq, msg);
-        messages.push(this.mapRemediationMessage(msg, previewBytes));
-        if (messages.length >= batchSize) break;
-      }
-    } finally {
-      await delivered.close();
-    }
-
-    const session = this.createRemediationSession(connectionId, streamName, consumerName, handles);
-
-    return {
-      session_id: session.id,
-      connection_id: connectionId,
-      stream_name: streamName,
-      consumer_name: consumerName,
-      batch_size: batchSize,
-      fetched: messages.length,
-      expires_at: new Date(session.expiresAtMs).toISOString(),
-      messages,
-    };
+    return this.remediation.fetchRemediationMessages(
+      js,
+      jsm,
+      connectionId,
+      streamName,
+      consumerName,
+      request,
+    );
   }
 
-  async applyRemediationAction(
+  applyRemediationAction(
     connectionId: string,
     streamName: string,
     consumerName: string,
     request: MessageRemediationActionRequestDto,
   ): Promise<MessageRemediationActionResponseDto> {
-    const session = this.getRemediationSession(
-      request.session_id,
-      connectionId,
-      streamName,
-      consumerName,
-    );
-
-    const results: MessageRemediationActionResultDto[] = [];
-
-    for (const streamSeq of request.stream_sequences) {
-      const msg = session.messages.get(streamSeq);
-      if (!msg) {
-        results.push({
-          stream_seq: streamSeq,
-          status: 'missing' as const,
-          error: 'Message is not available in the remediation session',
-        });
-        continue;
-      }
-
-      try {
-        await this.applyActionToMessage(msg, request);
-        if (request.action !== MessageRemediationAction.Working) {
-          session.messages.delete(streamSeq);
-        }
-        results.push({
-          stream_seq: streamSeq,
-          consumer_seq: msg.info.deliverySequence,
-          subject: msg.subject,
-          status: 'ok' as const,
-        });
-      } catch (error: unknown) {
-        results.push({
-          stream_seq: streamSeq,
-          consumer_seq: msg.info.deliverySequence,
-          subject: msg.subject,
-          status: 'error' as const,
-          error: (error as Error).message,
-        });
-      }
-    }
-
-    const handled = results.filter((result) => result.status === 'ok').length;
-    const failed = results.length - handled;
-
-    if (session.messages.size === 0) {
-      this.deleteRemediationSession(session.id);
-    }
-
-    return {
-      session_id: session.id,
-      stream_name: streamName,
-      consumer_name: consumerName,
-      action: request.action,
-      handled,
-      failed,
-      remaining_session_messages: session.messages.size,
-      expires_at: new Date(session.expiresAtMs).toISOString(),
-      results,
-    };
+    return this.remediation.applyRemediationAction(connectionId, streamName, consumerName, request);
   }
 
-  async deleteStreamMessage(
+  deleteStreamMessage(
     jsm: JetStreamManager,
     streamName: string,
     seq: number,
     request: MessageDeleteRequestDto,
   ): Promise<MessageDeleteResponseDto> {
-    const erase = request.erase ?? true;
-    if (request.confirm_stream_name !== streamName || request.confirm_seq !== seq) {
-      throw new BadRequestException(
-        `Delete confirmation must match stream '${streamName}' and sequence ${seq}`,
-      );
-    }
-
-    try {
-      await jsm.streams.getMessage(streamName, { seq });
-    } catch (error: unknown) {
-      if (isNatsNotFound(error)) {
-        throw new NotFoundException(
-          `Message with sequence ${seq} not found in stream ${streamName}`,
-        );
-      }
-      throw new NotFoundException(`Message with sequence ${seq} not found in stream ${streamName}`);
-    }
-
-    let deleted: boolean;
-    try {
-      deleted = await jsm.streams.deleteMessage(streamName, seq, erase);
-    } catch (error: unknown) {
-      if (isNatsNotFound(error)) {
-        throw new NotFoundException(
-          `Message with sequence ${seq} not found in stream ${streamName}`,
-        );
-      }
-      throw error;
-    }
-
-    if (!deleted) {
-      throw new NotFoundException(`Message with sequence ${seq} not found in stream ${streamName}`);
-    }
-
-    return {
-      success: true,
-      stream_name: streamName,
-      seq,
-      erased: erase,
-      deleted,
-    };
+    return this.deletion.deleteStreamMessage(jsm, streamName, seq, request);
   }
 
-  // ── Search Index ─────────────────────────────────────────────────────────
-
-  async buildSearchIndex(
+  buildSearchIndex(
     jsm: JetStreamManager,
     connectionId: string,
     streamName: string,
     limit: number = 2000,
+    options: BuildSearchIndexOptions = {},
   ): Promise<BuildIndexResponseDto> {
-    const streamInfo = await jsm.streams.info(streamName);
-    const firstSeq = streamInfo.state.first_seq;
-    const lastSeq = streamInfo.state.last_seq;
-    const totalMessages = streamInfo.state.messages;
-
-    if (totalMessages === 0) {
-      const key = `${connectionId}:${streamName}`;
-      this.searchIndex.set(key, { messages: [], built_at: new Date().toISOString() });
-      return { stream_name: streamName, indexed_messages: 0 };
-    }
-
-    const indexed: IndexedMessage[] = [];
-    const cappedLimit = Math.max(1, Math.floor(limit));
-    const startSeq = Math.max(firstSeq, lastSeq - cappedLimit + 1);
-
-    for (let seq = startSeq; seq <= lastSeq; seq++) {
-      try {
-        const sm = await jsm.streams.getMessage(streamName, { seq });
-        const payload = decodePayload(sm.data);
-        const headers = extractHeaders(sm.header) ?? {};
-
-        indexed.push({
-          seq: sm.seq,
-          subject: sm.subject,
-          payload,
-          headers,
-        });
-      } catch {
-        // Sequence may have been deleted — skip gaps
-        continue;
-      }
-    }
-
-    const key = `${connectionId}:${streamName}`;
-    this.searchIndex.set(key, {
-      messages: indexed,
-      built_at: new Date().toISOString(),
-    });
-
-    this.logger.log(`Built search index for ${key}: ${indexed.length} messages`);
-
-    return {
-      stream_name: streamName,
-      indexed_messages: indexed.length,
-    };
+    return this.index.buildSearchIndex(jsm, connectionId, streamName, limit, options);
   }
 
   searchIndexMessages(
@@ -651,367 +128,10 @@ export class MessagesService {
     queryStr: string,
     limit: number = 50,
   ): MessageIndexSearchResponseDto {
-    const key = `${connectionId}:${streamName}`;
-    const entry = this.searchIndex.get(key);
-
-    if (!entry) {
-      return {
-        stream_name: streamName,
-        query: queryStr,
-        total: 0,
-        indexed_messages: 0,
-        matches: [],
-      };
-    }
-
-    const lowerQuery = queryStr.toLowerCase();
-    const matches: IndexedMessageMatchDto[] = [];
-
-    for (const msg of entry.messages) {
-      if (matches.length >= limit) break;
-
-      const subjectMatch = msg.subject.toLowerCase().includes(lowerQuery);
-      const payloadMatch = msg.payload.toLowerCase().includes(lowerQuery);
-
-      if (subjectMatch || payloadMatch) {
-        matches.push({
-          seq: msg.seq,
-          subject: msg.subject,
-          payload_preview:
-            msg.payload.length > 200 ? msg.payload.slice(0, 200) + '...' : msg.payload,
-          headers: Object.keys(msg.headers).length > 0 ? msg.headers : undefined,
-        });
-      }
-    }
-
-    return {
-      stream_name: streamName,
-      query: queryStr,
-      total: matches.length,
-      indexed_messages: entry.messages.length,
-      matches,
-      built_at: entry.built_at,
-    };
+    return this.index.searchIndexMessages(connectionId, streamName, queryStr, limit);
   }
-
-  // ── Schema Validation ────────────────────────────────────────────────────
 
   validateSchema(data: unknown, schema: JsonSchemaDefinition): ValidateSchemaResponseDto {
-    const errors: string[] = [];
-    this.validateValue(data, schema, '', errors);
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  }
-
-  // ── Private Helpers ──────────────────────────────────────────────────────
-
-  private async fetchAndFilterMessage(
-    jsm: JetStreamManager,
-    streamName: string,
-    seq: number,
-    includePayload: boolean,
-    previewBytes: number | undefined,
-    subjectRegex: RegExp | null,
-    headerKey: string | undefined,
-    headerValue: string | undefined,
-    payloadContains: string | undefined,
-    fromTimeMs: number | undefined,
-    toTimeMs: number | undefined,
-  ): Promise<MessageDataDto | null> {
-    let sm: StoredMsg;
-    try {
-      sm = await jsm.streams.getMessage(streamName, { seq });
-    } catch {
-      // Deleted or missing sequence — skip
-      return null;
-    }
-
-    // Apply subject filter
-    if (subjectRegex && !subjectRegex.test(sm.subject)) {
-      return null;
-    }
-
-    if (fromTimeMs !== undefined || toTimeMs !== undefined) {
-      const messageTimeMs = storedMessageTimeMs(sm);
-      if (messageTimeMs === undefined) return null;
-      if (fromTimeMs !== undefined && messageTimeMs < fromTimeMs) return null;
-      if (toTimeMs !== undefined && messageTimeMs > toTimeMs) return null;
-    }
-
-    // Apply header filter
-    if (headerKey) {
-      const hdrs = sm.header;
-      if (!hdrs) return null;
-      const val = hdrs.get(headerKey);
-      if (!val) return null;
-      if (headerValue && val !== headerValue) return null;
-    }
-
-    // Apply payload contains filter
-    if (payloadContains) {
-      const payload = decodePayload(sm.data);
-      if (!payload.toLowerCase().includes(payloadContains.toLowerCase())) {
-        return null;
-      }
-    }
-
-    return this.mapStoredMessage(sm, includePayload, previewBytes);
-  }
-
-  private mapStoredMessage(
-    sm: StoredMsg,
-    includePayload: boolean,
-    previewBytes?: number,
-  ): MessageDataDto {
-    const raw = decodePayload(sm.data);
-    const payloadSize = sm.data ? sm.data.length : 0;
-    const headers = extractHeaders(sm.header);
-    const time = sm.time
-      ? sm.time instanceof Date
-        ? sm.time.toISOString()
-        : String(sm.time)
-      : null;
-
-    const dto: MessageDataDto = {
-      subject: sm.subject,
-      seq: sm.seq,
-      payload_size: payloadSize,
-      headers,
-      time,
-    };
-
-    if (includePayload) {
-      if (previewBytes && raw.length > previewBytes) {
-        dto.data_preview = raw.slice(0, previewBytes);
-      } else {
-        dto.data = tryParseJson(raw);
-      }
-    } else if (previewBytes) {
-      dto.data_preview = raw.slice(0, previewBytes);
-    }
-
-    return dto;
-  }
-
-  private mapRemediationMessage(msg: JsMsg, previewBytes: number): MessageRemediationMessageDto {
-    const raw = decodePayload(msg.data);
-    const payloadSize = msg.data ? msg.data.length : 0;
-    const time =
-      msg.info.timestampNanos > 0
-        ? new Date(Math.floor(msg.info.timestampNanos / 1_000_000)).toISOString()
-        : null;
-
-    const dto: MessageRemediationMessageDto = {
-      subject: msg.subject,
-      seq: msg.info.streamSequence,
-      consumer_seq: msg.info.deliverySequence,
-      delivery_count: msg.info.deliveryCount,
-      pending: msg.info.pending,
-      redelivered: msg.info.redelivered,
-      payload_size: payloadSize,
-      headers: extractHeaders(msg.headers),
-      time,
-    };
-
-    if (raw.length > previewBytes) {
-      dto.data_preview = raw.slice(0, previewBytes);
-    } else {
-      dto.data = tryParseJson(raw);
-    }
-
-    return dto;
-  }
-
-  private async applyActionToMessage(
-    msg: JsMsg,
-    request: MessageRemediationActionRequestDto,
-  ): Promise<void> {
-    switch (request.action) {
-      case MessageRemediationAction.Ack: {
-        const confirmed = await msg.ackAck({ timeout: DEFAULT_REMEDIATION_ACK_TIMEOUT_MS });
-        if (!confirmed) {
-          throw new Error('JetStream did not confirm the acknowledgement');
-        }
-        return;
-      }
-      case MessageRemediationAction.Nak:
-        msg.nak(request.nak_delay_ms);
-        return;
-      case MessageRemediationAction.Term:
-        msg.term(request.term_reason);
-        return;
-      case MessageRemediationAction.Working:
-        msg.working();
-        return;
-      default:
-        throw new BadRequestException(`Unsupported remediation action: ${request.action}`);
-    }
-  }
-
-  private createRemediationSession(
-    connectionId: string,
-    streamName: string,
-    consumerName: string,
-    messages: Map<number, JsMsg>,
-  ): RemediationSession {
-    const id = randomUUID();
-    const expiresAtMs = Date.now() + REMEDIATION_SESSION_TTL_MS;
-    const timer = setTimeout(() => {
-      this.remediationSessions.delete(id);
-    }, REMEDIATION_SESSION_TTL_MS);
-    timer.unref?.();
-
-    const session: RemediationSession = {
-      id,
-      connectionId,
-      streamName,
-      consumerName,
-      messages,
-      expiresAtMs,
-      timer,
-    };
-    this.remediationSessions.set(id, session);
-    return session;
-  }
-
-  private getRemediationSession(
-    sessionId: string,
-    connectionId: string,
-    streamName: string,
-    consumerName: string,
-  ): RemediationSession {
-    const session = this.remediationSessions.get(sessionId);
-    if (!session || session.expiresAtMs <= Date.now()) {
-      if (session) this.deleteRemediationSession(sessionId);
-      throw new NotFoundException('Remediation session has expired or does not exist');
-    }
-
-    if (
-      session.connectionId !== connectionId ||
-      session.streamName !== streamName ||
-      session.consumerName !== consumerName
-    ) {
-      throw new BadRequestException('Remediation session does not match the requested consumer');
-    }
-
-    return session;
-  }
-
-  private deleteRemediationSession(sessionId: string): void {
-    const session = this.remediationSessions.get(sessionId);
-    if (!session) return;
-    clearTimeout(session.timer);
-    this.remediationSessions.delete(sessionId);
-  }
-
-  private validateValue(
-    value: unknown,
-    schema: JsonSchemaDefinition,
-    path: string,
-    errors: string[],
-  ): void {
-    const fieldLabel = path || 'root';
-
-    if (schema.enum) {
-      if (!schema.enum.includes(value)) {
-        errors.push(`${fieldLabel}: value must be one of [${schema.enum.join(', ')}]`);
-      }
-      return;
-    }
-
-    if (!schema.type) return;
-
-    switch (schema.type) {
-      case 'string':
-        if (typeof value !== 'string') {
-          errors.push(`${fieldLabel}: expected string, got ${typeof value}`);
-          return;
-        }
-        if (schema.minLength !== undefined && value.length < schema.minLength) {
-          errors.push(`${fieldLabel}: string length must be >= ${schema.minLength}`);
-        }
-        if (schema.maxLength !== undefined && value.length > schema.maxLength) {
-          errors.push(`${fieldLabel}: string length must be <= ${schema.maxLength}`);
-        }
-        break;
-
-      case 'number':
-      case 'integer':
-        if (typeof value !== 'number') {
-          errors.push(`${fieldLabel}: expected ${schema.type}, got ${typeof value}`);
-          return;
-        }
-        if (schema.type === 'integer' && !Number.isInteger(value)) {
-          errors.push(`${fieldLabel}: expected integer, got float`);
-        }
-        if (schema.minimum !== undefined && value < schema.minimum) {
-          errors.push(`${fieldLabel}: value must be >= ${schema.minimum}`);
-        }
-        if (schema.maximum !== undefined && value > schema.maximum) {
-          errors.push(`${fieldLabel}: value must be <= ${schema.maximum}`);
-        }
-        break;
-
-      case 'boolean':
-        if (typeof value !== 'boolean') {
-          errors.push(`${fieldLabel}: expected boolean, got ${typeof value}`);
-        }
-        break;
-
-      case 'null':
-        if (value !== null) {
-          errors.push(`${fieldLabel}: expected null`);
-        }
-        break;
-
-      case 'array':
-        if (!Array.isArray(value)) {
-          errors.push(`${fieldLabel}: expected array, got ${typeof value}`);
-          return;
-        }
-        if (schema.items) {
-          value.forEach((item: unknown, idx: number) => {
-            this.validateValue(item, schema.items!, `${path}[${idx}]`, errors);
-          });
-        }
-        break;
-
-      case 'object':
-        if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-          errors.push(`${fieldLabel}: expected object`);
-          return;
-        }
-        {
-          const obj = value as Record<string, unknown>;
-          // Check required fields
-          if (schema.required) {
-            for (const field of schema.required) {
-              if (!(field in obj)) {
-                errors.push(`${path ? path + '.' : ''}${field}: required field is missing`);
-              }
-            }
-          }
-          // Validate known properties
-          if (schema.properties) {
-            for (const [propName, propSchema] of Object.entries(schema.properties)) {
-              if (propName in obj) {
-                this.validateValue(
-                  obj[propName],
-                  propSchema,
-                  path ? `${path}.${propName}` : propName,
-                  errors,
-                );
-              }
-            }
-          }
-        }
-        break;
-
-      default:
-        errors.push(`${fieldLabel}: unsupported type "${schema.type}"`);
-    }
+    return this.schemaValidation.validateSchema(data, schema);
   }
 }

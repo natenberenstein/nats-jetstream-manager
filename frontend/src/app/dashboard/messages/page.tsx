@@ -16,6 +16,7 @@ import {
 } from '@/hooks/useMessages';
 import { useCancelJob, useJobs, useStartIndexJob } from '@/hooks/useJobs';
 import { useConsumers } from '@/hooks/useConsumers';
+import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import { useStreams } from '@/hooks/useStreams';
 import {
   ViewControls,
@@ -191,9 +192,15 @@ export default function MessagesPage() {
   const [compareLoading, setCompareLoading] = useState<Record<number, boolean>>({});
   const [showDiffViewer, setShowDiffViewer] = useState(false);
   const refetchRef = useRef<() => void>(() => {});
-  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
-  const [favoriteStreams, setFavoriteStreams] = useState<string[]>([]);
-  const [messageBookmarks, setMessageBookmarks] = useState<Record<string, number[]>>({});
+  const [savedViews, setSavedViews] = useLocalStorageState<SavedView[]>(SAVED_VIEWS_KEY, []);
+  const [favoriteStreams, setFavoriteStreams] = useLocalStorageState<string[]>(
+    FAVORITE_STREAMS_KEY,
+    [],
+  );
+  const [messageBookmarks, setMessageBookmarks] = useLocalStorageState<Record<string, number[]>>(
+    MESSAGE_BOOKMARKS_KEY,
+    {},
+  );
 
   const [showHeadersCol, setShowHeadersCol] = useState(false);
   const [showSizeCol, setShowSizeCol] = useState(true);
@@ -217,34 +224,6 @@ export default function MessagesPage() {
   const [indexLoading, setIndexLoading] = useState(false);
   const [indexLimit, setIndexLimit] = useState(2000);
   const [activeIndexJobId, setActiveIndexJobId] = useState<string | null>(null);
-
-  // Load saved views and favorites from localStorage
-  useEffect(() => {
-    const viewsRaw = localStorage.getItem(SAVED_VIEWS_KEY);
-    if (viewsRaw) {
-      try {
-        setSavedViews(JSON.parse(viewsRaw) as SavedView[]);
-      } catch {
-        setSavedViews([]);
-      }
-    }
-    const favoritesRaw = localStorage.getItem(FAVORITE_STREAMS_KEY);
-    if (favoritesRaw) {
-      try {
-        setFavoriteStreams(JSON.parse(favoritesRaw) as string[]);
-      } catch {
-        setFavoriteStreams([]);
-      }
-    }
-    const bookmarksRaw = localStorage.getItem(MESSAGE_BOOKMARKS_KEY);
-    if (bookmarksRaw) {
-      try {
-        setMessageBookmarks(JSON.parse(bookmarksRaw) as Record<string, number[]>);
-      } catch {
-        setMessageBookmarks({});
-      }
-    }
-  }, []);
 
   // Sync URL search params to state
   useEffect(() => {
@@ -808,9 +787,7 @@ export default function MessagesPage() {
       const nextForStream = current.includes(seq)
         ? current.filter((item) => item !== seq)
         : [...current, seq].sort((a, b) => a - b);
-      const next = { ...prev, [selectedStream]: nextForStream };
-      localStorage.setItem(MESSAGE_BOOKMARKS_KEY, JSON.stringify(next));
-      return next;
+      return { ...prev, [selectedStream]: nextForStream };
     });
   };
 
@@ -909,7 +886,6 @@ export default function MessagesPage() {
       ? favoriteStreams.filter((s) => s !== selectedStream)
       : [...favoriteStreams, selectedStream];
     setFavoriteStreams(next);
-    localStorage.setItem(FAVORITE_STREAMS_KEY, JSON.stringify(next));
   };
 
   const saveCurrentView = async () => {
@@ -941,7 +917,6 @@ export default function MessagesPage() {
       { name, query: Object.fromEntries(params) },
     ];
     setSavedViews(nextViews);
-    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(nextViews));
     toast.success(`View "${name}" saved.`);
   };
 

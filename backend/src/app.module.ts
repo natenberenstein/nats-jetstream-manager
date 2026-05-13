@@ -41,6 +41,10 @@ import * as fs from 'fs';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const dbType = configService.get<string>('DATABASE_TYPE', 'sqlite');
+        const isProduction = configService.get<string>('NODE_ENV') === 'production';
+        const synchronize =
+          configService.get<string>('TYPEORM_SYNCHRONIZE', isProduction ? 'false' : 'true') ===
+          'true';
 
         if (dbType === 'postgres') {
           return {
@@ -55,7 +59,7 @@ import * as fs from 'fs';
                 ? { rejectUnauthorized: false }
                 : false,
             autoLoadEntities: true,
-            synchronize: true,
+            synchronize,
           };
         }
 
@@ -68,7 +72,7 @@ import * as fs from 'fs';
           type: 'better-sqlite3' as const,
           database: dbPath,
           autoLoadEntities: true,
-          synchronize: true,
+          synchronize,
         };
       },
       inject: [ConfigService],

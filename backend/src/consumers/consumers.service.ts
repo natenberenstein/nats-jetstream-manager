@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { AckPolicy, DeliverPolicy, ReplayPolicy, ConsumerInfo, StreamInfo } from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
 import { StreamsService } from '../streams/streams.service';
+import { isNatsNotFound } from '../common/nats/errors';
 import { ConsumerCreateDto, ConsumerUpdateDto } from './dto/consumer.dto';
 
 export interface ConsumerMetric {
@@ -164,10 +165,7 @@ export class ConsumersService {
       const ci = await jsm.consumers.info(streamName, consumerName);
       return this.convertConsumerInfo(ci);
     } catch (error: unknown) {
-      if (
-        (error as Error).message?.includes('consumer not found') ||
-        (error as Error).message?.includes('not found')
-      ) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(
           `Consumer '${consumerName}' not found on stream '${streamName}'`,
         );
@@ -250,10 +248,7 @@ export class ConsumersService {
     try {
       currentInfo = await jsm.consumers.info(streamName, consumerName);
     } catch (error: unknown) {
-      if (
-        (error as Error).message?.includes('consumer not found') ||
-        (error as Error).message?.includes('not found')
-      ) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(
           `Consumer '${consumerName}' not found on stream '${streamName}'`,
         );
@@ -305,10 +300,7 @@ export class ConsumersService {
       this.logger.log(`Consumer '${consumerName}' deleted from stream '${streamName}'`);
       return { success: true, deleted_consumer: consumerName };
     } catch (error: unknown) {
-      if (
-        (error as Error).message?.includes('consumer not found') ||
-        (error as Error).message?.includes('not found')
-      ) {
+      if (isNatsNotFound(error)) {
         throw new NotFoundException(
           `Consumer '${consumerName}' not found on stream '${streamName}'`,
         );
