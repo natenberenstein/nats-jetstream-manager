@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.2](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.1...v1.9.2) (2026-05-14)
+
+
+### Bug Fixes
+
+* include backend workspace modules in image ([d9a3e0e](https://github.com/natenberenstein/nats-jetstream-manager/commit/d9a3e0e93e650082bf8033f77b7d75a51ecc67d2))
+* include backend workspace modules in image ([994eb58](https://github.com/natenberenstein/nats-jetstream-manager/commit/994eb586a5ff8839552fcbfd8bc9e03d8e209b87))
+
 ## [1.9.1](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.0...v1.9.1) (2026-05-14)
 
 
