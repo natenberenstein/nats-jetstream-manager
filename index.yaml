@@ -2,8 +2,26 @@ apiVersion: v1
 entries:
   nats-jetstream-manager:
   - apiVersion: v2
+    appVersion: 1.9.3
+    created: "2026-05-14T16:07:32.876994886Z"
+    description: A Helm chart for NATS JetStream Manager - a web UI for managing NATS
+      JetStream clusters
+    digest: 7444dfdcb9427b0f55d28c2e4360c9d31d0065bff0743b86442fce5c5939973a
+    keywords:
+    - nats
+    - jetstream
+    - streaming
+    - messaging
+    maintainers:
+    - name: ncbernar
+    name: nats-jetstream-manager
+    type: application
+    urls:
+    - https://natenberenstein.github.io/nats-jetstream-manager/nats-jetstream-manager-1.9.3.tgz
+    version: 1.9.3
+  - apiVersion: v2
     appVersion: 1.9.2
-    created: "2026-05-14T06:52:43.315250376Z"
+    created: "2026-05-14T16:07:32.876366405Z"
     description: A Helm chart for NATS JetStream Manager - a web UI for managing NATS
       JetStream clusters
     digest: 774de47bf45b33541f8feffdb75c1d1884e399be7b728c6901f0638eb6f7de5e
@@ -21,7 +39,7 @@ entries:
     version: 1.9.2
   - apiVersion: v2
     appVersion: 1.9.1
-    created: "2026-05-14T06:52:43.314657122Z"
+    created: "2026-05-14T16:07:32.875766847Z"
     description: A Helm chart for NATS JetStream Manager - a web UI for managing NATS
       JetStream clusters
     digest: bf511913100938743e8e04fd840a27b259fc494c9e980aa57eb621bd23cc2757
@@ -39,7 +57,7 @@ entries:
     version: 1.9.1
   - apiVersion: v2
     appVersion: 1.8.2
-    created: "2026-05-14T06:52:43.314035837Z"
+    created: "2026-05-14T16:07:32.875144317Z"
     description: A Helm chart for NATS JetStream Manager - a web UI for managing NATS
       JetStream clusters
     digest: d16ff15cfb22c05f36457fbff61ea2e38bc71504d529cf5f649e450127fe8cd7
@@ -55,4 +73,4 @@ entries:
     urls:
     - https://natenberenstein.github.io/nats-jetstream-manager/nats-jetstream-manager-1.8.2.tgz
     version: 1.8.2
-generated: "2026-05-14T06:52:43.313253482Z"
+generated: "2026-05-14T16:07:32.874362129Z"
