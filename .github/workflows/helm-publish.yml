@@ -1,6 +1,8 @@
 name: helm-publish
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -14,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.event.release.tag_name || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -33,8 +35,10 @@ jobs:
         env:
           INPUT_REF: ${{ github.event.inputs.ref }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          version="$INPUT_TAG"
+          version="${INPUT_TAG:-$RELEASE_TAG}"
+          version="${version#refs/tags/}"
           version="${version#v}"
 
           if [[ -z "$version" ]]; then
@@ -49,6 +53,8 @@ jobs:
 
           if [[ -n "$INPUT_REF" ]]; then
             checkout_ref="$INPUT_REF"
+          elif [[ -n "$RELEASE_TAG" ]]; then
+            checkout_ref="$RELEASE_TAG"
           else
             checkout_ref="v$version"
           fi
