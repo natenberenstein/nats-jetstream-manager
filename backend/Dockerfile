@@ -21,6 +21,7 @@ RUN addgroup --system --gid 1001 nestjs && \
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/backend/node_modules ./node_modules
 COPY --from=builder /app/backend/dist ./dist
 
 RUN mkdir -p /app/data && chown nestjs:nestjs /app/data
