@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.5...v1.10.0) (2026-05-15)
+
+
+### Features
+
+* add live tail and operations workflows ([765ea9b](https://github.com/natenberenstein/nats-jetstream-manager/commit/765ea9bf8b576f9c8eb8b44cd7aaf834351ddfe3))
+* add live tail and operations workflows ([45b5627](https://github.com/natenberenstein/nats-jetstream-manager/commit/45b5627332d7ed714f8ffc3e0eeefa659642808f))
+
+
+### Bug Fixes
+
+* address live tail review findings ([1552dc9](https://github.com/natenberenstein/nats-jetstream-manager/commit/1552dc9c5ef780600f63906de235539d5e161433))
+
 ## [1.9.5](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.4...v1.9.5) (2026-05-15)
 
 
