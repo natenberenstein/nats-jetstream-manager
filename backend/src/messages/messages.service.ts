@@ -142,7 +142,11 @@ export class MessagesService {
     return this.schemaValidation.validateSchema(data, schema);
   }
 
-  tailMessages(nc: NatsConnection, query: TailMessagesQueryDto): Observable<MessageEvent> {
+  tailMessages(
+    nc: NatsConnection,
+    query: TailMessagesQueryDto,
+    onActivity?: () => void,
+  ): Observable<MessageEvent> {
     const { subject, include_payload = true, preview_bytes = 4096 } = query;
 
     return new Observable<MessageEvent>((subscriber) => {
@@ -153,6 +157,7 @@ export class MessagesService {
       const emit = (event: LiveTailEventDto) => subscriber.next({ data: event });
       const now = () => new Date().toISOString();
 
+      onActivity?.();
       emit({
         event_type: 'status',
         subject,
@@ -161,6 +166,7 @@ export class MessagesService {
       });
 
       const heartbeat = setInterval(() => {
+        onActivity?.();
         emit({
           event_type: 'heartbeat',
           subject,
@@ -173,6 +179,7 @@ export class MessagesService {
         try {
           for await (const message of subscription) {
             received += 1;
+            onActivity?.();
             emit({
               event_type: 'message',
               subject,

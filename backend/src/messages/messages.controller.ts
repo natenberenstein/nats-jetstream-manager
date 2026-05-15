@@ -100,7 +100,9 @@ export class MessagesController {
     @Query() query: TailMessagesQueryDto,
   ): Observable<MessageEvent> {
     const conn = this.connectionsService.getConnection(connectionId);
-    return this.messagesService.tailMessages(conn.nc, query);
+    return this.messagesService.tailMessages(conn.nc, query, () =>
+      this.connectionsService.touchConnection(connectionId),
+    );
   }
 
   @Get('streams/:streamName/messages')

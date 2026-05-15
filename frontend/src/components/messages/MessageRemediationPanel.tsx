@@ -210,7 +210,9 @@ export function MessageRemediationPanel({
                 ? 'Ack marks selected deliveries as handled for this consumer.'
                 : action === 'nak'
                   ? 'Nak makes selected deliveries eligible for redelivery.'
-                  : 'Term stops redelivery for selected deliveries.',
+                  : action === 'working'
+                    ? 'Working extends the ack wait and signals active processing; it does not mark the message handled or stop redelivery.'
+                    : 'Term stops redelivery for selected deliveries.',
             ]}
           />
         ),

@@ -125,6 +125,13 @@ export class ConnectionsService implements OnModuleDestroy {
     return this.connections.get(connectionId) ?? null;
   }
 
+  touchConnection(connectionId: string): void {
+    const conn = this.connections.get(connectionId);
+    if (conn) {
+      conn.lastAccessed = new Date();
+    }
+  }
+
   async removeConnection(connectionId: string): Promise<void> {
     const conn = this.connections.get(connectionId);
     if (!conn) {
