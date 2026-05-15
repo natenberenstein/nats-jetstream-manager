@@ -27,6 +27,7 @@ export interface BulkDeleteDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: ReactNode;
+  impact?: ReactNode;
   items: string[];
   /** Called for each item. Should throw on failure. */
   onDeleteItem: (name: string) => Promise<void>;
@@ -39,6 +40,7 @@ export function BulkDeleteDialog({
   onOpenChange,
   title,
   description,
+  impact,
   items,
   onDeleteItem,
   onFinished,
@@ -114,6 +116,7 @@ export function BulkDeleteDialog({
               ? `Finished: ${summary.succeeded} succeeded, ${summary.failed.length} failed.`
               : `This will permanently delete ${items.length} item${items.length === 1 ? '' : 's'}.`}
           </p>
+          {!finished && impact}
           <div className="max-h-64 overflow-auto rounded border bg-muted/40 divide-y">
             {states.map((s) => (
               <div key={s.name} className="flex items-center gap-2 px-3 py-1.5 text-xs">

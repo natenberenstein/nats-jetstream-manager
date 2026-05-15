@@ -1,9 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { JetStreamClient, JetStreamManager } from 'nats';
+import { Injectable, MessageEvent } from '@nestjs/common';
+import { JetStreamClient, JetStreamManager, Msg, NatsConnection } from 'nats';
+import { Observable } from 'rxjs';
 import {
   BuildIndexResponseDto,
   GetMessagesQueryDto,
   JsonSchemaDefinition,
+  LiveTailEventDto,
+  LiveTailMessageDto,
   MessageDataDto,
   MessageDeleteRequestDto,
   MessageDeleteResponseDto,
@@ -18,6 +21,7 @@ import {
   MessageReplayRequestDto,
   MessageReplayResponseDto,
   MessagesResponseDto,
+  TailMessagesQueryDto,
   ValidateSchemaResponseDto,
 } from './dto/message.dto';
 import { MessagePublisherService } from './message-publisher.service';
@@ -27,6 +31,9 @@ import { MessageRemediationService } from './message-remediation.service';
 import { BuildSearchIndexOptions, MessageIndexService } from './message-index.service';
 import { MessageDeleteService } from './message-delete.service';
 import { SchemaValidationService } from './schema-validation.service';
+import { decodePayload, extractHeaders, tryParseJson } from './message-codec';
+
+const LIVE_TAIL_HEARTBEAT_MS = 15_000;
 
 @Injectable()
 export class MessagesService {
@@ -133,5 +140,87 @@ export class MessagesService {
 
   validateSchema(data: unknown, schema: JsonSchemaDefinition): ValidateSchemaResponseDto {
     return this.schemaValidation.validateSchema(data, schema);
+  }
+
+  tailMessages(nc: NatsConnection, query: TailMessagesQueryDto): Observable<MessageEvent> {
+    const { subject, include_payload = true, preview_bytes = 4096 } = query;
+
+    return new Observable<MessageEvent>((subscriber) => {
+      let closed = false;
+      let received = 0;
+      const subscription = nc.subscribe(subject);
+
+      const emit = (event: LiveTailEventDto) => subscriber.next({ data: event });
+      const now = () => new Date().toISOString();
+
+      emit({
+        event_type: 'status',
+        subject,
+        received_at: now(),
+        status: 'subscribed',
+      });
+
+      const heartbeat = setInterval(() => {
+        emit({
+          event_type: 'heartbeat',
+          subject,
+          received_at: now(),
+          status: 'active',
+        });
+      }, LIVE_TAIL_HEARTBEAT_MS);
+
+      void (async () => {
+        try {
+          for await (const message of subscription) {
+            received += 1;
+            emit({
+              event_type: 'message',
+              subject,
+              received_at: now(),
+              message: this.mapLiveTailMessage(message, received, include_payload, preview_bytes),
+            });
+          }
+
+          if (!closed) {
+            subscriber.complete();
+          }
+        } catch (error) {
+          if (!closed) {
+            subscriber.error(error);
+          }
+        }
+      })();
+
+      return () => {
+        closed = true;
+        clearInterval(heartbeat);
+        subscription.unsubscribe();
+      };
+    });
+  }
+
+  private mapLiveTailMessage(
+    message: Msg,
+    id: number,
+    includePayload: boolean,
+    previewBytes: number,
+  ): LiveTailMessageDto {
+    const raw = decodePayload(message.data);
+    const dto: LiveTailMessageDto = {
+      id,
+      subject: message.subject,
+      payload_size: message.data.length,
+      headers: extractHeaders(message.headers),
+      received_at: new Date().toISOString(),
+      reply: message.reply || undefined,
+    };
+
+    if (includePayload && raw.length <= previewBytes) {
+      dto.data = tryParseJson(raw);
+    } else {
+      dto.data_preview = raw.slice(0, previewBytes);
+    }
+
+    return dto;
   }
 }

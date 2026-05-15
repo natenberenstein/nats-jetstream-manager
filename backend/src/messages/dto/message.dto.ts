@@ -183,6 +183,24 @@ export class BuildIndexRequestDto {
   limit?: number = 2000;
 }
 
+export class TailMessagesQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  subject: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(65536)
+  preview_bytes?: number = 4096;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  include_payload?: boolean = true;
+}
+
 // ─── Query DTOs ──────────────────────────────────────────────────────────────
 
 export class GetMessagesQueryDto {
@@ -287,6 +305,25 @@ export class MessageDataDto {
   payload_size?: number;
   headers?: Record<string, string>;
   time?: string | null;
+}
+
+export class LiveTailMessageDto {
+  id: number;
+  subject: string;
+  data?: unknown;
+  data_preview?: string;
+  payload_size?: number;
+  headers?: Record<string, string>;
+  received_at: string;
+  reply?: string;
+}
+
+export class LiveTailEventDto {
+  event_type: 'status' | 'heartbeat' | 'message';
+  subject: string;
+  received_at: string;
+  status?: string;
+  message?: LiveTailMessageDto;
 }
 
 export class MessagesResponseDto {

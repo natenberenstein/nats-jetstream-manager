@@ -13,7 +13,6 @@ import {
   useUpdateConsumer,
 } from '@/hooks/useConsumers';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
-import { buildConsumerMessagesHref } from '@/lib/consumer-messages';
 import { copyText, downloadFile } from '@/lib/download';
 import { formatNumber } from '@/lib/utils';
 import {
@@ -54,28 +53,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ConsumerDiagnostic, ConsumerInfo } from '@/lib/types';
+import { ConsumerInfo } from '@/lib/types';
 import { SubjectChip } from '@/components/subjects/SubjectChips';
+import { ConsumerLagTriage } from '@/components/operations/ConsumerLagTriage';
 
 function formatNsToSeconds(nanoseconds?: number): string {
   if (!nanoseconds || Number.isNaN(nanoseconds)) return '-';
   return `${(nanoseconds / 1_000_000_000).toFixed(1)}s`;
-}
-
-const HEALTH_LABELS: Record<ConsumerDiagnostic['severity'], string> = {
-  critical: 'Critical',
-  warning: 'Warning',
-  info: 'Info',
-  ok: 'OK',
-};
-
-function healthBadgeVariant(
-  severity: ConsumerDiagnostic['severity'],
-): 'destructive' | 'warning' | 'success' | 'outline' {
-  if (severity === 'critical') return 'destructive';
-  if (severity === 'warning') return 'warning';
-  if (severity === 'ok') return 'success';
-  return 'outline';
 }
 
 export default function ConsumerDetailPage({
@@ -258,88 +242,11 @@ export default function ConsumerDetailPage({
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-lg">Diagnostics</CardTitle>
-            <Badge variant={diagnostic ? healthBadgeVariant(diagnostic.severity) : 'outline'}>
-              {diagnostic ? HEALTH_LABELS[diagnostic.severity] : 'Unknown'}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {diagnostic ? (
-            diagnostic.issues.length > 0 ? (
-              <div className="space-y-3">
-                {diagnostic.issues.map((issue) => (
-                  <div key={issue.code} className="rounded-md border p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={healthBadgeVariant(issue.severity)}>{issue.severity}</Badge>
-                      <p className="font-medium">{issue.message}</p>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{issue.recommendation}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {(
-                        [
-                          ['ack_pending', 'Ack pending'] as const,
-                          ['pending', 'Pending'] as const,
-                        ] as const
-                      ).map(([window, label]) => {
-                        const href = buildConsumerMessagesHref({
-                          streamName,
-                          consumerName: consumer.name,
-                          diagnostic,
-                          filterSubject: diagnostic.filter_subject ?? config.filter_subject,
-                          window,
-                        });
-                        if (!href) return null;
-                        return (
-                          <Link key={window} href={href}>
-                            <Button variant="outline" size="sm">
-                              <MessageSquare className="h-4 w-4" />
-                              {label}
-                            </Button>
-                          </Link>
-                        );
-                      })}
-                      <Link href={`/dashboard/consumers?stream=${encodeURIComponent(streamName)}`}>
-                        <Button variant="outline" size="sm">
-                          <Copy className="h-4 w-4" />
-                          Clone or Tune
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-                <div className="grid grid-cols-1 gap-3 pt-1 text-sm md:grid-cols-4">
-                  <div>
-                    <p className="text-muted-foreground">Last Stream Seq</p>
-                    <p className="font-medium">{formatNumber(diagnostic.last_stream_seq)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Stream Lag</p>
-                    <p className="font-medium">{formatNumber(diagnostic.stream_lag)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Unacked Span</p>
-                    <p className="font-medium">{formatNumber(diagnostic.unacked_span)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Type</p>
-                    <p className="font-medium capitalize">{diagnostic.type}</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No current consumer issues detected.</p>
-            )
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Diagnostics are not available for this consumer yet.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <ConsumerLagTriage
+        diagnostics={diagnostic ? [diagnostic] : []}
+        streamName={streamName}
+        maxItems={1}
+      />
 
       {/* Metrics Chart */}
       {chartData.length > 0 && (

@@ -24,8 +24,10 @@ const SEGMENT_LABELS: Record<string, string> = {
   topology: 'Topology',
   consumers: 'Consumers',
   messages: 'Messages',
+  tail: 'Live Tail',
   kv: 'KV Stores',
   objectstore: 'Object Store',
+  operations: 'Timeline',
   'config-diff': 'Config Diff',
   audit: 'Audit Log',
 };

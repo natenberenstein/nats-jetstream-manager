@@ -8,8 +8,11 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  MessageEvent,
+  Sse,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Observable } from 'rxjs';
 import { MessagesService } from './messages.service';
 import {
   MessagePublishRequestDto,
@@ -33,6 +36,7 @@ import {
   MessageIndexSearchResponseDto,
   ValidateSchemaResponseDto,
   BuildIndexResponseDto,
+  TailMessagesQueryDto,
 } from './dto/message.dto';
 import { ConnectionsService } from '../connections/connections.service';
 import { AuditService } from '../audit/audit.service';
@@ -88,6 +92,15 @@ export class MessagesController {
   @HttpCode(HttpStatus.OK)
   async validateSchema(@Body() body: ValidateSchemaRequestDto): Promise<ValidateSchemaResponseDto> {
     return this.messagesService.validateSchema(body.data, body.schema);
+  }
+
+  @Sse('messages/tail')
+  tailMessages(
+    @Param('connectionId') connectionId: string,
+    @Query() query: TailMessagesQueryDto,
+  ): Observable<MessageEvent> {
+    const conn = this.connectionsService.getConnection(connectionId);
+    return this.messagesService.tailMessages(conn.nc, query);
   }
 
   @Get('streams/:streamName/messages')

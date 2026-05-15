@@ -23,6 +23,8 @@ import {
   GitBranch,
   GitFork,
   FileDiff,
+  ListChecks,
+  Radio,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -108,6 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           { href: '/dashboard/topology', icon: GitFork, label: 'Topology' },
           { href: '/dashboard/consumers', icon: Users, label: 'Consumers' },
           { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
+          { href: '/dashboard/tail', icon: Radio, label: 'Live Tail' },
         ],
       },
       {
@@ -120,6 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {
         label: 'Operations',
         items: [
+          { href: '/dashboard/operations', icon: ListChecks, label: 'Timeline' },
           { href: '/dashboard/config-diff', icon: FileDiff, label: 'Config Diff' },
           { href: '/dashboard/audit', icon: FileClock, label: 'Audit Log' },
         ],

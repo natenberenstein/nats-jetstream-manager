@@ -39,7 +39,7 @@ import {
   Users,
 } from 'lucide-react';
 import { focusFirstError } from '@/lib/form-utils';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
@@ -80,6 +80,8 @@ import { Pagination } from '@/components/ui/pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SubjectChip } from '@/components/subjects/SubjectChips';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ConsumerLagTriage } from '@/components/operations/ConsumerLagTriage';
+import { ImpactPreview } from '@/components/operations/ImpactPreview';
 
 const CHART_COLORS = [
   '#3b82f6',
@@ -544,6 +546,84 @@ const DEFAULT_CONSUMER_FORM: ConsumerConfig = {
   headers_only: false,
 };
 
+const CONSUMER_PRESETS: Array<{
+  label: string;
+  description: string;
+  values: Partial<ConsumerConfig>;
+}> = [
+  {
+    label: 'Pull worker',
+    description: 'Durable pull consumer for application workers.',
+    values: {
+      deliver_subject: undefined,
+      deliver_group: undefined,
+      flow_control: undefined,
+      idle_heartbeat: undefined,
+      ack_policy: 'explicit',
+      deliver_policy: 'all',
+      replay_policy: 'instant',
+      ack_wait: 30_000_000_000,
+      max_deliver: -1,
+      max_ack_pending: 1000,
+      max_waiting: 512,
+      headers_only: false,
+    },
+  },
+  {
+    label: 'New messages',
+    description: 'Start at new traffic and ignore existing backlog.',
+    values: {
+      deliver_subject: undefined,
+      deliver_group: undefined,
+      flow_control: undefined,
+      idle_heartbeat: undefined,
+      ack_policy: 'explicit',
+      deliver_policy: 'new',
+      replay_policy: 'instant',
+      ack_wait: 30_000_000_000,
+      max_deliver: -1,
+      max_ack_pending: 1000,
+      max_waiting: 512,
+      headers_only: false,
+    },
+  },
+  {
+    label: 'Push subscriber',
+    description: 'Server-pushed delivery to a subject.',
+    values: {
+      deliver_subject: 'deliver.',
+      deliver_group: '',
+      flow_control: true,
+      idle_heartbeat: 30_000_000_000,
+      ack_policy: 'explicit',
+      deliver_policy: 'all',
+      replay_policy: 'instant',
+      ack_wait: 30_000_000_000,
+      max_deliver: -1,
+      max_ack_pending: 1000,
+      max_waiting: undefined,
+      headers_only: false,
+    },
+  },
+  {
+    label: 'Headers only',
+    description: 'Observe message metadata without loading bodies.',
+    values: {
+      deliver_subject: undefined,
+      deliver_group: undefined,
+      flow_control: undefined,
+      idle_heartbeat: undefined,
+      ack_policy: 'none',
+      deliver_policy: 'new',
+      replay_policy: 'instant',
+      max_deliver: 1,
+      max_ack_pending: 1000,
+      max_waiting: 512,
+      headers_only: true,
+    },
+  },
+];
+
 function formatNsToSeconds(nanoseconds?: number): string {
   if (!nanoseconds || Number.isNaN(nanoseconds)) {
     return '-';
@@ -813,6 +893,48 @@ export default function ConsumersPage() {
   const createConsumer = useCreateConsumer(connectionId, selectedStream || '');
   const deleteConsumer = useDeleteConsumer(connectionId, selectedStream || '');
 
+  const selectedConsumerDetails = useMemo(() => {
+    const selected = new Set(selectedConsumers);
+    return (consumersData?.consumers ?? []).filter((consumer) => selected.has(consumer.name));
+  }, [consumersData?.consumers, selectedConsumers]);
+
+  const bulkDeleteImpact = useMemo(() => {
+    if (selectedConsumerDetails.length === 0) return null;
+    const pending = selectedConsumerDetails.reduce(
+      (sum, consumer) => sum + consumer.num_pending,
+      0,
+    );
+    const ackPending = selectedConsumerDetails.reduce(
+      (sum, consumer) => sum + consumer.num_ack_pending,
+      0,
+    );
+    const waiting = selectedConsumerDetails.reduce(
+      (sum, consumer) => sum + consumer.num_waiting,
+      0,
+    );
+    return (
+      <ImpactPreview
+        title="Selected consumer impact"
+        tone="destructive"
+        compact
+        metrics={[
+          { label: 'Consumers', value: selectedConsumerDetails.length, icon: Users },
+          { label: 'Pending', value: formatNumber(pending), icon: MessageSquare },
+          { label: 'Ack pending', value: formatNumber(ackPending), icon: Clock },
+          { label: 'Waiting', value: formatNumber(waiting), icon: Users },
+        ]}
+        rows={[
+          { label: 'Stream', value: selectedStream ?? '-' },
+          {
+            label: 'Delivery state',
+            value: ackPending > 0 ? 'unacknowledged deliveries exist' : 'no ack-pending deliveries',
+            tone: ackPending > 0 ? 'warning' : 'default',
+          },
+        ]}
+      />
+    );
+  }, [selectedConsumerDetails, selectedStream]);
+
   const diagnosticsByName = useMemo(() => {
     const map = new Map<string, ConsumerDiagnostic>();
     diagnosticsData?.consumers.forEach((diagnostic) => {
@@ -820,11 +942,6 @@ export default function ConsumersPage() {
     });
     return map;
   }, [diagnosticsData?.consumers]);
-
-  const topDiagnostics = useMemo(
-    () => (diagnosticsData?.consumers ?? []).filter((diagnostic) => diagnostic.severity !== 'ok'),
-    [diagnosticsData?.consumers],
-  );
 
   const handleCloneConsumer = (consumer: ConsumerInfo) => {
     setFormData({
@@ -886,8 +1003,9 @@ export default function ConsumersPage() {
     }
   };
 
-  const handleDeleteConsumer = async (consumerName: string) => {
+  const handleDeleteConsumer = async (consumer: ConsumerInfo) => {
     if (!selectedStream) return;
+    const consumerName = consumer.name;
     const ok = await confirm({
       title: 'Delete consumer',
       description: (
@@ -896,6 +1014,35 @@ export default function ConsumersPage() {
           <span className="font-mono font-semibold">{consumerName}</span> from stream{' '}
           <span className="font-mono font-semibold">{selectedStream}</span>.
         </>
+      ),
+      body: (
+        <ImpactPreview
+          title="Consumer delete impact"
+          tone="destructive"
+          metrics={[
+            { label: 'Pending', value: formatNumber(consumer.num_pending), icon: MessageSquare },
+            { label: 'Ack pending', value: formatNumber(consumer.num_ack_pending), icon: Clock },
+            { label: 'Waiting', value: formatNumber(consumer.num_waiting), icon: Users },
+            {
+              label: 'Delivered seq',
+              value: formatNumber(consumer.delivered.stream_seq),
+              icon: MessageSquare,
+            },
+          ]}
+          rows={[
+            { label: 'Stream', value: selectedStream },
+            { label: 'Filter', value: consumer.config.filter_subject || '*' },
+            { label: 'Ack policy', value: consumer.config.ack_policy ?? 'explicit' },
+            {
+              label: 'Consumer type',
+              value: consumer.config.deliver_subject ? 'push' : 'pull',
+            },
+          ]}
+          notes={[
+            'The stream and stored messages remain.',
+            'This removes the delivery cursor and any in-flight acknowledgement state for this consumer.',
+          ]}
+        />
       ),
       tone: 'destructive',
       confirmLabel: 'Delete consumer',
@@ -1021,6 +1168,7 @@ export default function ConsumersPage() {
             cannot be undone.
           </>
         }
+        impact={bulkDeleteImpact}
         items={Array.from(selectedConsumers)}
         onDeleteItem={(name) => deleteConsumer.mutateAsync(name).then(() => undefined)}
         onFinished={({ succeeded, failed }) => {
@@ -1071,67 +1219,11 @@ export default function ConsumersPage() {
         />
       </div>
 
-      {topDiagnostics.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Top Diagnostics</CardTitle>
-            <CardDescription>Current consumer conditions that need review.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {topDiagnostics.slice(0, 5).map((diagnostic) => (
-              <div
-                key={`${diagnostic.stream_name}:${diagnostic.name}`}
-                className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ConsumerHealthBadge diagnostic={diagnostic} />
-                    <Link
-                      href={`/dashboard/consumers/${encodeURIComponent(diagnostic.stream_name)}/${encodeURIComponent(diagnostic.name)}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {diagnostic.name}
-                    </Link>
-                    <span className="text-sm text-muted-foreground">
-                      lag {diagnostic.stream_lag} · pending {diagnostic.num_pending} · ack pending{' '}
-                      {diagnostic.num_ack_pending}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{diagnostic.issues[0]?.message}</p>
-                </div>
-                <p className="text-sm text-muted-foreground sm:max-w-md">
-                  {diagnostic.issues[0]?.recommendation}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      ['ack_pending', 'Ack pending'] as const,
-                      ['pending', 'Pending'] as const,
-                    ] as const
-                  ).map(([window, label]) => {
-                    const href = buildConsumerMessagesHref({
-                      streamName: diagnostic.stream_name,
-                      consumerName: diagnostic.name,
-                      diagnostic,
-                      filterSubject: diagnostic.filter_subject,
-                      window,
-                    });
-                    if (!href) return null;
-                    return (
-                      <Link key={window} href={href}>
-                        <Button variant="outline" size="sm">
-                          <MessageSquare className="h-4 w-4" />
-                          {label}
-                        </Button>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <ConsumerLagTriage
+        diagnostics={diagnosticsData?.consumers ?? []}
+        streamName={selectedStream}
+        maxItems={5}
+      />
 
       <ConsumerLagSection
         analyticsData={analyticsData ?? null}
@@ -1159,6 +1251,28 @@ export default function ConsumersPage() {
                 <AlertDescription>{cloneMessage}</AlertDescription>
               </Alert>
             )}
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+              {CONSUMER_PRESETS.map((preset) => (
+                <Button
+                  key={preset.label}
+                  type="button"
+                  variant="outline"
+                  className="h-auto flex-col items-start gap-1 whitespace-normal p-3 text-left"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      ...preset.values,
+                    }))
+                  }
+                >
+                  <span className="font-medium">{preset.label}</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {preset.description}
+                  </span>
+                </Button>
+              ))}
+            </div>
 
             <div className="space-y-1">
               <Label htmlFor="consumer-type">Consumer Type</Label>
@@ -1655,7 +1769,7 @@ export default function ConsumersPage() {
                               <Copy className="w-4 h-4" />
                             </Button>
                             <Button
-                              onClick={() => handleDeleteConsumer(consumer.name)}
+                              onClick={() => handleDeleteConsumer(consumer)}
                               disabled={deleteConsumer.isPending}
                               variant="ghost"
                               size="icon"

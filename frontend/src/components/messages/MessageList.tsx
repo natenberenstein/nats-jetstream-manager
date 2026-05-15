@@ -110,7 +110,7 @@ function getMessageStatus(message: MessageData, consumers: ConsumerInfo[]): Mess
       label: counts.pending > 0 ? 'Mixed' : 'Not acknowledged',
       title,
       icon: AlertTriangle,
-      className: 'border-warning/50 bg-warning/10 text-warning-foreground',
+      className: 'border-warning/50 bg-warning/10 text-warning',
     };
   }
 
@@ -129,7 +129,7 @@ function getMessageStatus(message: MessageData, consumers: ConsumerInfo[]): Mess
       label: counts.no_ack > 0 ? 'Mixed' : 'Acknowledged',
       title,
       icon: CheckCircle2,
-      className: 'border-success/50 bg-success/10 text-success-foreground',
+      className: 'border-success/50 bg-success/10 text-success',
     };
   }
 
@@ -137,7 +137,7 @@ function getMessageStatus(message: MessageData, consumers: ConsumerInfo[]): Mess
     label: 'No ack required',
     title,
     icon: CheckCircle2,
-    className: 'border-success/50 bg-success/10 text-success-foreground',
+    className: 'border-success/50 bg-success/10 text-success',
   };
 }
 
@@ -660,7 +660,7 @@ export function MessageList({
   };
 
   return (
-    <Card className={cn('overflow-hidden', className)}>
+    <Card className={cn('min-w-0 overflow-hidden', className)}>
       <CardHeader className="space-y-4 border-b">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -762,8 +762,8 @@ export function MessageList({
         )}
 
         <div className="-mx-4 border-y bg-muted/20 px-4 py-4">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(220px,1fr)_minmax(300px,1fr)_minmax(420px,2fr)]">
-            <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap gap-4">
+            <div className="min-w-0 flex-[1_1_14rem] space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">
                 Stream
               </Label>
@@ -785,7 +785,7 @@ export function MessageList({
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="min-w-0 flex-[1_1_18rem] space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">
                 Timeline
               </Label>
@@ -850,7 +850,7 @@ export function MessageList({
               </div>
             </div>
 
-            <div className="min-w-0 space-y-3">
+            <div className="min-w-0 flex-[2_1_26rem] space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">
                   Filters
@@ -862,7 +862,7 @@ export function MessageList({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_190px_auto]">
+              <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr))]">
                 <div className="relative">
                   <GitBranch className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -891,7 +891,10 @@ export function MessageList({
                         onValueChange={handleDatePresetSelect}
                         onOpenChange={handleDateSelectOpenChange}
                       >
-                        <SelectTrigger aria-label="Date preset" className="gap-2 bg-background">
+                        <SelectTrigger
+                          aria-label="Date preset"
+                          className="min-w-0 gap-2 bg-background"
+                        >
                           <CalendarDays className="h-4 w-4 text-muted-foreground" />
                           <SelectValue />
                         </SelectTrigger>
@@ -979,7 +982,10 @@ export function MessageList({
                 </Popover>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="justify-center gap-2 bg-background">
+                    <Button
+                      variant="outline"
+                      className="min-w-0 justify-center gap-2 bg-background"
+                    >
                       <SlidersHorizontal className="h-4 w-4" />
                       {advancedFilterCount > 0 ? `Advanced · ${advancedFilterCount}` : 'Advanced'}
                     </Button>
@@ -1173,11 +1179,6 @@ export function MessageList({
                         <StatusIcon className="h-3 w-3" />
                         {status.label}
                       </Badge>
-                      {compareSelection.includes(message.seq) && (
-                        <Badge variant="outline" className="rounded-md">
-                          selected
-                        </Badge>
-                      )}
                     </div>
                     {showTimeCol && (
                       <span className="text-xs text-muted-foreground">

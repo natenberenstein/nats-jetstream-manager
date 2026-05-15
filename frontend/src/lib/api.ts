@@ -409,6 +409,23 @@ export const messageApi = {
       method: 'POST',
       body: JSON.stringify({ schema, data: payload }),
     }),
+
+  tailUrl: (
+    connectionId: string,
+    query: {
+      subject: string;
+      includePayload?: boolean;
+      previewBytes?: number;
+    },
+  ) => {
+    const searchParams = new URLSearchParams({
+      subject: query.subject,
+      include_payload: query.includePayload === false ? 'false' : 'true',
+    });
+    if (query.previewBytes) searchParams.set('preview_bytes', String(query.previewBytes));
+
+    return `${API_BASE}/connections/${connectionId}/messages/tail?${searchParams}`;
+  },
 };
 
 export const metricsApi = {

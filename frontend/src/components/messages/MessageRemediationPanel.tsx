@@ -1,7 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Ban, Check, Clock, Play, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  Ban,
+  Check,
+  Clock,
+  GitBranch,
+  Hash,
+  MessageSquare,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -32,6 +45,9 @@ import {
 } from '@/components/ui/select';
 import { PayloadViewer } from './PayloadViewer';
 import { formatPayload } from './utils';
+import { ImpactPreview } from '@/components/operations/ImpactPreview';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { subjectMatches } from '@/lib/subject-analysis';
 
 type RemediationContext = 'pending' | 'ack-pending' | 'general';
 
@@ -44,7 +60,7 @@ interface MessageRemediationPanelProps {
   replaySubject: string;
   onConsumerChange: (consumerName: string) => void;
   onReplaySubjectChange: (subject: string) => void;
-  onDeleteMessage: (seq: number) => Promise<void>;
+  onDeleteMessage: (message: MessageRemediationMessage) => Promise<void>;
 }
 
 const ACTION_LABELS: Record<MessageRemediationAction, string> = {
@@ -83,6 +99,7 @@ export function MessageRemediationPanel({
   const fetchRemediation = useFetchRemediationMessages(connectionId);
   const applyAction = useApplyRemediationAction(connectionId);
   const replayMessage = useReplayStoredMessage(connectionId);
+  const confirm = useConfirm();
 
   const selectedConsumer = useMemo(
     () => consumers.find((consumer) => consumer.name === selectedConsumerName) ?? null,
@@ -97,6 +114,18 @@ export function MessageRemediationPanel({
   );
   const allSelected =
     sessionSeqs.length > 0 && sessionSeqs.every((seq) => selectedSeqs.includes(seq));
+  const selectedMessages = useMemo(
+    () => sessionMessages.filter((message) => selectedSeqs.includes(message.seq)),
+    [selectedSeqs, sessionMessages],
+  );
+  const selectedMessageSeqs = useMemo(
+    () => selectedMessages.map((message) => message.seq),
+    [selectedMessages],
+  );
+  const selectedSubjects = useMemo(
+    () => Array.from(new Set(selectedMessages.map((message) => message.subject))),
+    [selectedMessages],
+  );
 
   useEffect(() => {
     setSession(null);
@@ -134,6 +163,61 @@ export function MessageRemediationPanel({
     if (streamSequences.length === 0) {
       toast.error('Select at least one fetched message.');
       return;
+    }
+    const actionMessages = sessionMessages.filter((message) =>
+      streamSequences.includes(message.seq),
+    );
+    const actionSubjects = Array.from(new Set(actionMessages.map((message) => message.subject)));
+    const shouldConfirm = action === 'term' || streamSequences.length > 1;
+    if (shouldConfirm) {
+      const confirmed = await confirm({
+        title: `${ACTION_LABELS[action]} messages`,
+        description: (
+          <>
+            Apply {ACTION_LABELS[action].toLowerCase()} to{' '}
+            <span className="font-mono font-semibold">{streamSequences.length}</span> fetched
+            message{streamSequences.length === 1 ? '' : 's'}.
+          </>
+        ),
+        body: (
+          <ImpactPreview
+            title="Remediation impact"
+            tone={action === 'term' ? 'destructive' : 'warning'}
+            metrics={[
+              { label: 'Messages', value: streamSequences.length, icon: MessageSquare },
+              {
+                label: 'Sequence range',
+                value: `${Math.min(...streamSequences)} - ${Math.max(...streamSequences)}`,
+                icon: Hash,
+              },
+              { label: 'Subjects', value: actionSubjects.length, icon: GitBranch },
+              { label: 'Consumer', value: selectedConsumerName, icon: Users },
+            ]}
+            rows={[
+              { label: 'Stream', value: selectedStream },
+              {
+                label: 'Action',
+                value: ACTION_LABELS[action],
+                tone: action === 'term' ? 'destructive' : 'warning',
+              },
+              {
+                label: 'Subjects',
+                value: actionSubjects.length ? actionSubjects.join(', ') : 'unknown',
+              },
+            ]}
+            notes={[
+              action === 'ack'
+                ? 'Ack marks selected deliveries as handled for this consumer.'
+                : action === 'nak'
+                  ? 'Nak makes selected deliveries eligible for redelivery.'
+                  : 'Term stops redelivery for selected deliveries.',
+            ]}
+          />
+        ),
+        tone: action === 'term' ? 'destructive' : 'default',
+        confirmLabel: ACTION_LABELS[action],
+      });
+      if (!confirmed) return;
     }
 
     try {
@@ -182,13 +266,55 @@ export function MessageRemediationPanel({
       toast.error('Replay subject is required.');
       return;
     }
+    const targetSubject = replaySubject.trim();
+    const matchingConsumers = consumers.filter((consumer) =>
+      subjectMatches(consumer.config.filter_subject || '>', targetSubject),
+    );
+    const confirmed = await confirm({
+      title: 'Replay message',
+      description: (
+        <>
+          Replay stream sequence <span className="font-mono font-semibold">{message.seq}</span> to{' '}
+          <span className="font-mono font-semibold">{targetSubject}</span>.
+        </>
+      ),
+      body: (
+        <ImpactPreview
+          title="Replay impact"
+          tone="warning"
+          metrics={[
+            { label: 'Source seq', value: message.seq, icon: Hash },
+            { label: 'Target consumers', value: matchingConsumers.length, icon: Users },
+            {
+              label: 'Payload size',
+              value: `${message.payload_size ?? 0} bytes`,
+              icon: MessageSquare,
+            },
+            { label: 'Headers', value: Object.keys(message.headers ?? {}).length, icon: GitBranch },
+          ]}
+          rows={[
+            { label: 'Source subject', value: message.subject },
+            { label: 'Target subject', value: targetSubject, tone: 'warning' },
+            {
+              label: 'Matching consumers',
+              value: matchingConsumers.length
+                ? matchingConsumers.map((consumer) => consumer.name).join(', ')
+                : 'none on selected stream',
+            },
+          ]}
+          notes={['Replay publishes a new message and can trigger downstream side effects.']}
+        />
+      ),
+      confirmLabel: 'Replay message',
+    });
+    if (!confirmed) return;
 
     try {
       const result = await replayMessage.mutateAsync({
         streamName: selectedStream,
         seq: message.seq,
         request: {
-          target_subject: replaySubject.trim(),
+          target_subject: targetSubject,
           copy_headers: true,
         },
       });
@@ -381,6 +507,31 @@ export function MessageRemediationPanel({
           </Button>
         </div>
 
+        {selectedMessages.length > 0 && (
+          <ImpactPreview
+            title="Selected remediation scope"
+            tone={selectedMessages.some((message) => message.redelivered) ? 'warning' : 'info'}
+            compact
+            metrics={[
+              { label: 'Messages', value: selectedMessages.length, icon: MessageSquare },
+              {
+                label: 'Sequence range',
+                value: `${Math.min(...selectedMessageSeqs)} - ${Math.max(...selectedMessageSeqs)}`,
+                icon: Hash,
+              },
+              { label: 'Subjects', value: selectedSubjects.length, icon: GitBranch },
+              { label: 'Consumer', value: selectedConsumerName || '-', icon: Users },
+            ]}
+            rows={[
+              { label: 'Stream', value: selectedStream ?? '-' },
+              {
+                label: 'Subjects',
+                value: selectedSubjects.length ? selectedSubjects.join(', ') : 'unknown',
+              },
+            ]}
+          />
+        )}
+
         {session && (
           <div className="rounded-md border">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b p-3">
@@ -466,7 +617,7 @@ export function MessageRemediationPanel({
                           type="button"
                           size="sm"
                           variant="destructive"
-                          onClick={() => onDeleteMessage(message.seq)}
+                          onClick={() => onDeleteMessage(message)}
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete
