@@ -1,4 +1,4 @@
-name: docker-publish
+name: release-publish
 
 on:
   release:
@@ -21,6 +21,7 @@ concurrency:
 
 env:
   CHART_DIR: helm/nats-jetstream-manager
+  HELM_REPO_URL: https://natenberenstein.github.io/nats-jetstream-manager
   OCI_REPO: oci://registry-1.docker.io/natenberenstein
 
 jobs:
@@ -110,6 +111,9 @@ jobs:
         with:
           ref: ${{ needs.resolve-version.outputs.checkout_ref }}
 
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
@@ -136,7 +140,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.component.dockerfile }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -148,6 +152,8 @@ jobs:
     needs:
       - resolve-version
       - build-push
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -198,6 +204,38 @@ jobs:
         run: |
           CHART_PKG=$(find dist -maxdepth 1 -name '*.tgz' -print -quit)
           helm push "$CHART_PKG" "$OCI_REPO"
+
+      - name: Publish chart repository
+        shell: bash
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages --depth=1
+            git worktree add pages FETCH_HEAD
+          else
+            git worktree add --detach pages
+            git -C pages checkout --orphan gh-pages
+            git -C pages rm -rf . || true
+          fi
+
+          cp dist/*.tgz pages/
+
+          if [[ -f pages/index.yaml ]]; then
+            helm repo index pages --url "$HELM_REPO_URL" --merge pages/index.yaml
+          else
+            helm repo index pages --url "$HELM_REPO_URL"
+          fi
+
+          touch pages/.nojekyll
+          git -C pages config user.name "github-actions[bot]"
+          git -C pages config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C pages add .
+
+          if git -C pages diff --cached --quiet; then
+            echo "Helm repository already contains chart ${{ needs.resolve-version.outputs.version }}"
+          else
+            git -C pages commit -m "Publish nats-jetstream-manager chart ${{ needs.resolve-version.outputs.version }}"
+            git -C pages push origin HEAD:gh-pages
+          fi
 
       - name: Logout
         if: always()
