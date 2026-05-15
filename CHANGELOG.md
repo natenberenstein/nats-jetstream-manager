@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.4](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.3...v1.9.4) (2026-05-15)
+
+
+### Bug Fixes
+
+* handle unresolved runtime api url ([7372e9c](https://github.com/natenberenstein/nats-jetstream-manager/commit/7372e9cae228027c82b373dbeaec3380251e9912))
+* handle unresolved runtime API URL ([b2a4bd7](https://github.com/natenberenstein/nats-jetstream-manager/commit/b2a4bd7a8bcb42030fb8f97b302a914604316974))
+
 ## [1.9.3](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.2...v1.9.3) (2026-05-14)
 
 
