@@ -1,6 +1,6 @@
 {
   "name": "nats-jetstream-manager-backend",
-  "version": "1.9.4",
+  "version": "1.9.5",
   "description": "NestJS backend for NATS JetStream Manager",
   "private": true,
   "scripts": {

@@ -4,8 +4,8 @@ description: >-
   A Helm chart for NATS JetStream Manager - a web UI for managing NATS JetStream
   clusters
 type: application
-version: 1.9.4
-appVersion: 1.9.4
+version: 1.9.5
+appVersion: 1.9.5
 keywords:
   - nats
   - jetstream
