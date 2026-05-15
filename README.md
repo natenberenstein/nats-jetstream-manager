@@ -267,8 +267,9 @@ For cross-stack API changes, run backend tests and the frontend build.
 ## Release and Publishing
 
 Release automation uses release-please from `.github/workflows/release-please.yml`. Docker image and
-Helm chart publishing workflows are in `.github/workflows/docker-publish.yml` and
-`.github/workflows/helm-publish.yml`.
+Helm chart publishing are handled together by `.github/workflows/docker-publish.yml`.
+Release notes use GitHub-generated PR notes so merge commits do not duplicate the underlying
+conventional commits.
 
 Published Helm charts are available from:
 

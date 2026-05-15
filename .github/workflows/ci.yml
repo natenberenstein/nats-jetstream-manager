@@ -27,7 +27,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }}
-      docker: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docker == 'true' }}
+      docker_backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docker_backend == 'true' }}
+      docker_frontend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docker_frontend == 'true' }}
       format: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.format == 'true' }}
       frontend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.frontend == 'true' }}
       helm: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.helm == 'true' }}
@@ -48,12 +49,15 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/**'
-            docker:
+            docker_backend:
               - 'backend/**'
-              - 'frontend/**'
               - 'backend/Dockerfile'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/**'
+            docker_frontend:
+              - 'frontend/**'
               - 'frontend/Dockerfile'
-              - 'docker-compose.yml'
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/**'
@@ -155,6 +159,19 @@ jobs:
       - name: Install dependencies
         run: npm ci --workspace=frontend --include-workspace-root
 
+      - name: Cache Next.js build
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: frontend/.next/cache
+          key: >-
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json',
+            'frontend/package.json') }}-${{ hashFiles('frontend/src/**/*',
+            'frontend/public/**/*', 'frontend/next.config.*',
+            'frontend/postcss.config.*', 'frontend/tailwind.config.*',
+            'frontend/tsconfig.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json', 'frontend/package.json') }}-
+
       - name: Lint frontend
         run: npm run lint:check --workspace=frontend
 
@@ -162,11 +179,37 @@ jobs:
         run: npm run build --workspace=frontend
 
   helm:
-    name: Helm
+    name: Helm (${{ matrix.render.name }})
     needs: changes
     if: needs.changes.outputs.helm == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        render:
+          - name: defaults
+            args: ''
+          - name: postgres
+            args: >-
+              --set backend.config.databaseType=postgres
+              --set backend.postgresql.host=postgres.example.com
+              --set backend.secrets.databasePassword=test-password
+          - name: ingress
+            args: >-
+              --set ingress.enabled=true
+              --set ingress.frontend.host=app.example.com
+              --set ingress.backend.host=api.example.com
+          - name: autoscaling
+            args: >-
+              --set backend.config.databaseType=postgres
+              --set backend.postgresql.host=postgres.example.com
+              --set backend.secrets.databasePassword=test-password
+              --set backend.persistence.enabled=false
+              --set backend.autoscaling.enabled=true
+              --set frontend.autoscaling.enabled=true
+          - name: network-policy
+            args: --set networkPolicy.enabled=true
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -180,27 +223,19 @@ jobs:
         run: helm lint helm/nats-jetstream-manager
 
       - name: Render chart
-        run: helm template test helm/nats-jetstream-manager > /tmp/rendered-chart.yaml
+        run: helm template test helm/nats-jetstream-manager ${{ matrix.render.args }} > /tmp/rendered-chart.yaml
 
       - name: Verify default image repositories
         run: |
           grep -F "image: natenberenstein/nats-jetstream-manager-backend:" /tmp/rendered-chart.yaml
           grep -F "image: natenberenstein/nats-jetstream-manager-frontend:" /tmp/rendered-chart.yaml
 
-  docker:
-    name: Docker
+  docker_backend:
+    name: Docker (backend)
     needs: changes
-    if: needs.changes.outputs.docker == 'true'
+    if: needs.changes.outputs.docker_backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-          - name: backend
-            dockerfile: ./backend/Dockerfile
-          - name: frontend
-            dockerfile: ./frontend/Dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -208,16 +243,40 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
-      - name: Build ${{ matrix.component.name }} image
+      - name: Build backend image
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
-          file: ${{ matrix.component.dockerfile }}
+          file: ./backend/Dockerfile
           platforms: linux/amd64
           push: false
-          tags: nats-jetstream-manager-${{ matrix.component.name }}:ci
-          cache-from: type=gha,scope=ci-${{ matrix.component.name }}
-          cache-to: type=gha,mode=max,scope=ci-${{ matrix.component.name }}
+          tags: nats-jetstream-manager-backend:ci
+          cache-from: type=gha,scope=ci-backend
+          cache-to: type=gha,mode=max,scope=ci-backend
+
+  docker_frontend:
+    name: Docker (frontend)
+    needs: changes
+    if: needs.changes.outputs.docker_frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Build frontend image
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: ./frontend/Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: nats-jetstream-manager-frontend:ci
+          cache-from: type=gha,scope=ci-frontend
+          cache-to: type=gha,mode=max,scope=ci-frontend
 
   ci-result:
     name: CI Result
@@ -227,7 +286,8 @@ jobs:
       - backend
       - frontend
       - helm
-      - docker
+      - docker_backend
+      - docker_frontend
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -245,7 +305,8 @@ jobs:
             "${{ needs.backend.result }}" \
             "${{ needs.frontend.result }}" \
             "${{ needs.helm.result }}" \
-            "${{ needs.docker.result }}"; do
+            "${{ needs.docker_backend.result }}" \
+            "${{ needs.docker_frontend.result }}"; do
             if [[ "$result" != "success" && "$result" != "skipped" ]]; then
               echo "A CI job finished with result: $result" >&2
               exit 1
