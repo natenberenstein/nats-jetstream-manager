@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.5](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.4...v1.9.5) (2026-05-15)
+
+
+### Bug Fixes
+
+* default frontend api url to backend ([cc7f667](https://github.com/natenberenstein/nats-jetstream-manager/commit/cc7f66706c00847e73ad35f82e5d5bee2b37476d))
+* default frontend api url to backend ([24c030c](https://github.com/natenberenstein/nats-jetstream-manager/commit/24c030c068c68d68a2d2c29ef6a81e76474669db))
+
 ## [1.9.4](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.3...v1.9.4) (2026-05-15)
 
 
