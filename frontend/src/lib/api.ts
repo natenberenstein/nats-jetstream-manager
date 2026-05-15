@@ -44,7 +44,26 @@ import {
   ConsumerMetricsResponse,
 } from './types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const DEFAULT_API_URL = 'http://localhost:8000';
+const RUNTIME_API_URL_PLACEHOLDER = '__RUNTIME_API_URL__';
+
+function resolveApiUrl(): string {
+  const configuredUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const needsRuntimeFallback =
+    !configuredUrl || configuredUrl.includes(RUNTIME_API_URL_PLACEHOLDER);
+
+  if (needsRuntimeFallback && typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+
+  if (needsRuntimeFallback) {
+    return DEFAULT_API_URL;
+  }
+
+  return configuredUrl.replace(/\/+$/, '');
+}
+
+const API_URL = resolveApiUrl();
 const API_BASE = `${API_URL}/api/v1`;
 
 class ApiError extends Error {
