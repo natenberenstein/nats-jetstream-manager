@@ -49,14 +49,16 @@ const RUNTIME_API_URL_PLACEHOLDER = '__RUNTIME_API_URL__';
 
 function resolveApiUrl(): string {
   const configuredUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  const needsRuntimeFallback =
-    !configuredUrl || configuredUrl.includes(RUNTIME_API_URL_PLACEHOLDER);
 
-  if (needsRuntimeFallback && typeof window !== 'undefined') {
+  if (!configuredUrl) {
+    return DEFAULT_API_URL;
+  }
+
+  if (configuredUrl.includes(RUNTIME_API_URL_PLACEHOLDER) && typeof window !== 'undefined') {
     return window.location.origin;
   }
 
-  if (needsRuntimeFallback) {
+  if (configuredUrl.includes(RUNTIME_API_URL_PLACEHOLDER)) {
     return DEFAULT_API_URL;
   }
 
