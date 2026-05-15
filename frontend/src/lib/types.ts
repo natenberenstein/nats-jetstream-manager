@@ -297,6 +297,25 @@ export interface MessageData {
   time?: string | null;
 }
 
+export interface LiveTailMessage {
+  id: number;
+  subject: string;
+  data?: unknown;
+  data_preview?: string;
+  payload_size?: number;
+  headers?: Record<string, string>;
+  received_at: string;
+  reply?: string;
+}
+
+export interface LiveTailEvent {
+  event_type: 'status' | 'heartbeat' | 'message';
+  subject: string;
+  received_at: string;
+  status?: string;
+  message?: LiveTailMessage;
+}
+
 export interface MessagesResponse {
   messages: MessageData[];
   total: number;

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useStreams, useDeleteStream, useCreateStream, useUpdateStream } from '@/hooks/useStreams';
+import { useClusterOverview } from '@/hooks/useCluster';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { StreamInfo } from '@/lib/types';
 import Link from 'next/link';
@@ -14,6 +15,7 @@ import {
   Copy,
   Database,
   HardDrive,
+  ListOrdered,
   MessageSquare,
   Pencil,
   Plus,
@@ -67,6 +69,8 @@ import {
 } from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
 import { SubjectChips } from '@/components/subjects/SubjectChips';
+import { ImpactPreview } from '@/components/operations/ImpactPreview';
+import { StreamConfigAdvisor } from '@/components/operations/StreamConfigAdvisor';
 
 type StreamCreateFormState = {
   name: string;
@@ -178,13 +182,24 @@ function storageBadgeClass(storage?: string) {
     : 'border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300';
 }
 
+function parseSubjectList(subjects: string) {
+  return subjects
+    .split(',')
+    .map((subject) => subject.trim())
+    .filter(Boolean);
+}
+
 function StreamEditForm({
   stream,
   connectionId,
+  clusterNodeCount,
+  clusterTopology,
   onClose,
 }: {
   stream: StreamInfo;
   connectionId: string;
+  clusterNodeCount?: number;
+  clusterTopology?: 'standalone' | 'clustered';
   onClose: () => void;
 }) {
   const updateStream = useUpdateStream(connectionId, stream.config.name);
@@ -193,6 +208,7 @@ function StreamEditForm({
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors },
   } = useForm<StreamUpdateFormData>({
     mode: 'onSubmit',
@@ -210,6 +226,14 @@ function StreamEditForm({
       replicas: stream.config.replicas ?? 1,
     },
   });
+
+  const watchedConfig = watch();
+  const advisorConfig = {
+    ...stream.config,
+    ...watchedConfig,
+    subjects: parseSubjectList(watchedConfig.subjects),
+    storage: stream.config.storage,
+  };
 
   const onSubmit = async (data: StreamUpdateFormData) => {
     const subjects = data.subjects
@@ -378,6 +402,14 @@ function StreamEditForm({
                 </div>
               </div>
 
+              <StreamConfigAdvisor
+                config={advisorConfig}
+                state={stream.state}
+                consumerCount={stream.state.consumer_count}
+                clusterNodeCount={clusterNodeCount}
+                clusterTopology={clusterTopology}
+              />
+
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onClose}>
                   Cancel
@@ -405,6 +437,7 @@ export default function StreamsPage() {
     dataUpdatedAt,
     refetch,
   } = useStreams(connectionId);
+  const { data: clusterData } = useClusterOverview(connectionId);
   const deleteStream = useDeleteStream(connectionId);
   const createStream = useCreateStream(connectionId);
   const confirm = useConfirm();
@@ -418,6 +451,48 @@ export default function StreamsPage() {
   const [selectedStreams, setSelectedStreams] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
+
+  const createAdvisorConfig = useMemo(
+    () => ({
+      ...createForm,
+      name: createForm.name.trim(),
+      subjects: parseSubjectList(createForm.subjects),
+    }),
+    [createForm],
+  );
+
+  const selectedStreamDetails = useMemo(() => {
+    const selected = new Set(selectedStreams);
+    return (streamsData?.streams ?? []).filter((stream) => selected.has(stream.config.name));
+  }, [selectedStreams, streamsData?.streams]);
+
+  const bulkImpact = useMemo(() => {
+    if (selectedStreamDetails.length === 0) return null;
+    const messages = selectedStreamDetails.reduce((sum, stream) => sum + stream.state.messages, 0);
+    const bytes = selectedStreamDetails.reduce((sum, stream) => sum + stream.state.bytes, 0);
+    const consumers = selectedStreamDetails.reduce(
+      (sum, stream) => sum + stream.state.consumer_count,
+      0,
+    );
+    const subjects = selectedStreamDetails.reduce(
+      (sum, stream) => sum + stream.config.subjects.length,
+      0,
+    );
+    return (
+      <ImpactPreview
+        title="Selected stream impact"
+        tone="destructive"
+        compact
+        metrics={[
+          { label: 'Streams', value: selectedStreamDetails.length, icon: Database },
+          { label: 'Messages', value: formatNumber(messages), icon: MessageSquare },
+          { label: 'Storage', value: formatBytes(bytes), icon: HardDrive },
+          { label: 'Consumers', value: formatNumber(consumers), icon: Users },
+        ]}
+        rows={[{ label: 'Subjects', value: formatNumber(subjects) }]}
+      />
+    );
+  }, [selectedStreamDetails]);
 
   const filteredStreams = useMemo(() => {
     const items = streamsData?.streams ?? [];
@@ -434,7 +509,8 @@ export default function StreamsPage() {
     setPageIndex(0);
   }, [searchQuery]);
 
-  const handleDelete = async (streamName: string) => {
+  const handleDelete = async (stream: StreamInfo) => {
+    const streamName = stream.config.name;
     const ok = await confirm({
       title: 'Delete stream',
       description: (
@@ -442,6 +518,34 @@ export default function StreamsPage() {
           This permanently deletes stream{' '}
           <span className="font-mono font-semibold">{streamName}</span> and all of its messages.
         </>
+      ),
+      body: (
+        <ImpactPreview
+          title="Stream delete impact"
+          tone="destructive"
+          metrics={[
+            { label: 'Messages', value: formatNumber(stream.state.messages), icon: MessageSquare },
+            { label: 'Storage', value: formatBytes(stream.state.bytes), icon: HardDrive },
+            { label: 'Consumers', value: formatNumber(stream.state.consumer_count), icon: Users },
+            {
+              label: 'Sequences',
+              value: `${stream.state.first_seq} - ${stream.state.last_seq}`,
+              icon: ListOrdered,
+            },
+          ]}
+          rows={[
+            {
+              label: 'Subjects',
+              value: stream.config.subjects.length ? stream.config.subjects.join(', ') : '-',
+            },
+            { label: 'Retention', value: stream.config.retention ?? 'limits' },
+            { label: 'Storage', value: stream.config.storage ?? 'file' },
+          ]}
+          notes={[
+            'Consumers on this stream are removed with the stream.',
+            'Stored messages cannot be recovered from this operation.',
+          ]}
+        />
       ),
       tone: 'destructive',
       confirmLabel: 'Delete stream',
@@ -557,6 +661,7 @@ export default function StreamsPage() {
         onOpenChange={setBulkOpen}
         title="Delete selected streams"
         description="Deleting streams also removes their messages and consumers. This cannot be undone."
+        impact={bulkImpact}
         items={Array.from(selectedStreams)}
         onDeleteItem={(name) => deleteStream.mutateAsync(name).then(() => undefined)}
         onFinished={({ succeeded, failed }) => {
@@ -822,6 +927,12 @@ export default function StreamsPage() {
               </div>
             </div>
 
+            <StreamConfigAdvisor
+              config={createAdvisorConfig}
+              clusterNodeCount={clusterData?.node_count}
+              clusterTopology={clusterData?.topology}
+            />
+
             {createError && <p className="text-sm text-destructive">{createError}</p>}
 
             <DialogFooter>
@@ -1011,7 +1122,7 @@ export default function StreamsPage() {
                                   <Pencil className="w-4 h-4" />
                                 </Button>
                                 <Button
-                                  onClick={() => handleDelete(stream.config.name)}
+                                  onClick={() => handleDelete(stream)}
                                   variant="ghost"
                                   size="icon"
                                   disabled={deleteStream.isPending}
@@ -1053,7 +1164,7 @@ export default function StreamsPage() {
                             </ContextMenuItem>
                             <ContextMenuItem
                               className="text-destructive focus:text-destructive"
-                              onSelect={() => handleDelete(stream.config.name)}
+                              onSelect={() => handleDelete(stream)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
@@ -1065,6 +1176,8 @@ export default function StreamsPage() {
                             key={`edit-${stream.config.name}`}
                             stream={stream}
                             connectionId={connectionId}
+                            clusterNodeCount={clusterData?.node_count}
+                            clusterTopology={clusterData?.topology}
                             onClose={() => setEditingStream(null)}
                           />
                         )}

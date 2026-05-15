@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
 import { usePurgeStream, useStream, useUpdateStream } from '@/hooks/useStreams';
 import { useConsumers } from '@/hooks/useConsumers';
+import { useClusterOverview } from '@/hooks/useCluster';
 import { useStreamMetrics } from '@/hooks/useMetrics';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { copyText, downloadFile } from '@/lib/download';
@@ -58,6 +59,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { SubjectChip, SubjectChips } from '@/components/subjects/SubjectChips';
+import { ImpactPreview } from '@/components/operations/ImpactPreview';
+import { StreamConfigAdvisor } from '@/components/operations/StreamConfigAdvisor';
+
+function parseSubjectList(subjects: string) {
+  return subjects
+    .split(',')
+    .map((subject) => subject.trim())
+    .filter(Boolean);
+}
 
 export default function StreamDetailPage({ params }: { params: Promise<{ name: string }> }) {
   const { name } = use(params);
@@ -71,6 +81,7 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
     refetch,
   } = useStream(connectionId, streamName);
   const { data: consumersData } = useConsumers(connectionId, streamName);
+  const { data: clusterData } = useClusterOverview(connectionId);
   const { data: metricsData } = useStreamMetrics(connectionId, streamName, 60);
   const purgeStream = usePurgeStream(connectionId);
   const confirm = useConfirm();
@@ -140,6 +151,10 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
   };
 
   const handlePurge = async () => {
+    const ackPending = consumersData?.consumers.reduce(
+      (sum, consumer) => sum + consumer.num_ack_pending,
+      0,
+    );
     const ok = await confirm({
       title: 'Purge stream',
       description: (
@@ -149,6 +164,41 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
           <span className="font-mono font-semibold">{config.name}</span> without deleting the stream
           or its consumers.
         </>
+      ),
+      body: (
+        <ImpactPreview
+          title="Stream purge impact"
+          tone="destructive"
+          metrics={[
+            { label: 'Messages removed', value: formatNumber(state.messages), icon: MessageSquare },
+            { label: 'Storage freed', value: formatBytes(state.bytes), icon: HardDrive },
+            { label: 'Consumers kept', value: formatNumber(state.consumer_count), icon: Users },
+            {
+              label: 'Sequences',
+              value: `${state.first_seq} - ${state.last_seq}`,
+              icon: ListOrdered,
+            },
+          ]}
+          rows={[
+            {
+              label: 'Subjects',
+              value: config.subjects.length ? config.subjects.join(', ') : '-',
+            },
+            {
+              label: 'Ack pending',
+              value: formatNumber(ackPending ?? 0),
+              tone: (ackPending ?? 0) > 0 ? 'warning' : 'default',
+              detail:
+                (ackPending ?? 0) > 0
+                  ? 'Some consumers have delivered messages that are not acknowledged yet.'
+                  : undefined,
+            },
+          ]}
+          notes={[
+            'The stream and consumers remain, but stored messages are removed.',
+            'Consumer sequence state may point past messages that no longer exist.',
+          ]}
+        />
       ),
       tone: 'destructive',
       confirmLabel: 'Purge stream',
@@ -225,6 +275,8 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
           onOpenChange={setEditing}
           stream={stream}
           connectionId={connectionId}
+          clusterNodeCount={clusterData?.node_count}
+          clusterTopology={clusterData?.topology}
           onSuccess={() => {
             refetch();
             setEditing(false);
@@ -295,6 +347,14 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
           )}
         </CardContent>
       </Card>
+
+      <StreamConfigAdvisor
+        config={config}
+        state={state}
+        consumerCount={state.consumer_count}
+        clusterNodeCount={clusterData?.node_count}
+        clusterTopology={clusterData?.topology}
+      />
 
       {/* Mirror & Sources */}
       {config.mirror && (
@@ -481,12 +541,20 @@ function StreamEditDialog({
   onOpenChange,
   stream,
   connectionId,
+  clusterNodeCount,
+  clusterTopology,
   onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  stream: { config: import('@/lib/types').StreamConfig; created: string };
+  stream: {
+    config: import('@/lib/types').StreamConfig;
+    state?: import('@/lib/types').StreamState;
+    created: string;
+  };
   connectionId: string;
+  clusterNodeCount?: number;
+  clusterTopology?: 'standalone' | 'clustered';
   onSuccess: () => void;
 }) {
   const config = stream.config;
@@ -514,6 +582,14 @@ function StreamEditDialog({
     },
   });
 
+  const watchedConfig = watch();
+  const advisorConfig = {
+    ...config,
+    ...watchedConfig,
+    subjects: parseSubjectList(watchedConfig.subjects),
+    storage: config.storage,
+  };
+
   const onSubmit = async (data: StreamUpdateFormData) => {
     try {
       await updateStream.mutateAsync({
@@ -540,7 +616,7 @@ function StreamEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Edit Stream: {config.name}</DialogTitle>
           <DialogDescription>Modify the mutable configuration for this stream.</DialogDescription>
@@ -665,6 +741,14 @@ function StreamEditDialog({
               )}
             </div>
           </div>
+
+          <StreamConfigAdvisor
+            config={advisorConfig}
+            state={stream.state}
+            consumerCount={stream.state?.consumer_count}
+            clusterNodeCount={clusterNodeCount}
+            clusterTopology={clusterTopology}
+          />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

@@ -13,6 +13,7 @@ import {
   useMessages,
   usePublishBatch,
   usePublishMessage,
+  useReplayStoredMessage,
 } from '@/hooks/useMessages';
 import { useCancelJob, useJobs, useStartIndexJob } from '@/hooks/useJobs';
 import { useConsumers } from '@/hooks/useConsumers';
@@ -34,6 +35,9 @@ import type { DateRange } from '@/components/ui/date-range-picker';
 import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { ImpactPreview } from '@/components/operations/ImpactPreview';
+import { subjectMatches } from '@/lib/subject-analysis';
+import { GitBranch, Hash, MessageSquare, Users } from 'lucide-react';
 
 const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
 const FAVORITE_STREAMS_KEY = 'nats_favorite_streams_v1';
@@ -42,6 +46,7 @@ const MESSAGE_BOOKMARKS_KEY = 'nats_message_bookmarks_v1';
 type WorkspaceMode = 'browse' | 'publish' | 'tools' | 'remediate';
 type RemediationContext = 'pending' | 'ack-pending' | 'general';
 type MessageFilterKey = 'subject' | 'payload' | 'header' | 'date' | 'sequence';
+type MessageActionContext = Pick<MessageData, 'subject' | 'payload_size' | 'headers' | 'time'>;
 
 const DATE_PRESET_LABELS: Record<MessageDatePreset, string> = {
   all: 'Any time',
@@ -418,6 +423,7 @@ export default function MessagesPage() {
   const consumers = useMemo(() => consumersData?.consumers ?? [], [consumersData?.consumers]);
   const publishMessage = usePublishMessage(connectionId);
   const publishBatch = usePublishBatch(connectionId);
+  const replayStoredMessage = useReplayStoredMessage(connectionId);
   const deleteStreamMessage = useDeleteStreamMessage(connectionId);
   const startIndexJob = useStartIndexJob(connectionId);
   const cancelJob = useCancelJob(connectionId);
@@ -691,39 +697,125 @@ export default function MessagesPage() {
       toast.error('Replay subject is required.');
       return;
     }
+    const targetSubject = replaySubject.trim();
+    const matchingConsumers = consumers.filter((consumer) =>
+      subjectMatches(consumer.config.filter_subject || '>', targetSubject),
+    );
+    const confirmed = await confirm({
+      title: 'Replay message',
+      description: (
+        <>
+          Publish stream sequence <span className="font-mono font-semibold">{message.seq}</span> to{' '}
+          <span className="font-mono font-semibold">{targetSubject}</span>.
+        </>
+      ),
+      body: (
+        <ImpactPreview
+          title="Replay impact"
+          tone="warning"
+          metrics={[
+            { label: 'Source seq', value: message.seq, icon: Hash },
+            { label: 'Target consumers', value: matchingConsumers.length, icon: Users },
+            {
+              label: 'Payload size',
+              value: `${message.payload_size ?? 0} bytes`,
+              icon: MessageSquare,
+            },
+            { label: 'Headers', value: Object.keys(message.headers ?? {}).length, icon: GitBranch },
+          ]}
+          rows={[
+            { label: 'Source subject', value: message.subject },
+            { label: 'Target subject', value: targetSubject, tone: 'warning' },
+            {
+              label: 'Matching consumers',
+              value: matchingConsumers.length
+                ? matchingConsumers.map((consumer) => consumer.name).join(', ')
+                : 'none on selected stream',
+            },
+          ]}
+          notes={[
+            'Replay publishes a new message and can trigger downstream side effects.',
+            'Headers are copied by the backend replay endpoint.',
+          ]}
+        />
+      ),
+      confirmLabel: 'Replay message',
+    });
+    if (!confirmed) return;
+
     try {
-      let payloadToReplay: unknown = loadedPayloads[message.seq];
-      if (payloadToReplay === undefined) {
-        const fullMessage = await messageApi.getMessage(connectionId, selectedStream, message.seq);
-        payloadToReplay = fullMessage.data;
-      }
-      const result = await publishMessage.mutateAsync({
-        subject: replaySubject.trim(),
-        data: payloadToReplay,
+      const result = await replayStoredMessage.mutateAsync({
+        streamName: selectedStream,
+        seq: message.seq,
+        request: {
+          target_subject: targetSubject,
+          copy_headers: true,
+        },
       });
-      toast.success(`Replayed seq ${message.seq} to ${replaySubject} as seq ${result.seq}.`);
+      toast.success(
+        `Replayed seq ${message.seq} to ${targetSubject} as seq ${result.published_seq}.`,
+      );
     } catch (replayError) {
       toast.error(replayError instanceof Error ? replayError.message : 'Failed to replay message');
     }
   };
 
-  const handleDeleteStreamMessage = async (seq: number) => {
+  const handleDeleteStreamMessage = async (seq: number, context?: MessageActionContext) => {
     if (!connectionId || !selectedStream) return;
 
     const typedConfirmation = `${selectedStream}:${seq}`;
+    const message = context ?? currentMessages.find((item) => item.seq === seq);
+    const matchingConsumers = message?.subject
+      ? consumers.filter((consumer) =>
+          subjectMatches(consumer.config.filter_subject || '>', message.subject),
+        )
+      : [];
     const confirmed = await confirm({
       title: 'Erase stream message',
-      description:
-        'This deletes the message from the stream. It is not a consumer-only acknowledgement and cannot be undone.',
+      description: (
+        <>
+          This deletes stream sequence <span className="font-mono font-semibold">{seq}</span>. It is
+          not a consumer acknowledgement.
+        </>
+      ),
       body: (
-        <div className="rounded-md border p-3 text-sm">
-          <p>
-            Stream: <span className="font-mono">{selectedStream}</span>
-          </p>
-          <p>
-            Sequence: <span className="font-mono">{seq}</span>
-          </p>
-        </div>
+        <ImpactPreview
+          title="Message delete impact"
+          tone="destructive"
+          metrics={[
+            { label: 'Sequence', value: seq, icon: Hash },
+            {
+              label: 'Matching consumers',
+              value: matchingConsumers.length,
+              icon: Users,
+            },
+            {
+              label: 'Payload size',
+              value: `${message?.payload_size ?? 0} bytes`,
+              icon: MessageSquare,
+            },
+            {
+              label: 'Headers',
+              value: Object.keys(message?.headers ?? {}).length,
+              icon: GitBranch,
+            },
+          ]}
+          rows={[
+            { label: 'Stream', value: selectedStream },
+            { label: 'Subject', value: message?.subject ?? 'unknown' },
+            {
+              label: 'Affected consumers',
+              value: matchingConsumers.length
+                ? matchingConsumers.map((consumer) => consumer.name).join(', ')
+                : 'unknown or none',
+              tone: matchingConsumers.length > 0 ? 'warning' : 'default',
+            },
+          ]}
+          notes={[
+            'The message is erased from the stream for every consumer.',
+            'Ack, nak, or term is safer when the goal is consumer delivery remediation only.',
+          ]}
+        />
       ),
       confirmLabel: 'Erase message',
       tone: 'destructive',
@@ -1019,7 +1111,7 @@ export default function MessagesPage() {
       replaySubject={replaySubject}
       onConsumerChange={setSelectedConsumerName}
       onReplaySubjectChange={setReplaySubject}
-      onDeleteMessage={handleDeleteStreamMessage}
+      onDeleteMessage={(message) => handleDeleteStreamMessage(message.seq, message)}
     />
   );
 
@@ -1060,7 +1152,7 @@ export default function MessagesPage() {
       subjectOptions={selectedStreamSubjects}
       focusConsumer={focusConsumer}
       focusWindow={focusWindow}
-      isPublishing={publishMessage.isPending}
+      isPublishing={publishMessage.isPending || replayStoredMessage.isPending}
       diffMessagesCount={diffMessages.length}
       listContainerRef={listContainerRef}
       onLimitChange={handleLimitChange}
@@ -1081,7 +1173,7 @@ export default function MessagesPage() {
       onReplayMessage={handleReplayMessage}
       onCopyCli={handleCopyCli}
       onDeleteMessage={(message) => {
-        void handleDeleteStreamMessage(message.seq);
+        void handleDeleteStreamMessage(message.seq, message);
       }}
       onShowDiffViewer={() => setShowDiffViewer(true)}
       onFilterSubjectChange={handleFilterSubjectChange}
@@ -1144,12 +1236,12 @@ export default function MessagesPage() {
             direction="horizontal"
             className="hidden min-h-[640px] rounded-md xl:flex"
           >
-            <ResizablePanel defaultSize={40} minSize={28}>
-              <div className="pr-3">{renderPublishPanel()}</div>
+            <ResizablePanel defaultSize={40} minSize={28} className="min-w-0">
+              <div className="min-w-0 pr-3">{renderPublishPanel()}</div>
             </ResizablePanel>
             <ResizableHandle withHandle className="mx-1" />
-            <ResizablePanel defaultSize={60} minSize={36}>
-              <div className="pl-3">{renderMessageList()}</div>
+            <ResizablePanel defaultSize={60} minSize={36} className="min-w-0">
+              <div className="min-w-0 pl-3">{renderMessageList()}</div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </TabsContent>
@@ -1163,12 +1255,12 @@ export default function MessagesPage() {
             direction="horizontal"
             className="hidden min-h-[640px] rounded-md xl:flex"
           >
-            <ResizablePanel defaultSize={40} minSize={28}>
-              <div className="space-y-6 pr-3">{renderToolsPanel()}</div>
+            <ResizablePanel defaultSize={40} minSize={28} className="min-w-0">
+              <div className="min-w-0 space-y-6 pr-3">{renderToolsPanel()}</div>
             </ResizablePanel>
             <ResizableHandle withHandle className="mx-1" />
-            <ResizablePanel defaultSize={60} minSize={36}>
-              <div className="pl-3">{renderMessageList()}</div>
+            <ResizablePanel defaultSize={60} minSize={36} className="min-w-0">
+              <div className="min-w-0 pl-3">{renderMessageList()}</div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </TabsContent>
@@ -1182,12 +1274,12 @@ export default function MessagesPage() {
             direction="horizontal"
             className="hidden min-h-[640px] rounded-md xl:flex"
           >
-            <ResizablePanel defaultSize={44} minSize={32}>
-              <div className="pr-3">{renderRemediationPanel()}</div>
+            <ResizablePanel defaultSize={44} minSize={32} className="min-w-0">
+              <div className="min-w-0 pr-3">{renderRemediationPanel()}</div>
             </ResizablePanel>
             <ResizableHandle withHandle className="mx-1" />
-            <ResizablePanel defaultSize={56} minSize={36}>
-              <div className="pl-3">{renderMessageList()}</div>
+            <ResizablePanel defaultSize={56} minSize={36} className="min-w-0">
+              <div className="min-w-0 pl-3">{renderMessageList()}</div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </TabsContent>

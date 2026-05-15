@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ConnectionRequest } from '@/lib/types';
@@ -20,6 +21,54 @@ interface SavedConnection {
   name: string;
   environment: string;
   request: ConnectionRequest;
+  remember_secrets?: boolean;
+  created_at?: string;
+  last_used_at?: string;
+}
+
+type ConnectionFormData = {
+  url: string;
+  user: string;
+  password: string;
+  token: string;
+  monitoring_url: string;
+  sys_user: string;
+  sys_password: string;
+};
+
+function compactRequest(data: ConnectionFormData, includeSecrets: boolean): ConnectionRequest {
+  return {
+    url: data.url.trim(),
+    user: data.user.trim() || undefined,
+    password: includeSecrets ? data.password || undefined : undefined,
+    token: includeSecrets ? data.token || undefined : undefined,
+    monitoring_url: data.monitoring_url.trim() || undefined,
+    sys_user: data.sys_user.trim() || undefined,
+    sys_password: includeSecrets ? data.sys_password || undefined : undefined,
+  };
+}
+
+function hasStoredSecret(connection: SavedConnection): boolean {
+  return Boolean(
+    connection.request.password || connection.request.token || connection.request.sys_password,
+  );
+}
+
+function isProductionEnvironment(value: string): boolean {
+  return /(prod|production|live)/i.test(value.trim());
+}
+
+function environmentBadgeClass(environment: string): string {
+  if (isProductionEnvironment(environment)) {
+    return 'border-destructive/40 bg-destructive/10 text-destructive';
+  }
+  if (/stage|staging|preprod/i.test(environment)) {
+    return 'border-warning/40 bg-warning/10 text-warning';
+  }
+  if (/local|dev|test/i.test(environment)) {
+    return 'border-success/40 bg-success/10 text-success';
+  }
+  return '';
 }
 
 export default function HomePage() {
@@ -30,6 +79,7 @@ export default function HomePage() {
     url: 'nats://localhost:4222',
     user: '',
     password: '',
+    token: '',
     monitoring_url: '',
     sys_user: '',
     sys_password: '',
@@ -38,6 +88,7 @@ export default function HomePage() {
   const [environment, setEnvironment] = useState('local');
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [rememberSecrets, setRememberSecrets] = useState(false);
 
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -60,7 +111,7 @@ export default function HomePage() {
     setTestResult(null);
     setIsTesting(true);
     try {
-      const result = await testConnection(formData);
+      const result = await testConnection(compactRequest(formData, true));
       setTestResult({
         success: result.success,
         jetstream: result.jetstream_enabled,
@@ -80,7 +131,7 @@ export default function HomePage() {
   const handleConnect = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      await connect(formData);
+      await connect(compactRequest(formData, true));
       localStorage.setItem(
         ACTIVE_WORKSPACE_KEY,
         JSON.stringify({ name: workspaceName.trim() || formData.url, environment }),
@@ -93,12 +144,17 @@ export default function HomePage() {
 
   const saveConnection = () => {
     const name = workspaceName.trim() || formData.url;
+    const existing = savedConnections.find((connection) => connection.name === name);
+    const now = new Date().toISOString();
     const next = [
       ...savedConnections.filter((connection) => connection.name !== name),
       {
         name,
         environment: environment.trim() || 'default',
-        request: formData,
+        request: compactRequest(formData, rememberSecrets),
+        remember_secrets: rememberSecrets,
+        created_at: existing?.created_at ?? now,
+        last_used_at: existing?.last_used_at,
       },
     ];
     setSavedConnections(next);
@@ -118,11 +174,34 @@ export default function HomePage() {
       url: connection.request.url,
       user: connection.request.user || '',
       password: connection.request.password || '',
+      token: connection.request.token || '',
       monitoring_url: connection.request.monitoring_url || '',
       sys_user: connection.request.sys_user || '',
       sys_password: connection.request.sys_password || '',
     });
+    setRememberSecrets(Boolean(connection.remember_secrets || hasStoredSecret(connection)));
   };
+
+  const connectSavedConnection = async (connection: SavedConnection) => {
+    loadSavedConnection(connection);
+    try {
+      await connect(connection.request);
+      localStorage.setItem(
+        ACTIVE_WORKSPACE_KEY,
+        JSON.stringify({ name: connection.name, environment: connection.environment }),
+      );
+      const next = savedConnections.map((item) =>
+        item.name === connection.name ? { ...item, last_used_at: new Date().toISOString() } : item,
+      );
+      setSavedConnections(next);
+      localStorage.setItem(SAVED_CONNECTIONS_KEY, JSON.stringify(next));
+      router.push('/dashboard');
+    } catch {
+      // handled by connection context
+    }
+  };
+
+  const productionProfile = isProductionEnvironment(environment);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/40 flex items-center justify-center p-4">
@@ -209,6 +288,19 @@ export default function HomePage() {
               </div>
 
               <div>
+                <Label htmlFor="token" className="mb-2 block">
+                  Token (Optional)
+                </Label>
+                <Input
+                  id="token"
+                  type="password"
+                  value={formData.token}
+                  onChange={(e) => setFormData({ ...formData, token: e.target.value })}
+                  placeholder="token"
+                />
+              </div>
+
+              <div>
                 <Button
                   type="button"
                   variant="link"
@@ -263,6 +355,32 @@ export default function HomePage() {
                     />
                   </div>
                 </div>
+              )}
+
+              <div className="flex items-start gap-2 rounded-md border p-3">
+                <Checkbox
+                  id="remember-secrets"
+                  checked={rememberSecrets}
+                  onCheckedChange={(checked) => setRememberSecrets(checked === true)}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="remember-secrets" className="text-sm font-medium">
+                    Save credentials in this browser
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    When off, saved workspaces keep URLs and labels but omit passwords and tokens.
+                  </p>
+                </div>
+              </div>
+
+              {productionProfile && (
+                <Alert variant="warning">
+                  <AlertTitle>Production workspace</AlertTitle>
+                  <AlertDescription>
+                    Destructive actions in this workspace require typed confirmations in the
+                    dashboard.
+                  </AlertDescription>
+                </Alert>
               )}
 
               {testResult && (
@@ -354,13 +472,39 @@ export default function HomePage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="truncate font-medium">{connection.name}</p>
-                      <Badge variant="outline">{connection.environment}</Badge>
+                      <Badge
+                        variant="outline"
+                        className={environmentBadgeClass(connection.environment)}
+                      >
+                        {connection.environment}
+                      </Badge>
+                      {!hasStoredSecret(connection) && (
+                        <Badge variant="outline" className="rounded-md">
+                          no secrets
+                        </Badge>
+                      )}
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
                       {connection.request.url}
                     </p>
+                    {connection.last_used_at && (
+                      <p className="text-xs text-muted-foreground">
+                        Last used {new Date(connection.last_used_at).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        void connectSavedConnection(connection);
+                      }}
+                      disabled={isConnecting}
+                    >
+                      Connect
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"
