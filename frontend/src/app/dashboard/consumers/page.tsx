@@ -82,6 +82,10 @@ import { SubjectChip } from '@/components/subjects/SubjectChips';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ConsumerLagTriage } from '@/components/operations/ConsumerLagTriage';
 import { ImpactPreview } from '@/components/operations/ImpactPreview';
+import {
+  EntityDetailDrawer,
+  type EntityDetailTarget,
+} from '@/components/operations/EntityDetailDrawer';
 
 const CHART_COLORS = [
   '#3b82f6',
@@ -865,6 +869,7 @@ export default function ConsumersPage() {
   const [editingConsumer, setEditingConsumer] = useState<string | null>(null);
   const [cloneMessage, setCloneMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [detailTarget, setDetailTarget] = useState<EntityDetailTarget | null>(null);
   const durableNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -1108,6 +1113,8 @@ export default function ConsumersPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <EntityDetailDrawer target={detailTarget} onClose={() => setDetailTarget(null)} />
+
       <PageHeader
         title="Consumers"
         description="Manage JetStream consumers by stream"
@@ -1748,6 +1755,21 @@ export default function ConsumersPage() {
                           </TableCell>
                           <TableCell>{formatDate(consumer.created)}</TableCell>
                           <TableCell className="text-right space-x-1">
+                            <Button
+                              onClick={() =>
+                                selectedStream &&
+                                setDetailTarget({
+                                  type: 'consumer',
+                                  streamName: selectedStream,
+                                  name: consumer.name,
+                                })
+                              }
+                              variant="ghost"
+                              size="icon"
+                              title="Inspect consumer"
+                            >
+                              <Info className="w-4 h-4" />
+                            </Button>
                             <Button
                               onClick={() =>
                                 setEditingConsumer(

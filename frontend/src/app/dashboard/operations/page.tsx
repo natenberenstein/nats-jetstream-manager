@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -28,6 +28,11 @@ import { useConsumerDiagnostics } from '@/hooks/useConsumers';
 import { useHealthHistory, useUptimeSummary } from '@/hooks/useHealth';
 import { useJobs } from '@/hooks/useJobs';
 import { formatNumber } from '@/lib/utils';
+import {
+  EntityDetailDrawer,
+  type EntityDetailTarget,
+} from '@/components/operations/EntityDetailDrawer';
+import { RunbookDiagnostics } from '@/components/operations/RunbookDiagnostics';
 
 type TimelineTone = 'default' | 'success' | 'warning' | 'destructive' | 'outline';
 
@@ -40,6 +45,7 @@ interface TimelineEvent {
   tone: TimelineTone;
   icon: LucideIcon;
   href?: string;
+  target?: EntityDetailTarget;
 }
 
 function badgeVariant(tone: TimelineTone) {
@@ -80,6 +86,7 @@ function eventIconClass(tone: TimelineTone) {
 
 export default function OperationsPage() {
   const { connectionId } = useConnection();
+  const [detailTarget, setDetailTarget] = useState<EntityDetailTarget | null>(null);
   const {
     data: auditData,
     isFetching: auditFetching,
@@ -120,6 +127,10 @@ export default function OperationsPage() {
       tone: auditTone(entry.action),
       icon: FileClock,
       href: '/dashboard/audit',
+      target:
+        entry.resource_type === 'stream' && entry.resource_name
+          ? { type: 'stream', name: entry.resource_name }
+          : undefined,
     }));
 
     const jobEvents: TimelineEvent[] = (jobsData?.jobs ?? []).map((job) => ({
@@ -146,6 +157,7 @@ export default function OperationsPage() {
         tone: check.status === 'up' && check.jetstream_ok ? 'success' : 'destructive',
         icon: check.status === 'up' && check.jetstream_ok ? CheckCircle2 : XCircle,
         href: '/dashboard/health',
+        target: { type: 'cluster' },
       }));
 
     const diagnosticEvents: TimelineEvent[] = (diagnosticsData?.consumers ?? [])
@@ -163,6 +175,11 @@ export default function OperationsPage() {
         tone: diagnosticTone(consumer.severity),
         icon: AlertTriangle,
         href: `/dashboard/consumers?stream=${encodeURIComponent(consumer.stream_name)}`,
+        target: {
+          type: 'consumer',
+          streamName: consumer.stream_name,
+          name: consumer.name,
+        },
       }));
 
     return [...auditEvents, ...jobEvents, ...healthEvents, ...diagnosticEvents]
@@ -207,6 +224,8 @@ export default function OperationsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <EntityDetailDrawer target={detailTarget} onClose={() => setDetailTarget(null)} />
+
       <PageHeader
         title="Operations Timeline"
         description="Recent health, job, audit, and consumer-risk events"
@@ -245,6 +264,8 @@ export default function OperationsPage() {
           isLoading={!auditData}
         />
       </div>
+
+      <RunbookDiagnostics limit={8} onOpenEntity={setDetailTarget} />
 
       <Card>
         <CardHeader className="border-b">
@@ -285,11 +306,24 @@ export default function OperationsPage() {
                         {event.meta && <span className="font-mono">{event.meta}</span>}
                       </div>
                     </div>
-                    {event.href && (
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={event.href}>Open</Link>
-                      </Button>
-                    )}
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      {event.target && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (event.target) setDetailTarget(event.target);
+                          }}
+                        >
+                          Details
+                        </Button>
+                      )}
+                      {event.href && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={event.href}>Open</Link>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 );
 
