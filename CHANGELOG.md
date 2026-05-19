@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.1 (2026-05-19)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Dependencies
+* chore(deps): bump docker/setup-qemu-action from 3.6.0 to 4.0.0 in the github-actions group by @dependabot[bot] in https://github.com/natenberenstein/nats-jetstream-manager/pull/43
+
+
+**Full Changelog**: https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.11.0...v1.11.1
+
 ## 1.11.0 (2026-05-19)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
