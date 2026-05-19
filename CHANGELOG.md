@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.10.1 (2026-05-19)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Other Changes
+* ci: optimize release workflows by @natenberenstein in https://github.com/natenberenstein/nats-jetstream-manager/pull/40
+* fix: quote release notes labels by @natenberenstein in https://github.com/natenberenstein/nats-jetstream-manager/pull/41
+
+
+**Full Changelog**: https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.10.0...v1.10.1
+
 ## [1.10.0](https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.9.5...v1.10.0) (2026-05-15)
 
 
