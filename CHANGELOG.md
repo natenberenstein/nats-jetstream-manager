@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.0 (2026-05-19)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Other Changes
+* feat: add entity detail drawer and runbook diagnostics by @natenberenstein in https://github.com/natenberenstein/nats-jetstream-manager/pull/44
+
+
+**Full Changelog**: https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.10.1...v1.11.0
+
 ## 1.10.1 (2026-05-19)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
