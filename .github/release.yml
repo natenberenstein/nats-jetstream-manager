@@ -1,10 +1,10 @@
 changelog:
   exclude:
     labels:
-      - autorelease: pending
-      - autorelease: tagged
-      - autorelease: snapshot
-      - autorelease: published
+      - "autorelease: pending"
+      - "autorelease: tagged"
+      - "autorelease: snapshot"
+      - "autorelease: published"
   categories:
     - title: Features
       labels:
