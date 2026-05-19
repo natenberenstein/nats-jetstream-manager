@@ -15,6 +15,7 @@ import {
   Copy,
   Database,
   HardDrive,
+  Info,
   ListOrdered,
   MessageSquare,
   Pencil,
@@ -71,6 +72,10 @@ import { Pagination } from '@/components/ui/pagination';
 import { SubjectChips } from '@/components/subjects/SubjectChips';
 import { ImpactPreview } from '@/components/operations/ImpactPreview';
 import { StreamConfigAdvisor } from '@/components/operations/StreamConfigAdvisor';
+import {
+  EntityDetailDrawer,
+  type EntityDetailTarget,
+} from '@/components/operations/EntityDetailDrawer';
 
 type StreamCreateFormState = {
   name: string;
@@ -451,6 +456,7 @@ export default function StreamsPage() {
   const [selectedStreams, setSelectedStreams] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<EntityDetailTarget | null>(null);
 
   const createAdvisorConfig = useMemo(
     () => ({
@@ -629,6 +635,8 @@ export default function StreamsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <EntityDetailDrawer target={detailTarget} onClose={() => setDetailTarget(null)} />
+
       <PageHeader
         title="Streams"
         description="Manage your JetStream streams"
@@ -1109,6 +1117,16 @@ export default function StreamsPage() {
                               <TableCell className="text-right space-x-1">
                                 <Button
                                   onClick={() =>
+                                    setDetailTarget({ type: 'stream', name: stream.config.name })
+                                  }
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Inspect stream"
+                                >
+                                  <Info className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() =>
                                     setEditingStream(
                                       editingStream === stream.config.name
                                         ? null
@@ -1144,6 +1162,14 @@ export default function StreamsPage() {
                             >
                               <MessageSquare className="mr-2 h-4 w-4" />
                               View messages
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              onSelect={() =>
+                                setDetailTarget({ type: 'stream', name: stream.config.name })
+                              }
+                            >
+                              <Info className="mr-2 h-4 w-4" />
+                              Inspect details
                             </ContextMenuItem>
                             <ContextMenuItem
                               onSelect={() => navigator.clipboard.writeText(stream.config.name)}

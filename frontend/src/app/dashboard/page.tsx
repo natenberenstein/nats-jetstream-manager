@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useStreams } from '@/hooks/useStreams';
@@ -24,6 +24,11 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  EntityDetailDrawer,
+  type EntityDetailTarget,
+} from '@/components/operations/EntityDetailDrawer';
+import { RunbookDiagnostics } from '@/components/operations/RunbookDiagnostics';
 
 type AttentionSeverity = 'critical' | 'warning' | 'info';
 
@@ -34,6 +39,7 @@ interface AttentionItem {
   detail: string;
   href: string;
   source: string;
+  target?: EntityDetailTarget;
 }
 
 const SEVERITY_RANK: Record<AttentionSeverity, number> = {
@@ -55,6 +61,7 @@ function streamLimitRatio(used: number, limit?: number) {
 
 export default function DashboardPage() {
   const { connectionId } = useConnection();
+  const [detailTarget, setDetailTarget] = useState<EntityDetailTarget | null>(null);
   const {
     data: streamsData,
     isLoading,
@@ -92,6 +99,7 @@ export default function DashboardPage() {
         detail: 'One or more replicated streams have no leader.',
         href: '/dashboard/cluster',
         source: 'Cluster',
+        target: { type: 'cluster' },
       });
     }
 
@@ -103,6 +111,7 @@ export default function DashboardPage() {
         detail: 'Replicated streams are missing enough replicas to put availability at risk.',
         href: '/dashboard/cluster',
         source: 'Cluster',
+        target: { type: 'cluster' },
       });
     }
 
@@ -114,6 +123,7 @@ export default function DashboardPage() {
         detail: 'Cluster nodes are not all reporting the same NATS server version.',
         href: '/dashboard/cluster',
         source: 'Cluster',
+        target: { type: 'cluster' },
       });
     }
 
@@ -125,6 +135,7 @@ export default function DashboardPage() {
         detail: warning,
         href: '/dashboard/cluster',
         source: 'Cluster',
+        target: { type: 'cluster' },
       });
     });
 
@@ -144,6 +155,7 @@ export default function DashboardPage() {
           detail: reasons.join(', ') || 'Stream replication is degraded.',
           href: '/dashboard/cluster',
           source: 'Replication',
+          target: { type: 'stream', name: stream.stream },
         });
       });
 
@@ -157,6 +169,7 @@ export default function DashboardPage() {
           detail: `${formatBytes(stream.state.bytes)} of ${formatBytes(stream.config.max_bytes ?? 0)} configured max bytes.`,
           href: `/dashboard/streams/${encodeURIComponent(stream.config.name)}`,
           source: 'Streams',
+          target: { type: 'stream', name: stream.config.name },
         });
       }
 
@@ -172,6 +185,7 @@ export default function DashboardPage() {
           detail: `${formatNumber(stream.state.messages)} workqueue message${stream.state.messages === 1 ? '' : 's'} have no consumer.`,
           href: `/dashboard/streams/${encodeURIComponent(stream.config.name)}`,
           source: 'Streams',
+          target: { type: 'stream', name: stream.config.name },
         });
       }
     });
@@ -196,6 +210,7 @@ export default function DashboardPage() {
             `Lag ${formatNumber(consumer.stream_lag)}, pending ${formatNumber(consumer.num_pending)}.`,
           href: `/dashboard/consumers/${encodeURIComponent(consumer.stream_name)}/${encodeURIComponent(consumer.name)}`,
           source: 'Consumers',
+          target: { type: 'consumer', streamName: consumer.stream_name, name: consumer.name },
         });
       });
 
@@ -257,6 +272,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <EntityDetailDrawer target={detailTarget} onClose={() => setDetailTarget(null)} />
+
       <PageHeader
         title="Dashboard Overview"
         description="Monitor your NATS JetStream cluster"
@@ -323,9 +340,22 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-sm text-muted-foreground">{item.detail}</p>
                   </div>
-                  <Button asChild variant="outline" size="sm" className="shrink-0">
-                    <Link href={item.href}>Open</Link>
-                  </Button>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {item.target && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (item.target) setDetailTarget(item.target);
+                        }}
+                      >
+                        Details
+                      </Button>
+                    )}
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={item.href}>Open</Link>
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -342,6 +372,8 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      <RunbookDiagnostics limit={4} compact onOpenEntity={setDetailTarget} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard
@@ -399,6 +431,13 @@ export default function DashboardPage() {
                     <p className="text-sm text-muted-foreground">
                       {formatBytes(stream.state.bytes)}
                     </p>
+                    <Button
+                      variant="link"
+                      className="h-auto px-0 text-xs"
+                      onClick={() => setDetailTarget({ type: 'stream', name: stream.config.name })}
+                    >
+                      Details
+                    </Button>
                   </div>
                 </div>
               ))}
