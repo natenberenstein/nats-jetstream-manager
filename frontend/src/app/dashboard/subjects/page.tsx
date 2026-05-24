@@ -7,7 +7,7 @@ import { AlertTriangle, GitBranch, Search } from 'lucide-react';
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useStreams } from '@/hooks/useStreams';
 import { useAllConsumers } from '@/hooks/useConsumers';
-import { analyzeSubjects, subjectMatches } from '@/lib/subject-analysis';
+import { analyzeSubjects, consumerSubjectMatches, subjectMatches } from '@/lib/subject-analysis';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { StatCard } from '@/components/cards/StatCard';
@@ -89,8 +89,7 @@ export default function SubjectExplorerPage() {
         const streamMatches = stream?.config.subjects.some((pattern) =>
           subjectMatches(pattern, subject),
         );
-        const filter = item.consumer.config.filter_subject;
-        return streamMatches && (!filter || subjectMatches(filter, subject));
+        return streamMatches && consumerSubjectMatches(item.consumer.config, subject);
       }),
     };
   }, [allConsumers.consumers, probeSubject, streams]);
@@ -290,7 +289,7 @@ export default function SubjectExplorerPage() {
                 </TableHeader>
                 <TableBody>
                   {analysis.unmatchedConsumerFilters.map((item) => (
-                    <TableRow key={`${item.streamName}:${item.consumerName}`}>
+                    <TableRow key={`${item.streamName}:${item.consumerName}:${item.filterSubject}`}>
                       <TableCell>
                         <Link
                           href={`/dashboard/consumers/${encodeURIComponent(item.streamName)}/${encodeURIComponent(item.consumerName)}`}

@@ -70,6 +70,7 @@ export class ConsumersController {
         stream: streamName,
         durable: consumer.config?.durable_name,
         filter_subject: consumer.config?.filter_subject,
+        filter_subjects: consumer.config?.filter_subjects,
       },
     });
     return consumer;

@@ -30,8 +30,8 @@ import {
 } from 'lucide-react';
 
 import { ConsumerInfo, MessageData, MessagesResponse } from '@/lib/types';
+import { consumerSubjectMatches } from '@/lib/subject-analysis';
 import { cn } from '@/lib/utils';
-import { subjectMatches } from '@/lib/subject-analysis';
 import { MessageDatePreset } from '@/components/messages/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -75,8 +75,7 @@ function getConsumerMessageState(
 
 function getMessageStatus(message: MessageData, consumers: ConsumerInfo[]): MessageStatusSummary {
   const matchingConsumers = consumers.filter((consumer) => {
-    const filterSubject = consumer.config.filter_subject;
-    return !filterSubject || subjectMatches(filterSubject, message.subject);
+    return consumerSubjectMatches(consumer.config, message.subject);
   });
 
   if (matchingConsumers.length === 0) {

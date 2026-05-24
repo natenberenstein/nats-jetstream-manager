@@ -173,6 +173,7 @@ export interface ConsumerConfig {
   ack_wait?: number;
   max_deliver?: number;
   filter_subject?: string;
+  filter_subjects?: string[];
   deliver_subject?: string;
   deliver_group?: string;
   flow_control?: boolean;
@@ -239,6 +240,7 @@ export interface ConsumerDiagnostic {
   name: string;
   type: 'pull' | 'push';
   filter_subject?: string;
+  filter_subjects?: string[];
   deliver_policy: string;
   ack_policy: string;
   num_pending: number;

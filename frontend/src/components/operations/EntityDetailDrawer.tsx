@@ -45,6 +45,7 @@ import type {
   ConsumerInfo,
   StreamInfo,
 } from '@/lib/types';
+import { consumerFilterLabel } from '@/lib/subject-analysis';
 import { cn, formatBytes, formatNanoseconds, formatNumber, formatRelativeTime } from '@/lib/utils';
 
 export type EntityDetailTarget =
@@ -341,9 +342,7 @@ function ConsumerOverview({
         <DetailRow label="Type">
           {diagnostic?.type ?? (config?.deliver_subject ? 'push' : 'pull')}
         </DetailRow>
-        <DetailRow label="Filter">
-          {diagnostic?.filter_subject ?? config?.filter_subject ?? '-'}
-        </DetailRow>
+        <DetailRow label="Filter">{consumerFilterLabel(diagnostic ?? config, '-')}</DetailRow>
         <DetailRow label="Deliver policy">
           {diagnostic?.deliver_policy ?? config?.deliver_policy ?? '-'}
         </DetailRow>

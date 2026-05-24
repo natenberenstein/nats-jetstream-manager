@@ -36,7 +36,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { ImpactPreview } from '@/components/operations/ImpactPreview';
-import { subjectMatches } from '@/lib/subject-analysis';
+import { consumerSubjectMatches } from '@/lib/subject-analysis';
 import { GitBranch, Hash, MessageSquare, Users } from 'lucide-react';
 
 const SAVED_VIEWS_KEY = 'nats_saved_message_views_v1';
@@ -699,7 +699,7 @@ export default function MessagesPage() {
     }
     const targetSubject = replaySubject.trim();
     const matchingConsumers = consumers.filter((consumer) =>
-      subjectMatches(consumer.config.filter_subject || '>', targetSubject),
+      consumerSubjectMatches(consumer.config, targetSubject),
     );
     const confirmed = await confirm({
       title: 'Replay message',
@@ -766,9 +766,7 @@ export default function MessagesPage() {
     const typedConfirmation = `${selectedStream}:${seq}`;
     const message = context ?? currentMessages.find((item) => item.seq === seq);
     const matchingConsumers = message?.subject
-      ? consumers.filter((consumer) =>
-          subjectMatches(consumer.config.filter_subject || '>', message.subject),
-        )
+      ? consumers.filter((consumer) => consumerSubjectMatches(consumer.config, message.subject))
       : [];
     const confirmed = await confirm({
       title: 'Erase stream message',

@@ -12,6 +12,7 @@ import { useClusterOverview } from '@/hooks/useCluster';
 import { useStreamMetrics } from '@/hooks/useMetrics';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { copyText, downloadFile } from '@/lib/download';
+import { consumerFilterSubjects } from '@/lib/subject-analysis';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -517,7 +518,7 @@ export default function StreamDetailPage({ params }: { params: Promise<{ name: s
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <SubjectChip subject={consumer.config.filter_subject} />
+                      <SubjectChips subjects={consumerFilterSubjects(consumer.config)} />
                     </TableCell>
                     <TableCell>{consumer.config.ack_policy}</TableCell>
                     <TableCell>{consumer.num_pending}</TableCell>
