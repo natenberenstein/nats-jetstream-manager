@@ -53,6 +53,7 @@ export interface ConsumerDiagnostic {
   name: string;
   type: 'pull' | 'push';
   filter_subject?: string;
+  filter_subjects?: string[];
   deliver_policy: string;
   ack_policy: string;
   num_pending: number;
@@ -186,7 +187,13 @@ export class ConsumersService {
     if (dto.durable_name) config.durable_name = dto.durable_name;
     if (dto.name) config.name = dto.name;
     if (dto.description) config.description = dto.description;
-    if (dto.filter_subject) config.filter_subject = dto.filter_subject;
+    const filterSubject = this.normalizeFilterSubject(dto.filter_subject);
+    const filterSubjects = this.normalizeFilterSubjects(dto.filter_subjects);
+    if (filterSubject && filterSubjects) {
+      throw new BadRequestException('filter_subject and filter_subjects are mutually exclusive');
+    }
+    if (filterSubject) config.filter_subject = filterSubject;
+    if (filterSubjects) config.filter_subjects = filterSubjects;
     if (dto.sample_freq) config.sample_freq = dto.sample_freq;
     if (dto.headers_only !== undefined) config.headers_only = dto.headers_only;
 
@@ -434,6 +441,7 @@ export class ConsumersService {
 
   private convertConsumerInfo(ci: ConsumerInfo): ConsumerResponse {
     const config = ci.config ?? {};
+    const filterSubjects = this.normalizeFilterSubjects(config.filter_subjects);
 
     return {
       stream_name: ci.stream_name ?? '',
@@ -450,6 +458,7 @@ export class ConsumersService {
         ack_wait: config.ack_wait,
         max_deliver: config.max_deliver,
         filter_subject: config.filter_subject,
+        filter_subjects: filterSubjects,
         deliver_subject: config.deliver_subject,
         deliver_group: config.deliver_group,
         flow_control: config.flow_control,
@@ -496,6 +505,7 @@ export class ConsumersService {
     const maxWaiting = this.asNumber(config.max_waiting);
     const maxDeliver = this.asNumber(config.max_deliver);
     const ackWaitNs = this.asNumber(config.ack_wait);
+    const filterSubjects = this.normalizeFilterSubjects(config.filter_subjects);
 
     const issues = this.buildDiagnosticIssues({
       type,
@@ -515,6 +525,7 @@ export class ConsumersService {
       name,
       type,
       filter_subject: typeof config.filter_subject === 'string' ? config.filter_subject : undefined,
+      filter_subjects: filterSubjects,
       deliver_policy: deliverPolicy,
       ack_policy: ackPolicy,
       num_pending: numPending,
@@ -532,6 +543,22 @@ export class ConsumersService {
       severity: this.getDiagnosticSeverity(issues),
       issues,
     };
+  }
+
+  private normalizeFilterSubjects(values: unknown): string[] | undefined {
+    if (!Array.isArray(values)) return undefined;
+
+    const subjects = values
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter((value): value is string => value.length > 0);
+
+    return subjects.length > 0 ? subjects : undefined;
+  }
+
+  private normalizeFilterSubject(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const subject = value.trim();
+    return subject.length > 0 ? subject : undefined;
   }
 
   private buildDiagnosticIssues(params: {

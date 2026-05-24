@@ -25,6 +25,11 @@ import {
 } from '@/lib/types';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import { buildConsumerMessagesHref } from '@/lib/consumer-messages';
+import {
+  consumerFilterLabel,
+  consumerFilterSubjects,
+  singleConsumerFilterSubject,
+} from '@/lib/subject-analysis';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -78,7 +83,7 @@ import {
 } from '@/components/ui/dialog';
 import { Pagination } from '@/components/ui/pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SubjectChip } from '@/components/subjects/SubjectChips';
+import { SubjectChips } from '@/components/subjects/SubjectChips';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ConsumerLagTriage } from '@/components/operations/ConsumerLagTriage';
 import { ImpactPreview } from '@/components/operations/ImpactPreview';
@@ -403,7 +408,7 @@ function ConsumerLagAnalyticsView({
                             streamName: metric.stream_name,
                             consumerName: metric.name,
                             diagnostic,
-                            filterSubject: diagnostic?.filter_subject,
+                            filterSubject: singleConsumerFilterSubject(diagnostic),
                             window,
                           });
                           if (!href) return null;
@@ -549,6 +554,22 @@ const DEFAULT_CONSUMER_FORM: ConsumerConfig = {
   max_waiting: 512,
   headers_only: false,
 };
+
+function parseConsumerFilterInput(
+  value?: string,
+): Pick<ConsumerConfig, 'filter_subject' | 'filter_subjects'> {
+  const filters =
+    value
+      ?.split(/[,\n]+/)
+      .map((filter) => filter.trim())
+      .filter(Boolean) ?? [];
+
+  if (filters.length > 1) {
+    return { filter_subject: undefined, filter_subjects: filters };
+  }
+
+  return { filter_subject: filters[0], filter_subjects: undefined };
+}
 
 const CONSUMER_PRESETS: Array<{
   label: string;
@@ -724,8 +745,8 @@ function ConsumerEditForm({
                     <Input value={consumer.config.deliver_subject ? 'Push' : 'Pull'} disabled />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Filter Subject</Label>
-                    <Input value={consumer.config.filter_subject || '*'} disabled />
+                    <Label className="text-muted-foreground">Filter Subjects</Label>
+                    <Input value={consumerFilterLabel(consumer.config)} disabled />
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Deliver Policy</Label>
@@ -953,6 +974,8 @@ export default function ConsumersPage() {
       ...consumer.config,
       durable_name: '',
       name: '',
+      filter_subject: consumerFilterSubjects(consumer.config).join(', '),
+      filter_subjects: undefined,
     });
     setShowCreateForm(true);
     setEditingConsumer(null);
@@ -986,12 +1009,14 @@ export default function ConsumersPage() {
       return;
     }
 
+    const filterConfig = parseConsumerFilterInput(formData.filter_subject);
     const payload: ConsumerConfig = {
       ...formData,
       name: consumerName || undefined,
       durable_name: durableName || undefined,
       description: formData.description?.trim() || undefined,
-      filter_subject: formData.filter_subject?.trim() || undefined,
+      filter_subject: filterConfig.filter_subject,
+      filter_subjects: filterConfig.filter_subjects,
       deliver_subject: formData.deliver_subject?.trim() || undefined,
       deliver_group: formData.deliver_group?.trim() || undefined,
     };
@@ -1036,7 +1061,7 @@ export default function ConsumersPage() {
           ]}
           rows={[
             { label: 'Stream', value: selectedStream },
-            { label: 'Filter', value: consumer.config.filter_subject || '*' },
+            { label: 'Filter', value: consumerFilterLabel(consumer.config) },
             { label: 'Ack policy', value: consumer.config.ack_policy ?? 'explicit' },
             {
               label: 'Consumer type',
@@ -1093,7 +1118,7 @@ export default function ConsumersPage() {
       (c) =>
         c.name.toLowerCase().includes(q) ||
         (c.config.durable_name && c.config.durable_name.toLowerCase().includes(q)) ||
-        (c.config.filter_subject && c.config.filter_subject.toLowerCase().includes(q)),
+        consumerFilterLabel(c.config).toLowerCase().includes(q),
     );
   }, [consumersData?.consumers, searchQuery]);
 
@@ -1347,7 +1372,7 @@ export default function ConsumersPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="filter-subject">Filter Subject</Label>
+                <Label htmlFor="filter-subject">Filter Subjects</Label>
                 <Input
                   id="filter-subject"
                   type="text"
@@ -1355,7 +1380,7 @@ export default function ConsumersPage() {
                   onChange={(event) =>
                     setFormData((prev) => ({ ...prev, filter_subject: event.target.value }))
                   }
-                  placeholder="orders.created"
+                  placeholder="orders.created, orders.updated"
                 />
               </div>
 
@@ -1693,7 +1718,7 @@ export default function ConsumersPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <SubjectChip subject={consumer.config.filter_subject} />
+                            <SubjectChips subjects={consumerFilterSubjects(consumer.config)} />
                           </TableCell>
                           <TableCell>
                             <Badge

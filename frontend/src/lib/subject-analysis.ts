@@ -1,4 +1,4 @@
-import { ConsumerInfo, StreamInfo } from '@/lib/types';
+import type { ConsumerConfig, ConsumerDiagnostic, ConsumerInfo, StreamInfo } from '@/lib/types';
 
 export interface StreamConsumer {
   streamName: string;
@@ -46,6 +46,12 @@ export interface SubjectAnalysis {
   overlappingStreamSubjects: OverlappingStreamSubject[];
 }
 
+type ConsumerFilterSource =
+  | Pick<ConsumerConfig, 'filter_subject' | 'filter_subjects'>
+  | Pick<ConsumerDiagnostic, 'filter_subject' | 'filter_subjects'>
+  | null
+  | undefined;
+
 function tokens(pattern: string): string[] {
   return pattern
     .trim()
@@ -68,6 +74,36 @@ export function subjectMatches(pattern: string, subject: string): boolean {
   return patternTokens.length === subjectTokens.length;
 }
 
+export function consumerFilterSubjects(source: ConsumerFilterSource): string[] {
+  const plural = Array.isArray(source?.filter_subjects)
+    ? source.filter_subjects
+        .map((subject) => (typeof subject === 'string' ? subject.trim() : ''))
+        .filter((subject): subject is string => subject.length > 0)
+    : [];
+
+  if (plural.length > 0) {
+    return [...new Set(plural)];
+  }
+
+  const singular = source?.filter_subject?.trim();
+  return singular ? [singular] : [];
+}
+
+export function consumerFilterLabel(source: ConsumerFilterSource, fallback = '*'): string {
+  const filters = consumerFilterSubjects(source);
+  return filters.length > 0 ? filters.join(', ') : fallback;
+}
+
+export function singleConsumerFilterSubject(source: ConsumerFilterSource): string | undefined {
+  const filters = consumerFilterSubjects(source);
+  return filters.length === 1 ? filters[0] : undefined;
+}
+
+export function consumerSubjectMatches(source: ConsumerFilterSource, subject: string): boolean {
+  const filters = consumerFilterSubjects(source);
+  return filters.length === 0 || filters.some((filter) => subjectMatches(filter, subject));
+}
+
 export function subjectPatternsOverlap(left: string, right: string): boolean {
   const leftTokens = tokens(left);
   const rightTokens = tokens(right);
@@ -88,6 +124,14 @@ export function subjectPatternsOverlap(left: string, right: string): boolean {
   };
 
   return visit(0, 0);
+}
+
+export function consumerFilterOverlapsSubject(
+  source: ConsumerFilterSource,
+  subject: string,
+): boolean {
+  const filters = consumerFilterSubjects(source);
+  return filters.length === 0 || filters.some((filter) => subjectPatternsOverlap(subject, filter));
 }
 
 export function subjectPatternCovers(cover: string, covered: string): boolean {
@@ -142,21 +186,24 @@ export function analyzeSubjects(
   const streamSubjects: StreamSubjectImpact[] = streams.flatMap((stream) =>
     (stream.config.subjects.length ? stream.config.subjects : ['>']).map((subject) => {
       const streamConsumers = consumersByStream.get(stream.config.name) ?? [];
-      const matches = streamConsumers
-        .map((consumer) => {
-          const filter = consumer.config.filter_subject || subject;
-          if (!subjectPatternsOverlap(subject, filter)) return null;
-          return {
-            streamName: stream.config.name,
-            streamSubject: subject,
-            consumerName: consumer.name,
-            consumerFilter: filter,
-            relationship: subjectRelationship(subject, filter),
-            pending: consumer.num_pending,
-            ackPending: consumer.num_ack_pending,
-          } satisfies SubjectConsumerMatch;
-        })
-        .filter((match): match is SubjectConsumerMatch => match !== null);
+      const matches = streamConsumers.flatMap((consumer) => {
+        const filters = consumerFilterSubjects(consumer.config);
+        const effectiveFilters = filters.length > 0 ? filters : [subject];
+        return effectiveFilters.flatMap((filter) => {
+          if (!subjectPatternsOverlap(subject, filter)) return [];
+          return [
+            {
+              streamName: stream.config.name,
+              streamSubject: subject,
+              consumerName: consumer.name,
+              consumerFilter: filter,
+              relationship: subjectRelationship(subject, filter),
+              pending: consumer.num_pending,
+              ackPending: consumer.num_ack_pending,
+            } satisfies SubjectConsumerMatch,
+          ];
+        });
+      });
 
       return {
         streamName: stream.config.name,
@@ -171,21 +218,19 @@ export function analyzeSubjects(
   const unmatchedConsumerFilters = consumers.flatMap((item) => {
     const stream = streams.find((candidate) => candidate.config.name === item.streamName);
     if (!stream) return [];
-    const filter = item.consumer.config.filter_subject;
-    if (!filter) return [];
-    const hasStreamSubject = stream.config.subjects.some((subject) =>
-      subjectPatternsOverlap(subject, filter),
-    );
-    if (hasStreamSubject) return [];
-    return [
-      {
+    return consumerFilterSubjects(item.consumer.config).flatMap((filter) => {
+      const hasStreamSubject = stream.config.subjects.some((subject) =>
+        subjectPatternsOverlap(subject, filter),
+      );
+      if (hasStreamSubject) return [];
+      return {
         streamName: item.streamName,
         consumerName: item.consumer.name,
         filterSubject: filter,
         pending: item.consumer.num_pending,
         ackPending: item.consumer.num_ack_pending,
-      },
-    ];
+      };
+    });
   });
 
   const flattenedSubjects = streams.flatMap((stream) =>

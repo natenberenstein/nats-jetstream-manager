@@ -16,6 +16,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConsumerDiagnostic } from '@/lib/types';
 import { buildConsumerMessagesHref } from '@/lib/consumer-messages';
+import {
+  consumerFilterLabel,
+  consumerFilterSubjects,
+  singleConsumerFilterSubject,
+} from '@/lib/subject-analysis';
 import { cn, formatNanoseconds, formatNumber } from '@/lib/utils';
 
 interface ConsumerLagTriageProps {
@@ -100,7 +105,7 @@ function likelyCause(diagnostic: ConsumerDiagnostic): TriageCause {
   }
 
   if (
-    diagnostic.filter_subject &&
+    consumerFilterSubjects(diagnostic).length > 0 &&
     diagnostic.stream_lag > 0 &&
     diagnostic.num_pending === 0 &&
     diagnostic.num_ack_pending === 0
@@ -195,14 +200,14 @@ export function ConsumerLagTriage({
                 streamName: diagnostic.stream_name,
                 consumerName: diagnostic.name,
                 diagnostic,
-                filterSubject: diagnostic.filter_subject,
+                filterSubject: singleConsumerFilterSubject(diagnostic),
                 window: 'ack_pending',
               });
               const pendingHref = buildConsumerMessagesHref({
                 streamName: diagnostic.stream_name,
                 consumerName: diagnostic.name,
                 diagnostic,
-                filterSubject: diagnostic.filter_subject,
+                filterSubject: singleConsumerFilterSubject(diagnostic),
                 window: 'pending',
               });
               const remediateHref = remediationHref(diagnostic);
@@ -234,7 +239,9 @@ export function ConsumerLagTriage({
                         </Link>
                         <p className="text-xs text-muted-foreground">
                           {diagnostic.stream_name}
-                          {diagnostic.filter_subject ? ` · ${diagnostic.filter_subject}` : ''}
+                          {consumerFilterSubjects(diagnostic).length > 0
+                            ? ` · ${consumerFilterLabel(diagnostic)}`
+                            : ''}
                         </p>
                       </div>
                     </div>

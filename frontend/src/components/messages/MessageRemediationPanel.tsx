@@ -47,7 +47,7 @@ import { PayloadViewer } from './PayloadViewer';
 import { formatPayload } from './utils';
 import { ImpactPreview } from '@/components/operations/ImpactPreview';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { subjectMatches } from '@/lib/subject-analysis';
+import { consumerSubjectMatches } from '@/lib/subject-analysis';
 
 type RemediationContext = 'pending' | 'ack-pending' | 'general';
 
@@ -270,7 +270,7 @@ export function MessageRemediationPanel({
     }
     const targetSubject = replaySubject.trim();
     const matchingConsumers = consumers.filter((consumer) =>
-      subjectMatches(consumer.config.filter_subject || '>', targetSubject),
+      consumerSubjectMatches(consumer.config, targetSubject),
     );
     const confirmed = await confirm({
       title: 'Replay message',

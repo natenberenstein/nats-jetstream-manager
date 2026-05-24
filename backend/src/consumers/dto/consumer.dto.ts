@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsIn, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsIn, Min, IsArray } from 'class-validator';
 
 export class ConsumerCreateDto {
   @IsOptional()
@@ -49,6 +49,11 @@ export class ConsumerCreateDto {
   @IsOptional()
   @IsString()
   filter_subject?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  filter_subjects?: string[];
 
   @IsOptional()
   @IsString()

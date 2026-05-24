@@ -14,6 +14,7 @@ import {
 } from '@/hooks/useConsumers';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import { copyText, downloadFile } from '@/lib/download';
+import { consumerFilterLabel, consumerFilterSubjects } from '@/lib/subject-analysis';
 import { formatNumber } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -54,7 +55,7 @@ import {
 } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ConsumerInfo } from '@/lib/types';
-import { SubjectChip } from '@/components/subjects/SubjectChips';
+import { SubjectChip, SubjectChips } from '@/components/subjects/SubjectChips';
 import { ConsumerLagTriage } from '@/components/operations/ConsumerLagTriage';
 
 function formatNsToSeconds(nanoseconds?: number): string {
@@ -120,11 +121,12 @@ export default function ConsumerDetailPage({
 
   const config = consumer.config;
   const isPush = !!config.deliver_subject;
+  const filterSubjects = consumerFilterSubjects(config);
   const consumerCliCommand = [
     'nats consumer add',
     streamName,
     consumer.name,
-    config.filter_subject ? `--filter ${config.filter_subject}` : null,
+    ...filterSubjects.map((filterSubject) => `--filter ${filterSubject}`),
     `--ack ${config.ack_policy || 'explicit'}`,
     `--deliver ${config.deliver_policy || 'all'}`,
     config.max_deliver != null ? `--max-deliver ${config.max_deliver}` : null,
@@ -357,9 +359,9 @@ export default function ConsumerDetailPage({
                 </TableRow>
               )}
               <TableRow>
-                <TableCell className="font-medium">Filter Subject</TableCell>
+                <TableCell className="font-medium">Filter Subjects</TableCell>
                 <TableCell>
-                  <SubjectChip subject={config.filter_subject} />
+                  <SubjectChips subjects={filterSubjects} />
                 </TableCell>
               </TableRow>
               <TableRow>
@@ -534,8 +536,8 @@ function ConsumerEditDialog({
                 <Input value={consumer.config.deliver_subject ? 'Push' : 'Pull'} disabled />
               </div>
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Filter Subject</Label>
-                <Input value={consumer.config.filter_subject || '*'} disabled />
+                <Label className="text-muted-foreground">Filter Subjects</Label>
+                <Input value={consumerFilterLabel(consumer.config)} disabled />
               </div>
               <div className="space-y-1">
                 <Label className="text-muted-foreground">Deliver Policy</Label>

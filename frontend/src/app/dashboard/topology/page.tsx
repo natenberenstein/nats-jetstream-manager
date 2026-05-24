@@ -37,7 +37,11 @@ import { useClusterOverview } from '@/hooks/useCluster';
 import { useAllConsumers } from '@/hooks/useConsumers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useStreams } from '@/hooks/useStreams';
-import { subjectPatternsOverlap } from '@/lib/subject-analysis';
+import {
+  consumerFilterLabel,
+  consumerFilterOverlapsSubject,
+  consumerFilterSubjects,
+} from '@/lib/subject-analysis';
 import { cn, formatBytes, formatNumber } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -291,15 +295,6 @@ function pruneSelectedValues(values: string[], validValues: string[]) {
   const valid = new Set(validValues);
   const nextValues = values.filter((value) => valid.has(value));
   return nextValues.length === values.length ? values : nextValues;
-}
-
-function consumerFilterLabel(filterSubject?: string) {
-  return filterSubject?.trim() || 'all subjects';
-}
-
-function consumerMatchesSubject(subject: string, filterSubject?: string) {
-  if (!filterSubject?.trim()) return true;
-  return subjectPatternsOverlap(subject, filterSubject);
 }
 
 function layoutVisibleNodes(nodes: TopologyFlowNode[], streamOrder: string[]) {
@@ -738,7 +733,7 @@ export default function TopologyPage() {
     () =>
       consumerItems
         .map((item) => {
-          const filterSubject = consumerFilterLabel(item.consumer.config.filter_subject);
+          const filterSubject = consumerFilterLabel(item.consumer.config, 'all subjects');
 
           return {
             value: consumerNodeId(item.streamName, item.consumer.name),
@@ -937,7 +932,7 @@ export default function TopologyPage() {
       stream.config.subjects.forEach((subject) => {
         const subjectId = subjectNodeId(stream.config.name, subject);
         const matchingConsumerIds = streamConsumers
-          .filter((item) => consumerMatchesSubject(subject, item.consumer.config.filter_subject))
+          .filter((item) => consumerFilterOverlapsSubject(item.consumer.config, subject))
           .map((item) => consumerNodeId(item.streamName, item.consumer.name));
 
         graphNodes.push(
@@ -950,9 +945,7 @@ export default function TopologyPage() {
               subject,
               stream.config.name,
               streamConsumers
-                .filter((item) =>
-                  consumerMatchesSubject(subject, item.consumer.config.filter_subject),
-                )
+                .filter((item) => consumerFilterOverlapsSubject(item.consumer.config, subject))
                 .map((item) => item.consumer.name)
                 .join(' '),
             ],
@@ -970,12 +963,12 @@ export default function TopologyPage() {
       if (!stream) return;
 
       const consumerId = consumerNodeId(item.streamName, item.consumer.name);
-      const filterSubject = item.consumer.config.filter_subject;
-      const filterLabel = consumerFilterLabel(filterSubject);
+      const filterSubjects = consumerFilterSubjects(item.consumer.config);
+      const filterLabel = consumerFilterLabel(item.consumer.config, 'all subjects');
       const streamId = streamNodeId(item.streamName);
       const hasAckBacklog = item.consumer.num_ack_pending > 0;
       const matchingSubjects = stream.config.subjects.filter((subject) =>
-        consumerMatchesSubject(subject, filterSubject),
+        consumerFilterOverlapsSubject(item.consumer.config, subject),
       );
       const matchingSubjectIds = matchingSubjects.map((subject) =>
         subjectNodeId(stream.config.name, subject),
@@ -1044,7 +1037,9 @@ export default function TopologyPage() {
               `edge:${subjectId}:${consumerId}`,
               subjectId,
               consumerId,
-              filterSubject && filterSubject !== subject ? filterSubject : undefined,
+              filterSubjects.length > 0 && !filterSubjects.includes(subject)
+                ? filterLabel
+                : undefined,
             ),
           );
         });
