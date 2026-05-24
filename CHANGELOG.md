@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.2 (2026-05-24)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Other Changes
+* fix: preserve consumer filter subjects by @natenberenstein in https://github.com/natenberenstein/nats-jetstream-manager/pull/47
+
+
+**Full Changelog**: https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.11.1...v1.11.2
+
 ## 1.11.1 (2026-05-19)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
