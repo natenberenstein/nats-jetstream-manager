@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.3 (2026-05-26)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Dependencies
+* chore(deps): bump the github-actions group with 4 updates by @dependabot[bot] in https://github.com/natenberenstein/nats-jetstream-manager/pull/49
+
+
+**Full Changelog**: https://github.com/natenberenstein/nats-jetstream-manager/compare/v1.11.2...v1.11.3
+
 ## 1.11.2 (2026-05-24)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
