@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { CONNECTION_FIELD_HELP } from '@/lib/field-help';
 import { ConnectionRequest } from '@/lib/types';
 
 const SAVED_CONNECTIONS_KEY = 'nats_saved_connections_v1';
@@ -222,9 +223,13 @@ export default function HomePage() {
           <CardContent>
             <form onSubmit={handleConnect} className="space-y-6">
               <div>
-                <Label htmlFor="workspace-name" className="mb-2 block">
+                <FieldLabel
+                  htmlFor="workspace-name"
+                  help={CONNECTION_FIELD_HELP.workspaceName}
+                  containerClassName="mb-2"
+                >
                   Workspace Name
-                </Label>
+                </FieldLabel>
                 <Input
                   id="workspace-name"
                   type="text"
@@ -235,9 +240,13 @@ export default function HomePage() {
               </div>
 
               <div>
-                <Label htmlFor="environment" className="mb-2 block">
+                <FieldLabel
+                  htmlFor="environment"
+                  help={CONNECTION_FIELD_HELP.environment}
+                  containerClassName="mb-2"
+                >
                   Environment
-                </Label>
+                </FieldLabel>
                 <Input
                   id="environment"
                   type="text"
@@ -248,9 +257,13 @@ export default function HomePage() {
               </div>
 
               <div>
-                <Label htmlFor="url" className="mb-2 block">
+                <FieldLabel
+                  htmlFor="url"
+                  help={CONNECTION_FIELD_HELP.url}
+                  containerClassName="mb-2"
+                >
                   NATS Server URL
-                </Label>
+                </FieldLabel>
                 <Input
                   id="url"
                   type="text"
@@ -262,9 +275,13 @@ export default function HomePage() {
               </div>
 
               <div>
-                <Label htmlFor="user" className="mb-2 block">
+                <FieldLabel
+                  htmlFor="user"
+                  help={CONNECTION_FIELD_HELP.user}
+                  containerClassName="mb-2"
+                >
                   Username (Optional)
-                </Label>
+                </FieldLabel>
                 <Input
                   id="user"
                   type="text"
@@ -275,9 +292,13 @@ export default function HomePage() {
               </div>
 
               <div>
-                <Label htmlFor="password" className="mb-2 block">
+                <FieldLabel
+                  htmlFor="password"
+                  help={CONNECTION_FIELD_HELP.password}
+                  containerClassName="mb-2"
+                >
                   Password (Optional)
-                </Label>
+                </FieldLabel>
                 <Input
                   id="password"
                   type="password"
@@ -288,9 +309,13 @@ export default function HomePage() {
               </div>
 
               <div>
-                <Label htmlFor="token" className="mb-2 block">
+                <FieldLabel
+                  htmlFor="token"
+                  help={CONNECTION_FIELD_HELP.token}
+                  containerClassName="mb-2"
+                >
                   Token (Optional)
-                </Label>
+                </FieldLabel>
                 <Input
                   id="token"
                   type="password"
@@ -319,9 +344,13 @@ export default function HomePage() {
                     URL, or $SYS account credentials, or both.
                   </p>
                   <div>
-                    <Label htmlFor="monitoring_url" className="mb-2 block">
+                    <FieldLabel
+                      htmlFor="monitoring_url"
+                      help={CONNECTION_FIELD_HELP.monitoringUrl}
+                      containerClassName="mb-2"
+                    >
                       Monitoring URL (Optional)
-                    </Label>
+                    </FieldLabel>
                     <Input
                       id="monitoring_url"
                       type="text"
@@ -331,9 +360,13 @@ export default function HomePage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="sys_user" className="mb-2 block">
+                    <FieldLabel
+                      htmlFor="sys_user"
+                      help={CONNECTION_FIELD_HELP.sysUser}
+                      containerClassName="mb-2"
+                    >
                       $SYS Username (Optional)
-                    </Label>
+                    </FieldLabel>
                     <Input
                       id="sys_user"
                       type="text"
@@ -343,9 +376,13 @@ export default function HomePage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="sys_password" className="mb-2 block">
+                    <FieldLabel
+                      htmlFor="sys_password"
+                      help={CONNECTION_FIELD_HELP.sysPassword}
+                      containerClassName="mb-2"
+                    >
                       $SYS Password (Optional)
-                    </Label>
+                    </FieldLabel>
                     <Input
                       id="sys_password"
                       type="password"
@@ -364,9 +401,13 @@ export default function HomePage() {
                   onCheckedChange={(checked) => setRememberSecrets(checked === true)}
                 />
                 <div className="space-y-1">
-                  <Label htmlFor="remember-secrets" className="text-sm font-medium">
+                  <FieldLabel
+                    htmlFor="remember-secrets"
+                    className="text-sm font-medium"
+                    help={CONNECTION_FIELD_HELP.rememberSecrets}
+                  >
                     Save credentials in this browser
-                  </Label>
+                  </FieldLabel>
                   <p className="text-xs text-muted-foreground">
                     When off, saved workspaces keep URLs and labels but omit passwords and tokens.
                   </p>

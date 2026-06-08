@@ -12,6 +12,7 @@ import {
   useConsumerMetric,
   useUpdateConsumer,
 } from '@/hooks/useConsumers';
+import { CONSUMER_FIELD_HELP } from '@/lib/field-help';
 import { consumerUpdateSchema, ConsumerUpdateFormData } from '@/lib/schemas';
 import { copyText, downloadFile } from '@/lib/download';
 import { consumerFilterLabel, consumerFilterSubjects } from '@/lib/subject-analysis';
@@ -32,7 +33,7 @@ import { StatCard } from '@/components/cards/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
@@ -429,7 +430,7 @@ export default function ConsumerDetailPage({
               {config.rate_limit_bps != null && config.rate_limit_bps > 0 && (
                 <TableRow>
                   <TableCell className="font-medium">Rate Limit</TableCell>
-                  <TableCell>{formatNumber(config.rate_limit_bps)} bytes/sec</TableCell>
+                  <TableCell>{formatNumber(config.rate_limit_bps)} bits/sec</TableCell>
                 </TableRow>
               )}
               <TableRow>
@@ -528,28 +529,58 @@ function ConsumerEditDialog({
             </p>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Name / Durable</Label>
+                <FieldLabel
+                  className="text-muted-foreground"
+                  help={CONSUMER_FIELD_HELP.immutableName}
+                >
+                  Name / Durable
+                </FieldLabel>
                 <Input value={consumer.config.durable_name || consumer.name} disabled />
               </div>
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Type</Label>
+                <FieldLabel
+                  className="text-muted-foreground"
+                  help={CONSUMER_FIELD_HELP.immutableType}
+                >
+                  Type
+                </FieldLabel>
                 <Input value={consumer.config.deliver_subject ? 'Push' : 'Pull'} disabled />
               </div>
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Filter Subjects</Label>
+                <FieldLabel
+                  className="text-muted-foreground"
+                  help={CONSUMER_FIELD_HELP.immutableFilters}
+                >
+                  Filter Subjects
+                </FieldLabel>
                 <Input value={consumerFilterLabel(consumer.config)} disabled />
               </div>
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Deliver Policy</Label>
+                <FieldLabel
+                  className="text-muted-foreground"
+                  help={CONSUMER_FIELD_HELP.immutableDeliverPolicy}
+                >
+                  Deliver Policy
+                </FieldLabel>
                 <Input value={consumer.config.deliver_policy || 'all'} disabled />
               </div>
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Ack Policy</Label>
+                <FieldLabel
+                  className="text-muted-foreground"
+                  help={CONSUMER_FIELD_HELP.immutableAckPolicy}
+                >
+                  Ack Policy
+                </FieldLabel>
                 <Input value={consumer.config.ack_policy || 'explicit'} disabled />
               </div>
               {consumer.config.deliver_subject && (
                 <div className="space-y-1">
-                  <Label className="text-muted-foreground">Deliver Subject</Label>
+                  <FieldLabel
+                    className="text-muted-foreground"
+                    help={CONSUMER_FIELD_HELP.immutableDeliverSubject}
+                  >
+                    Deliver Subject
+                  </FieldLabel>
                   <Input value={consumer.config.deliver_subject} disabled />
                 </div>
               )}
@@ -559,7 +590,9 @@ function ConsumerEditDialog({
           {/* Mutable fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="detail-description">Description</Label>
+              <FieldLabel htmlFor="detail-description" help={CONSUMER_FIELD_HELP.description}>
+                Description
+              </FieldLabel>
               <Input
                 id="detail-description"
                 {...register('description')}
@@ -568,7 +601,9 @@ function ConsumerEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="detail-ack-wait">Ack Wait (seconds)</Label>
+              <FieldLabel htmlFor="detail-ack-wait" help={CONSUMER_FIELD_HELP.ackWaitSeconds}>
+                Ack Wait (seconds)
+              </FieldLabel>
               <Input
                 id="detail-ack-wait"
                 type="number"
@@ -582,7 +617,9 @@ function ConsumerEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="detail-max-deliver">Max Deliver (-1 = unlimited)</Label>
+              <FieldLabel htmlFor="detail-max-deliver" help={CONSUMER_FIELD_HELP.maxDeliver}>
+                Max Deliver (-1 = unlimited)
+              </FieldLabel>
               <Input id="detail-max-deliver" type="number" {...register('max_deliver')} />
               {errors.max_deliver && (
                 <p className="text-xs text-destructive">{errors.max_deliver.message}</p>
@@ -590,7 +627,9 @@ function ConsumerEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="detail-max-ack-pending">Max Ack Pending</Label>
+              <FieldLabel htmlFor="detail-max-ack-pending" help={CONSUMER_FIELD_HELP.maxAckPending}>
+                Max Ack Pending
+              </FieldLabel>
               <Input
                 id="detail-max-ack-pending"
                 type="number"
@@ -603,7 +642,9 @@ function ConsumerEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="detail-max-waiting">Max Waiting</Label>
+              <FieldLabel htmlFor="detail-max-waiting" help={CONSUMER_FIELD_HELP.maxWaiting}>
+                Max Waiting
+              </FieldLabel>
               <Input id="detail-max-waiting" type="number" min={0} {...register('max_waiting')} />
               {errors.max_waiting && (
                 <p className="text-xs text-destructive">{errors.max_waiting.message}</p>
@@ -611,7 +652,9 @@ function ConsumerEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="detail-rate-limit">Rate Limit (bytes/sec, 0 = unlimited)</Label>
+              <FieldLabel htmlFor="detail-rate-limit" help={CONSUMER_FIELD_HELP.rateLimit}>
+                Rate Limit (bits/sec, 0 = unlimited)
+              </FieldLabel>
               <Input id="detail-rate-limit" type="number" min={0} {...register('rate_limit_bps')} />
               {errors.rate_limit_bps && (
                 <p className="text-xs text-destructive">{errors.rate_limit_bps.message}</p>
@@ -624,7 +667,9 @@ function ConsumerEditDialog({
                 checked={headersOnly}
                 onCheckedChange={(checked) => setValue('headers_only', checked === true)}
               />
-              <Label htmlFor="detail-headers-only">Headers Only</Label>
+              <FieldLabel htmlFor="detail-headers-only" help={CONSUMER_FIELD_HELP.headersOnly}>
+                Headers Only
+              </FieldLabel>
             </div>
           </div>
           <DialogFooter>

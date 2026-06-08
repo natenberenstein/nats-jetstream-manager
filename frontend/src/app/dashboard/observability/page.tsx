@@ -51,6 +51,11 @@ function MiniBarChart({
   );
 }
 
+function formatPercentRatio(value?: number) {
+  if (value == null || Number.isNaN(value)) return '-';
+  return `${(value * 100).toFixed(1)}%`;
+}
+
 export default function ObservabilityPage() {
   const { connectionId } = useConnection();
   const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } =
@@ -133,15 +138,11 @@ export default function ObservabilityPage() {
           </div>
           <div>
             <p className="text-muted-foreground">Memory Utilization</p>
-            <p className="font-medium">
-              {data?.memory_utilization != null ? `${data.memory_utilization}%` : '-'}
-            </p>
+            <p className="font-medium">{formatPercentRatio(data?.memory_utilization)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Storage Utilization</p>
-            <p className="font-medium">
-              {data?.storage_utilization != null ? `${data.storage_utilization}%` : '-'}
-            </p>
+            <p className="font-medium">{formatPercentRatio(data?.storage_utilization)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Memory</p>

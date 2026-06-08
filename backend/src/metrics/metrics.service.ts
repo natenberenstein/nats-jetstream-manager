@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
+import { StreamInfo as NatsStreamInfo } from 'nats';
 import { StreamMetric } from '../database/entities/stream-metric.entity';
 import { ConsumerMetric } from '../database/entities/consumer-metric.entity';
 import { ConnectionsService } from '../connections/connections.service';
@@ -77,7 +78,11 @@ export class MetricsService {
         const conn = this.connectionsService.getConnection(connItem.connection_id, {
           touch: false,
         });
-        const streams = await conn.jsm.streams.list().next();
+        const streams: NatsStreamInfo[] = [];
+        const streamLister = conn.jsm.streams.list();
+        for await (const stream of streamLister) {
+          streams.push(stream);
+        }
 
         for (const stream of streams) {
           const metric = this.metricRepo.create({

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useConnection } from '@/contexts/ConnectionContext';
 import { useStreams, useDeleteStream, useCreateStream, useUpdateStream } from '@/hooks/useStreams';
 import { useClusterOverview } from '@/hooks/useCluster';
+import { STREAM_FIELD_HELP } from '@/lib/field-help';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { StreamInfo } from '@/lib/types';
 import Link from 'next/link';
@@ -59,8 +60,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -286,17 +287,26 @@ function StreamEditForm({
             <form onSubmit={handleSubmit(onSubmit, focusFirstError)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-muted-foreground">Name (read-only)</Label>
+                  <FieldLabel className="text-muted-foreground" help={STREAM_FIELD_HELP.name}>
+                    Name (read-only)
+                  </FieldLabel>
                   <Input value={stream.config.name} disabled />
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-muted-foreground">Storage (read-only)</Label>
+                  <FieldLabel
+                    className="text-muted-foreground"
+                    help={STREAM_FIELD_HELP.storageReadonly}
+                  >
+                    Storage (read-only)
+                  </FieldLabel>
                   <Input value={stream.config.storage || 'file'} disabled />
                 </div>
 
                 <div className="space-y-1 md:col-span-2">
-                  <Label htmlFor="edit-subjects">Subjects (comma-separated)</Label>
+                  <FieldLabel htmlFor="edit-subjects" help={STREAM_FIELD_HELP.subjects}>
+                    Subjects (comma-separated)
+                  </FieldLabel>
                   <Input
                     id="edit-subjects"
                     {...register('subjects')}
@@ -308,7 +318,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1 md:col-span-2">
-                  <Label htmlFor="edit-description">Description</Label>
+                  <FieldLabel htmlFor="edit-description" help={STREAM_FIELD_HELP.description}>
+                    Description
+                  </FieldLabel>
                   <Input
                     id="edit-description"
                     {...register('description')}
@@ -317,7 +329,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-retention">Retention</Label>
+                  <FieldLabel htmlFor="edit-retention" help={STREAM_FIELD_HELP.retention}>
+                    Retention
+                  </FieldLabel>
                   <Controller
                     control={control}
                     name="retention"
@@ -340,7 +354,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-discard">Discard Policy</Label>
+                  <FieldLabel htmlFor="edit-discard" help={STREAM_FIELD_HELP.discard}>
+                    Discard Policy
+                  </FieldLabel>
                   <Controller
                     control={control}
                     name="discard"
@@ -359,7 +375,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-max-consumers">Max Consumers (-1 = unlimited)</Label>
+                  <FieldLabel htmlFor="edit-max-consumers" help={STREAM_FIELD_HELP.maxConsumers}>
+                    Max Consumers (-1 = unlimited)
+                  </FieldLabel>
                   <Input id="edit-max-consumers" type="number" {...register('max_consumers')} />
                   {errors.max_consumers && (
                     <p className="text-xs text-destructive">{errors.max_consumers.message}</p>
@@ -367,7 +385,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-max-messages">Max Messages (-1 = unlimited)</Label>
+                  <FieldLabel htmlFor="edit-max-messages" help={STREAM_FIELD_HELP.maxMessages}>
+                    Max Messages (-1 = unlimited)
+                  </FieldLabel>
                   <Input id="edit-max-messages" type="number" {...register('max_msgs')} />
                   {errors.max_msgs && (
                     <p className="text-xs text-destructive">{errors.max_msgs.message}</p>
@@ -375,7 +395,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-max-bytes">Max Bytes (-1 = unlimited)</Label>
+                  <FieldLabel htmlFor="edit-max-bytes" help={STREAM_FIELD_HELP.maxBytes}>
+                    Max Bytes (-1 = unlimited)
+                  </FieldLabel>
                   <Input id="edit-max-bytes" type="number" {...register('max_bytes')} />
                   {errors.max_bytes && (
                     <p className="text-xs text-destructive">{errors.max_bytes.message}</p>
@@ -383,7 +405,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-max-age">Max Age (seconds, 0 = unlimited)</Label>
+                  <FieldLabel htmlFor="edit-max-age" help={STREAM_FIELD_HELP.maxAge}>
+                    Max Age (seconds, 0 = unlimited)
+                  </FieldLabel>
                   <Input id="edit-max-age" type="number" {...register('max_age')} />
                   {errors.max_age && (
                     <p className="text-xs text-destructive">{errors.max_age.message}</p>
@@ -391,7 +415,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-max-msg-size">Max Message Size (-1 = unlimited)</Label>
+                  <FieldLabel htmlFor="edit-max-msg-size" help={STREAM_FIELD_HELP.maxMessageSize}>
+                    Max Message Size (-1 = unlimited)
+                  </FieldLabel>
                   <Input id="edit-max-msg-size" type="number" {...register('max_msg_size')} />
                   {errors.max_msg_size && (
                     <p className="text-xs text-destructive">{errors.max_msg_size.message}</p>
@@ -399,7 +425,9 @@ function StreamEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-replicas">Replicas</Label>
+                  <FieldLabel htmlFor="edit-replicas" help={STREAM_FIELD_HELP.replicas}>
+                    Replicas
+                  </FieldLabel>
                   <Input id="edit-replicas" type="number" min={1} {...register('replicas')} />
                   {errors.replicas && (
                     <p className="text-xs text-destructive">{errors.replicas.message}</p>
@@ -721,7 +749,9 @@ export default function StreamsPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
-                <Label htmlFor="create-name">Name</Label>
+                <FieldLabel htmlFor="create-name" help={STREAM_FIELD_HELP.name}>
+                  Name
+                </FieldLabel>
                 <Input
                   id="create-name"
                   value={createForm.name}
@@ -731,7 +761,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-retention">Retention</Label>
+                <FieldLabel htmlFor="create-retention" help={STREAM_FIELD_HELP.retention}>
+                  Retention
+                </FieldLabel>
                 <Select
                   value={createForm.retention}
                   onValueChange={(value) =>
@@ -753,7 +785,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1 md:col-span-2">
-                <Label htmlFor="create-subjects">Subjects (comma-separated)</Label>
+                <FieldLabel htmlFor="create-subjects" help={STREAM_FIELD_HELP.subjects}>
+                  Subjects (comma-separated)
+                </FieldLabel>
                 <Input
                   id="create-subjects"
                   value={createForm.subjects}
@@ -763,7 +797,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1 md:col-span-2">
-                <Label htmlFor="create-description">Description (optional)</Label>
+                <FieldLabel htmlFor="create-description" help={STREAM_FIELD_HELP.description}>
+                  Description (optional)
+                </FieldLabel>
                 <Input
                   id="create-description"
                   value={createForm.description}
@@ -775,7 +811,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-storage">Storage</Label>
+                <FieldLabel htmlFor="create-storage" help={STREAM_FIELD_HELP.storage}>
+                  Storage
+                </FieldLabel>
                 <Select
                   value={createForm.storage}
                   onValueChange={(value) =>
@@ -796,7 +834,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-discard">Discard Policy</Label>
+                <FieldLabel htmlFor="create-discard" help={STREAM_FIELD_HELP.discard}>
+                  Discard Policy
+                </FieldLabel>
                 <Select
                   value={createForm.discard}
                   onValueChange={(value) =>
@@ -817,7 +857,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-max-consumers">Max Consumers (-1 = unlimited)</Label>
+                <FieldLabel htmlFor="create-max-consumers" help={STREAM_FIELD_HELP.maxConsumers}>
+                  Max Consumers (-1 = unlimited)
+                </FieldLabel>
                 <Input
                   id="create-max-consumers"
                   type="number"
@@ -832,7 +874,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-max-messages">Max Messages (-1 = unlimited)</Label>
+                <FieldLabel htmlFor="create-max-messages" help={STREAM_FIELD_HELP.maxMessages}>
+                  Max Messages (-1 = unlimited)
+                </FieldLabel>
                 <Input
                   id="create-max-messages"
                   type="number"
@@ -844,7 +888,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-max-bytes">Max Bytes (-1 = unlimited)</Label>
+                <FieldLabel htmlFor="create-max-bytes" help={STREAM_FIELD_HELP.maxBytes}>
+                  Max Bytes (-1 = unlimited)
+                </FieldLabel>
                 <Input
                   id="create-max-bytes"
                   type="number"
@@ -856,7 +902,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-max-age">Max Age (seconds, 0 = unlimited)</Label>
+                <FieldLabel htmlFor="create-max-age" help={STREAM_FIELD_HELP.maxAge}>
+                  Max Age (seconds, 0 = unlimited)
+                </FieldLabel>
                 <Input
                   id="create-max-age"
                   type="number"
@@ -869,7 +917,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-max-msg-size">Max Message Size (-1 = unlimited)</Label>
+                <FieldLabel htmlFor="create-max-msg-size" help={STREAM_FIELD_HELP.maxMessageSize}>
+                  Max Message Size (-1 = unlimited)
+                </FieldLabel>
                 <Input
                   id="create-max-msg-size"
                   type="number"
@@ -884,7 +934,12 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-duplicate-window">Duplicate Window (seconds)</Label>
+                <FieldLabel
+                  htmlFor="create-duplicate-window"
+                  help={STREAM_FIELD_HELP.duplicateWindow}
+                >
+                  Duplicate Window (seconds)
+                </FieldLabel>
                 <Input
                   id="create-duplicate-window"
                   type="number"
@@ -900,7 +955,9 @@ export default function StreamsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="create-replicas">Replicas</Label>
+                <FieldLabel htmlFor="create-replicas" help={STREAM_FIELD_HELP.replicas}>
+                  Replicas
+                </FieldLabel>
                 <Input
                   id="create-replicas"
                   type="number"
@@ -920,7 +977,9 @@ export default function StreamsPage() {
                     setCreateForm((prev) => ({ ...prev, no_ack: checked === true }))
                   }
                 />
-                <Label htmlFor="create-no-ack">No Ack</Label>
+                <FieldLabel htmlFor="create-no-ack" help={STREAM_FIELD_HELP.noAck}>
+                  No Ack
+                </FieldLabel>
               </div>
 
               <div className="rounded-md border p-3 text-xs text-muted-foreground md:col-span-2">

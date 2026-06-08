@@ -93,6 +93,7 @@ export class ObjectStoreService {
         await jsm.streams.add({
           name: streamName,
           subjects: [`$O.${dto.name}.C.>`, `$O.${dto.name}.M.>`],
+          description: dto.description,
           max_age: 0,
           storage: dto.storage ? STORAGE_MAP[dto.storage] : StorageType.File,
           num_replicas: dto.replicas ?? 1,

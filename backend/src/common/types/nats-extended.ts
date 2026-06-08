@@ -42,7 +42,7 @@ export interface StreamClusterInfo {
 
 export interface ExtendedStreamInfo {
   config?: { name?: string };
-  state?: { bytes?: number; messages?: number };
+  state?: { bytes?: number; consumer_count?: number; messages?: number };
   cluster?: StreamClusterInfo;
 }
 
