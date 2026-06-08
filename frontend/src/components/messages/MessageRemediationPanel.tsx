@@ -29,13 +29,14 @@ import {
   useFetchRemediationMessages,
   useReplayStoredMessage,
 } from '@/hooks/useMessages';
+import { MESSAGE_REMEDIATION_FIELD_HELP } from '@/lib/field-help';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -366,13 +367,18 @@ export function MessageRemediationPanel({
       <CardContent className="space-y-4 pt-4">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_160px]">
           <div className="space-y-1">
-            <Label>Consumer</Label>
+            <FieldLabel
+              htmlFor="remediation-consumer"
+              help={MESSAGE_REMEDIATION_FIELD_HELP.consumer}
+            >
+              Consumer
+            </FieldLabel>
             <Select
               value={selectedConsumerName || undefined}
               onValueChange={onConsumerChange}
               disabled={!selectedStream || consumers.length === 0}
             >
-              <SelectTrigger>
+              <SelectTrigger id="remediation-consumer">
                 <SelectValue placeholder="Select consumer" />
               </SelectTrigger>
               <SelectContent>
@@ -385,7 +391,12 @@ export function MessageRemediationPanel({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="remediation-batch-size">Batch</Label>
+            <FieldLabel
+              htmlFor="remediation-batch-size"
+              help={MESSAGE_REMEDIATION_FIELD_HELP.batch}
+            >
+              Batch
+            </FieldLabel>
             <Input
               id="remediation-batch-size"
               type="number"
@@ -438,7 +449,12 @@ export function MessageRemediationPanel({
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="space-y-1">
-            <Label htmlFor="remediation-nak-delay">Nak delay ms</Label>
+            <FieldLabel
+              htmlFor="remediation-nak-delay"
+              help={MESSAGE_REMEDIATION_FIELD_HELP.nakDelay}
+            >
+              Nak delay ms
+            </FieldLabel>
             <Input
               id="remediation-nak-delay"
               type="number"
@@ -448,7 +464,12 @@ export function MessageRemediationPanel({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="remediation-term-reason">Term reason</Label>
+            <FieldLabel
+              htmlFor="remediation-term-reason"
+              help={MESSAGE_REMEDIATION_FIELD_HELP.termReason}
+            >
+              Term reason
+            </FieldLabel>
             <Input
               id="remediation-term-reason"
               value={termReason}
@@ -457,7 +478,12 @@ export function MessageRemediationPanel({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="remediation-replay-subject">Replay subject</Label>
+            <FieldLabel
+              htmlFor="remediation-replay-subject"
+              help={MESSAGE_REMEDIATION_FIELD_HELP.replaySubject}
+            >
+              Replay subject
+            </FieldLabel>
             <Input
               id="remediation-replay-subject"
               value={replaySubject}

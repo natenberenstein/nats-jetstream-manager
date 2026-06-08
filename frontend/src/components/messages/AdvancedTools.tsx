@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 
 import { messageApi } from '@/lib/api';
+import { MESSAGE_FIELD_HELP } from '@/lib/field-help';
 import { JobInfo, MessageData } from '@/lib/types';
 import {
   dlqReplaySchema,
@@ -15,8 +16,8 @@ import {
 } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
 interface AdvancedToolsProps {
@@ -177,9 +178,12 @@ export function AdvancedTools({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label>Indexed Search</Label>
+          <FieldLabel htmlFor="message-index-search" help={MESSAGE_FIELD_HELP.indexSearch}>
+            Indexed Search
+          </FieldLabel>
           <div className="flex gap-2">
             <Input
+              id="message-index-search"
               value={indexQuery}
               onChange={(e) => setIndexQuery(e.target.value)}
               placeholder="Search subject/header/payload preview"
@@ -192,8 +196,12 @@ export function AdvancedTools({
               Search
             </Button>
           </div>
+          <FieldLabel htmlFor="message-index-limit" help={MESSAGE_FIELD_HELP.indexLimit}>
+            Index Limit
+          </FieldLabel>
           <div className="flex items-center gap-2">
             <Input
+              id="message-index-limit"
               type="number"
               min={100}
               max={10000}
@@ -258,8 +266,11 @@ export function AdvancedTools({
         </div>
 
         <form onSubmit={dlqForm.handleSubmit(handleDlqReplay)} className="space-y-2">
-          <Label>DLQ Replay</Label>
+          <FieldLabel htmlFor="dlq-replay-seq" help={MESSAGE_FIELD_HELP.dlqSeq}>
+            Source Sequence
+          </FieldLabel>
           <Input
+            id="dlq-replay-seq"
             type="number"
             min={1}
             {...dlqForm.register('seq', { valueAsNumber: true })}
@@ -268,7 +279,11 @@ export function AdvancedTools({
           {dlqForm.formState.errors.seq && (
             <p className="text-xs text-destructive">{dlqForm.formState.errors.seq.message}</p>
           )}
+          <FieldLabel htmlFor="dlq-replay-target" help={MESSAGE_FIELD_HELP.dlqTarget}>
+            Target Subject
+          </FieldLabel>
           <Input
+            id="dlq-replay-target"
             {...dlqForm.register('targetSubject')}
             placeholder="Target subject (e.g. orders.retry)"
           />
@@ -283,8 +298,11 @@ export function AdvancedTools({
         </form>
 
         <form onSubmit={schemaForm.handleSubmit(handleValidateSchema)} className="space-y-2">
-          <Label>Schema Validation (JSON Schema subset)</Label>
+          <FieldLabel htmlFor="schema-validation-seq" help={MESSAGE_FIELD_HELP.schemaSeq}>
+            Sequence to Validate
+          </FieldLabel>
           <Input
+            id="schema-validation-seq"
             type="number"
             min={1}
             {...schemaForm.register('seq', { valueAsNumber: true })}
@@ -293,7 +311,15 @@ export function AdvancedTools({
           {schemaForm.formState.errors.seq && (
             <p className="text-xs text-destructive">{schemaForm.formState.errors.seq.message}</p>
           )}
-          <Textarea {...schemaForm.register('schema')} rows={5} className="font-mono" />
+          <FieldLabel htmlFor="schema-validation-schema" help={MESSAGE_FIELD_HELP.schema}>
+            JSON Schema
+          </FieldLabel>
+          <Textarea
+            id="schema-validation-schema"
+            {...schemaForm.register('schema')}
+            rows={5}
+            className="font-mono"
+          />
           {schemaForm.formState.errors.schema && (
             <p className="text-xs text-destructive">{schemaForm.formState.errors.schema.message}</p>
           )}

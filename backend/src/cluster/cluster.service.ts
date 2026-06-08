@@ -148,7 +148,7 @@ export class ClusterService {
       streamCount = accountInfo.streams ?? 0;
       consumerCount = accountInfo.consumers ?? 0;
       totalMessages = accountInfo.messages ?? 0;
-      totalBytes = accountInfo.storage ?? 0;
+      totalBytes = (accountInfo.memory ?? 0) + (accountInfo.storage ?? 0);
       jsDomain = accountInfo.domain;
 
       if (accountInfo.api) {
@@ -196,11 +196,24 @@ export class ClusterService {
     }
 
     try {
-      const streams = await jsm.streams.list().next();
+      const streams: ExtendedStreamInfo[] = [];
+      const streamLister = jsm.streams.list();
+      for await (const stream of streamLister) {
+        streams.push(stream as ExtendedStreamInfo);
+      }
       sources.push('stream_list');
 
+      let streamMessages = 0;
+      let streamBytes = 0;
+      let streamConsumers = 0;
+
       for (const si of streams) {
-        const cluster = (si as ExtendedStreamInfo).cluster;
+        const streamName = si.config?.name ?? 'unknown';
+        streamMessages += si.state?.messages ?? 0;
+        streamBytes += si.state?.bytes ?? 0;
+        streamConsumers += si.state?.consumer_count ?? 0;
+
+        const cluster = si.cluster;
         if (!cluster) {
           continue;
         }
@@ -240,14 +253,14 @@ export class ClusterService {
 
         if (isLeaderless) {
           leaderlessStreams++;
-          warnings.push(`Stream "${(si as ExtendedStreamInfo).config?.name}" has no leader`);
+          warnings.push(`Stream "${streamName}" has no leader`);
         }
         if (isQuorumDegraded) {
           quorumDegradedStreams++;
         }
 
         streamHealth.push({
-          stream: (si as ExtendedStreamInfo).config?.name ?? 'unknown',
+          stream: streamName,
           cluster_name: cluster.name,
           leader,
           replicas: totalReplicas,
@@ -259,6 +272,11 @@ export class ClusterService {
           healthy: isHealthy,
         });
       }
+
+      streamCount = streams.length;
+      consumerCount = streamConsumers;
+      totalMessages = streamMessages;
+      totalBytes = streamBytes;
     } catch (error: unknown) {
       this.logger.warn(`Failed to list streams for cluster health: ${(error as Error).message}`);
       caveats.push('Stream health information unavailable');

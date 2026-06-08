@@ -30,6 +30,7 @@ import {
   consumerFilterSubjects,
   singleConsumerFilterSubject,
 } from '@/lib/subject-analysis';
+import { CONSUMER_FIELD_HELP } from '@/lib/field-help';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -54,8 +55,8 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { BulkDeleteDialog } from '@/components/ui/bulk-delete-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/cards/StatCard';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -737,28 +738,58 @@ function ConsumerEditForm({
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
                   <div>
-                    <Label className="text-muted-foreground">Name / Durable</Label>
+                    <FieldLabel
+                      className="text-muted-foreground"
+                      help={CONSUMER_FIELD_HELP.immutableName}
+                    >
+                      Name / Durable
+                    </FieldLabel>
                     <Input value={consumer.config.durable_name || consumer.name} disabled />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Type</Label>
+                    <FieldLabel
+                      className="text-muted-foreground"
+                      help={CONSUMER_FIELD_HELP.immutableType}
+                    >
+                      Type
+                    </FieldLabel>
                     <Input value={consumer.config.deliver_subject ? 'Push' : 'Pull'} disabled />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Filter Subjects</Label>
+                    <FieldLabel
+                      className="text-muted-foreground"
+                      help={CONSUMER_FIELD_HELP.immutableFilters}
+                    >
+                      Filter Subjects
+                    </FieldLabel>
                     <Input value={consumerFilterLabel(consumer.config)} disabled />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Deliver Policy</Label>
+                    <FieldLabel
+                      className="text-muted-foreground"
+                      help={CONSUMER_FIELD_HELP.immutableDeliverPolicy}
+                    >
+                      Deliver Policy
+                    </FieldLabel>
                     <Input value={consumer.config.deliver_policy || 'all'} disabled />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Ack Policy</Label>
+                    <FieldLabel
+                      className="text-muted-foreground"
+                      help={CONSUMER_FIELD_HELP.immutableAckPolicy}
+                    >
+                      Ack Policy
+                    </FieldLabel>
                     <Input value={consumer.config.ack_policy || 'explicit'} disabled />
                   </div>
                   {consumer.config.deliver_subject && (
                     <div>
-                      <Label className="text-muted-foreground">Deliver Subject</Label>
+                      <FieldLabel
+                        className="text-muted-foreground"
+                        help={CONSUMER_FIELD_HELP.immutableDeliverSubject}
+                      >
+                        Deliver Subject
+                      </FieldLabel>
                       <Input value={consumer.config.deliver_subject} disabled />
                     </div>
                   )}
@@ -768,7 +799,12 @@ function ConsumerEditForm({
               {/* Mutable fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1 md:col-span-2">
-                  <Label htmlFor="edit-consumer-description">Description</Label>
+                  <FieldLabel
+                    htmlFor="edit-consumer-description"
+                    help={CONSUMER_FIELD_HELP.description}
+                  >
+                    Description
+                  </FieldLabel>
                   <Input
                     id="edit-consumer-description"
                     {...register('description')}
@@ -777,7 +813,12 @@ function ConsumerEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-consumer-ack-wait">Ack Wait (seconds)</Label>
+                  <FieldLabel
+                    htmlFor="edit-consumer-ack-wait"
+                    help={CONSUMER_FIELD_HELP.ackWaitSeconds}
+                  >
+                    Ack Wait (seconds)
+                  </FieldLabel>
                   <Input
                     id="edit-consumer-ack-wait"
                     type="number"
@@ -791,7 +832,12 @@ function ConsumerEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-consumer-max-deliver">Max Deliver (-1 = unlimited)</Label>
+                  <FieldLabel
+                    htmlFor="edit-consumer-max-deliver"
+                    help={CONSUMER_FIELD_HELP.maxDeliver}
+                  >
+                    Max Deliver (-1 = unlimited)
+                  </FieldLabel>
                   <Input
                     id="edit-consumer-max-deliver"
                     type="number"
@@ -803,7 +849,12 @@ function ConsumerEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-consumer-max-ack-pending">Max Ack Pending</Label>
+                  <FieldLabel
+                    htmlFor="edit-consumer-max-ack-pending"
+                    help={CONSUMER_FIELD_HELP.maxAckPending}
+                  >
+                    Max Ack Pending
+                  </FieldLabel>
                   <Input
                     id="edit-consumer-max-ack-pending"
                     type="number"
@@ -816,7 +867,12 @@ function ConsumerEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-consumer-max-waiting">Max Waiting</Label>
+                  <FieldLabel
+                    htmlFor="edit-consumer-max-waiting"
+                    help={CONSUMER_FIELD_HELP.maxWaiting}
+                  >
+                    Max Waiting
+                  </FieldLabel>
                   <Input
                     id="edit-consumer-max-waiting"
                     type="number"
@@ -829,9 +885,12 @@ function ConsumerEditForm({
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-consumer-rate-limit">
-                    Rate Limit (bytes/sec, 0 = unlimited)
-                  </Label>
+                  <FieldLabel
+                    htmlFor="edit-consumer-rate-limit"
+                    help={CONSUMER_FIELD_HELP.rateLimit}
+                  >
+                    Rate Limit (bits/sec, 0 = unlimited)
+                  </FieldLabel>
                   <Input
                     id="edit-consumer-rate-limit"
                     type="number"
@@ -849,7 +908,9 @@ function ConsumerEditForm({
                     checked={headersOnly}
                     onCheckedChange={(checked) => setValue('headers_only', checked === true)}
                   />
-                  <Label htmlFor="edit-headers-only">Headers Only</Label>
+                  <FieldLabel htmlFor="edit-headers-only" help={CONSUMER_FIELD_HELP.headersOnly}>
+                    Headers Only
+                  </FieldLabel>
                 </div>
               </div>
 
@@ -1307,7 +1368,9 @@ export default function ConsumersPage() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="consumer-type">Consumer Type</Label>
+              <FieldLabel htmlFor="consumer-type" help={CONSUMER_FIELD_HELP.type}>
+                Consumer Type
+              </FieldLabel>
               <Select
                 value={formData.deliver_subject !== undefined ? 'push' : 'pull'}
                 onValueChange={(value) => {
@@ -1345,7 +1408,9 @@ export default function ConsumersPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label htmlFor="durable-name">Durable Name</Label>
+                <FieldLabel htmlFor="durable-name" help={CONSUMER_FIELD_HELP.durableName}>
+                  Durable Name
+                </FieldLabel>
                 <Input
                   id="durable-name"
                   ref={durableNameRef}
@@ -1359,7 +1424,9 @@ export default function ConsumersPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="consumer-name">Consumer Name (optional)</Label>
+                <FieldLabel htmlFor="consumer-name" help={CONSUMER_FIELD_HELP.consumerName}>
+                  Consumer Name (optional)
+                </FieldLabel>
                 <Input
                   id="consumer-name"
                   type="text"
@@ -1372,7 +1439,9 @@ export default function ConsumersPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="filter-subject">Filter Subjects</Label>
+                <FieldLabel htmlFor="filter-subject" help={CONSUMER_FIELD_HELP.filterSubjects}>
+                  Filter Subjects
+                </FieldLabel>
                 <Input
                   id="filter-subject"
                   type="text"
@@ -1385,7 +1454,9 @@ export default function ConsumersPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="consumer-description">Description</Label>
+                <FieldLabel htmlFor="consumer-description" help={CONSUMER_FIELD_HELP.description}>
+                  Description
+                </FieldLabel>
                 <Input
                   id="consumer-description"
                   type="text"
@@ -1400,7 +1471,9 @@ export default function ConsumersPage() {
               {formData.deliver_subject !== undefined && (
                 <>
                   <div className="space-y-1">
-                    <Label htmlFor="deliver-subject">Deliver Subject</Label>
+                    <FieldLabel htmlFor="deliver-subject" help={CONSUMER_FIELD_HELP.deliverSubject}>
+                      Deliver Subject
+                    </FieldLabel>
                     <Input
                       id="deliver-subject"
                       type="text"
@@ -1416,7 +1489,9 @@ export default function ConsumersPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="deliver-group">Deliver Group (optional)</Label>
+                    <FieldLabel htmlFor="deliver-group" help={CONSUMER_FIELD_HELP.deliverGroup}>
+                      Deliver Group (optional)
+                    </FieldLabel>
                     <Input
                       id="deliver-group"
                       type="text"
@@ -1432,7 +1507,9 @@ export default function ConsumersPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="idle-heartbeat">Idle Heartbeat (nanoseconds, 0 = off)</Label>
+                    <FieldLabel htmlFor="idle-heartbeat" help={CONSUMER_FIELD_HELP.idleHeartbeat}>
+                      Idle Heartbeat (nanoseconds, 0 = off)
+                    </FieldLabel>
                     <Input
                       id="idle-heartbeat"
                       type="number"
@@ -1455,13 +1532,17 @@ export default function ConsumersPage() {
                         setFormData((prev) => ({ ...prev, flow_control: checked === true }))
                       }
                     />
-                    <Label htmlFor="flow-control">Flow Control</Label>
+                    <FieldLabel htmlFor="flow-control" help={CONSUMER_FIELD_HELP.flowControl}>
+                      Flow Control
+                    </FieldLabel>
                   </div>
                 </>
               )}
 
               <div className="space-y-1">
-                <Label htmlFor="ack-policy">Ack Policy</Label>
+                <FieldLabel htmlFor="ack-policy" help={CONSUMER_FIELD_HELP.ackPolicy}>
+                  Ack Policy
+                </FieldLabel>
                 <Select
                   value={formData.ack_policy}
                   onValueChange={(value) =>
@@ -1483,7 +1564,9 @@ export default function ConsumersPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="deliver-policy">Deliver Policy</Label>
+                <FieldLabel htmlFor="deliver-policy" help={CONSUMER_FIELD_HELP.deliverPolicy}>
+                  Deliver Policy
+                </FieldLabel>
                 <Select
                   value={formData.deliver_policy}
                   onValueChange={(value) =>
@@ -1508,7 +1591,9 @@ export default function ConsumersPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="ack-wait-ns">Ack Wait (nanoseconds)</Label>
+                <FieldLabel htmlFor="ack-wait-ns" help={CONSUMER_FIELD_HELP.ackWaitNs}>
+                  Ack Wait (nanoseconds)
+                </FieldLabel>
                 <Input
                   id="ack-wait-ns"
                   type="number"
@@ -1521,7 +1606,9 @@ export default function ConsumersPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="max-deliver">Max Deliver</Label>
+                <FieldLabel htmlFor="max-deliver" help={CONSUMER_FIELD_HELP.maxDeliver}>
+                  Max Deliver
+                </FieldLabel>
                 <Input
                   id="max-deliver"
                   type="number"
@@ -1533,7 +1620,9 @@ export default function ConsumersPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="max-ack-pending">Max Ack Pending</Label>
+                <FieldLabel htmlFor="max-ack-pending" help={CONSUMER_FIELD_HELP.maxAckPending}>
+                  Max Ack Pending
+                </FieldLabel>
                 <Input
                   id="max-ack-pending"
                   type="number"
@@ -1550,7 +1639,9 @@ export default function ConsumersPage() {
 
               {formData.deliver_subject === undefined && (
                 <div className="space-y-1">
-                  <Label htmlFor="max-waiting">Max Waiting</Label>
+                  <FieldLabel htmlFor="max-waiting" help={CONSUMER_FIELD_HELP.maxWaiting}>
+                    Max Waiting
+                  </FieldLabel>
                   <Input
                     id="max-waiting"
                     type="number"
@@ -1567,7 +1658,9 @@ export default function ConsumersPage() {
               )}
 
               <div className="space-y-1">
-                <Label htmlFor="rate-limit">Rate Limit (bytes/sec)</Label>
+                <FieldLabel htmlFor="rate-limit" help={CONSUMER_FIELD_HELP.rateLimit}>
+                  Rate Limit (bits/sec)
+                </FieldLabel>
                 <Input
                   id="rate-limit"
                   type="number"
@@ -1590,7 +1683,9 @@ export default function ConsumersPage() {
                     setFormData((prev) => ({ ...prev, headers_only: checked === true }))
                   }
                 />
-                <Label htmlFor="headers-only">Headers Only</Label>
+                <FieldLabel htmlFor="headers-only" help={CONSUMER_FIELD_HELP.headersOnly}>
+                  Headers Only
+                </FieldLabel>
               </div>
             </div>
 

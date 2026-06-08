@@ -10,6 +10,7 @@ import { usePurgeStream, useStream, useUpdateStream } from '@/hooks/useStreams';
 import { useConsumers } from '@/hooks/useConsumers';
 import { useClusterOverview } from '@/hooks/useCluster';
 import { useStreamMetrics } from '@/hooks/useMetrics';
+import { STREAM_FIELD_HELP } from '@/lib/field-help';
 import { streamUpdateSchema, StreamUpdateFormData } from '@/lib/schemas';
 import { copyText, downloadFile } from '@/lib/download';
 import { consumerFilterSubjects } from '@/lib/subject-analysis';
@@ -29,8 +30,8 @@ import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/cards/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/ui/page-header';
 import { LastUpdated } from '@/components/ui/last-updated';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -630,11 +631,18 @@ function StreamEditDialog({
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Name</Label>
+                <FieldLabel className="text-muted-foreground" help={STREAM_FIELD_HELP.name}>
+                  Name
+                </FieldLabel>
                 <Input value={config.name} disabled />
               </div>
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Storage</Label>
+                <FieldLabel
+                  className="text-muted-foreground"
+                  help={STREAM_FIELD_HELP.storageReadonly}
+                >
+                  Storage
+                </FieldLabel>
                 <Input value={config.storage || 'file'} disabled />
               </div>
             </div>
@@ -643,7 +651,9 @@ function StreamEditDialog({
           {/* Mutable fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="edit-subjects">Subjects (comma-separated)</Label>
+              <FieldLabel htmlFor="edit-subjects" help={STREAM_FIELD_HELP.subjects}>
+                Subjects (comma-separated)
+              </FieldLabel>
               <Input id="edit-subjects" {...register('subjects')} placeholder="orders.>" />
               {errors.subjects && (
                 <p className="text-xs text-destructive">{errors.subjects.message}</p>
@@ -651,7 +661,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="edit-description">Description</Label>
+              <FieldLabel htmlFor="edit-description" help={STREAM_FIELD_HELP.description}>
+                Description
+              </FieldLabel>
               <Input
                 id="edit-description"
                 {...register('description')}
@@ -660,7 +672,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-retention">Retention</Label>
+              <FieldLabel htmlFor="edit-retention" help={STREAM_FIELD_HELP.retention}>
+                Retention
+              </FieldLabel>
               <Select
                 value={watch('retention')}
                 onValueChange={(value) =>
@@ -679,7 +693,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-discard">Discard Policy</Label>
+              <FieldLabel htmlFor="edit-discard" help={STREAM_FIELD_HELP.discard}>
+                Discard Policy
+              </FieldLabel>
               <Select
                 value={watch('discard')}
                 onValueChange={(value) => setValue('discard', value as 'old' | 'new')}
@@ -695,7 +711,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-max-consumers">Max Consumers (-1 = unlimited)</Label>
+              <FieldLabel htmlFor="edit-max-consumers" help={STREAM_FIELD_HELP.maxConsumers}>
+                Max Consumers (-1 = unlimited)
+              </FieldLabel>
               <Input id="edit-max-consumers" type="number" {...register('max_consumers')} />
               {errors.max_consumers && (
                 <p className="text-xs text-destructive">{errors.max_consumers.message}</p>
@@ -703,7 +721,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-max-msgs">Max Messages (-1 = unlimited)</Label>
+              <FieldLabel htmlFor="edit-max-msgs" help={STREAM_FIELD_HELP.maxMessages}>
+                Max Messages (-1 = unlimited)
+              </FieldLabel>
               <Input id="edit-max-msgs" type="number" {...register('max_msgs')} />
               {errors.max_msgs && (
                 <p className="text-xs text-destructive">{errors.max_msgs.message}</p>
@@ -711,7 +731,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-max-bytes">Max Bytes (-1 = unlimited)</Label>
+              <FieldLabel htmlFor="edit-max-bytes" help={STREAM_FIELD_HELP.maxBytes}>
+                Max Bytes (-1 = unlimited)
+              </FieldLabel>
               <Input id="edit-max-bytes" type="number" {...register('max_bytes')} />
               {errors.max_bytes && (
                 <p className="text-xs text-destructive">{errors.max_bytes.message}</p>
@@ -719,7 +741,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-max-age">Max Age (seconds, 0 = unlimited)</Label>
+              <FieldLabel htmlFor="edit-max-age" help={STREAM_FIELD_HELP.maxAge}>
+                Max Age (seconds, 0 = unlimited)
+              </FieldLabel>
               <Input id="edit-max-age" type="number" min={0} {...register('max_age')} />
               {errors.max_age && (
                 <p className="text-xs text-destructive">{errors.max_age.message}</p>
@@ -727,7 +751,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-max-msg-size">Max Message Size (-1 = unlimited)</Label>
+              <FieldLabel htmlFor="edit-max-msg-size" help={STREAM_FIELD_HELP.maxMessageSize}>
+                Max Message Size (-1 = unlimited)
+              </FieldLabel>
               <Input id="edit-max-msg-size" type="number" {...register('max_msg_size')} />
               {errors.max_msg_size && (
                 <p className="text-xs text-destructive">{errors.max_msg_size.message}</p>
@@ -735,7 +761,9 @@ function StreamEditDialog({
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-replicas">Replicas</Label>
+              <FieldLabel htmlFor="edit-replicas" help={STREAM_FIELD_HELP.replicas}>
+                Replicas
+              </FieldLabel>
               <Input id="edit-replicas" type="number" min={1} {...register('replicas')} />
               {errors.replicas && (
                 <p className="text-xs text-destructive">{errors.replicas.message}</p>

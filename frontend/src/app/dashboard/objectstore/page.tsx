@@ -13,6 +13,7 @@ import {
   useDeleteObject,
 } from '@/hooks/useObjectStore';
 import { objectStoreApi } from '@/lib/api';
+import { OBJECT_STORE_FIELD_HELP } from '@/lib/field-help';
 import { ObjectStoreStatusInfo } from '@/lib/types';
 import {
   ArrowLeft,
@@ -55,8 +56,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -282,12 +283,16 @@ function ObjectBrowser({
           </DialogHeader>
           <form onSubmit={handleUpload} className="space-y-4">
             <div className="space-y-1">
-              <Label htmlFor="upload-file">File</Label>
+              <FieldLabel htmlFor="upload-file" help={OBJECT_STORE_FIELD_HELP.file}>
+                File
+              </FieldLabel>
               <Input id="upload-file" ref={fileInputRef} type="file" onChange={handleFileSelect} />
               {fileName && <p className="text-xs text-muted-foreground">Selected: {fileName}</p>}
             </div>
             <div className="space-y-1">
-              <Label htmlFor="upload-name">Object Name</Label>
+              <FieldLabel htmlFor="upload-name" help={OBJECT_STORE_FIELD_HELP.objectName}>
+                Object Name
+              </FieldLabel>
               <Input
                 id="upload-name"
                 value={uploadForm.name}
@@ -296,7 +301,9 @@ function ObjectBrowser({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="upload-description">Description (optional)</Label>
+              <FieldLabel htmlFor="upload-description" help={OBJECT_STORE_FIELD_HELP.description}>
+                Description (optional)
+              </FieldLabel>
               <Input
                 id="upload-description"
                 value={uploadForm.description}
@@ -570,7 +577,9 @@ export default function ObjectStorePage() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label htmlFor="os-name">Name</Label>
+                <FieldLabel htmlFor="os-name" help={OBJECT_STORE_FIELD_HELP.name}>
+                  Name
+                </FieldLabel>
                 <Input
                   id="os-name"
                   value={createForm.name}
@@ -579,7 +588,9 @@ export default function ObjectStorePage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="os-storage">Storage</Label>
+                <FieldLabel htmlFor="os-storage" help={OBJECT_STORE_FIELD_HELP.storage}>
+                  Storage
+                </FieldLabel>
                 <Select
                   value={createForm.storage}
                   onValueChange={(value) =>
@@ -600,7 +611,9 @@ export default function ObjectStorePage() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="os-description">Description (optional)</Label>
+              <FieldLabel htmlFor="os-description" help={OBJECT_STORE_FIELD_HELP.description}>
+                Description (optional)
+              </FieldLabel>
               <Input
                 id="os-description"
                 value={createForm.description}
@@ -611,7 +624,9 @@ export default function ObjectStorePage() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="os-replicas">Replicas</Label>
+              <FieldLabel htmlFor="os-replicas" help={OBJECT_STORE_FIELD_HELP.replicas}>
+                Replicas
+              </FieldLabel>
               <Input
                 id="os-replicas"
                 type="number"

@@ -14,6 +14,7 @@ import {
   useDeleteKvEntry,
   useKvWatchHistory,
 } from '@/hooks/useKv';
+import { KV_FIELD_HELP } from '@/lib/field-help';
 import { KvStoreStatus } from '@/lib/types';
 import {
   ArrowLeft,
@@ -54,8 +55,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -243,7 +244,9 @@ function KvKeyBrowser({
           </DialogHeader>
           <form onSubmit={handlePut} className="space-y-4">
             <div className="space-y-1">
-              <Label htmlFor="put-key">Key</Label>
+              <FieldLabel htmlFor="put-key" help={KV_FIELD_HELP.key}>
+                Key
+              </FieldLabel>
               <Input
                 id="put-key"
                 value={putForm.key}
@@ -252,7 +255,9 @@ function KvKeyBrowser({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="put-value">Value</Label>
+              <FieldLabel htmlFor="put-value" help={KV_FIELD_HELP.value}>
+                Value
+              </FieldLabel>
               <Textarea
                 id="put-value"
                 className="min-h-[120px]"
@@ -577,7 +582,9 @@ export default function KvPage() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label htmlFor="kv-name">Name</Label>
+                <FieldLabel htmlFor="kv-name" help={KV_FIELD_HELP.name}>
+                  Name
+                </FieldLabel>
                 <Input
                   id="kv-name"
                   value={createForm.name}
@@ -586,7 +593,9 @@ export default function KvPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="kv-storage">Storage</Label>
+                <FieldLabel htmlFor="kv-storage" help={KV_FIELD_HELP.storage}>
+                  Storage
+                </FieldLabel>
                 <Select
                   value={createForm.storage}
                   onValueChange={(value) =>
@@ -607,7 +616,9 @@ export default function KvPage() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="kv-description">Description (optional)</Label>
+              <FieldLabel htmlFor="kv-description" help={KV_FIELD_HELP.description}>
+                Description (optional)
+              </FieldLabel>
               <Input
                 id="kv-description"
                 value={createForm.description}
@@ -619,7 +630,9 @@ export default function KvPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label htmlFor="kv-history">History (versions per key)</Label>
+                <FieldLabel htmlFor="kv-history" help={KV_FIELD_HELP.history}>
+                  History (versions per key)
+                </FieldLabel>
                 <Input
                   id="kv-history"
                   type="number"
@@ -629,7 +642,9 @@ export default function KvPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="kv-replicas">Replicas</Label>
+                <FieldLabel htmlFor="kv-replicas" help={KV_FIELD_HELP.replicas}>
+                  Replicas
+                </FieldLabel>
                 <Input
                   id="kv-replicas"
                   type="number"

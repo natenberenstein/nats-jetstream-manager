@@ -1,5 +1,12 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { AckPolicy, DeliverPolicy, ReplayPolicy, ConsumerInfo, StreamInfo } from 'nats';
+import {
+  AckPolicy,
+  DeliverPolicy,
+  ReplayPolicy,
+  ConsumerInfo,
+  JetStreamManager,
+  StreamInfo,
+} from 'nats';
 import { ConnectionsService } from '../connections/connections.service';
 import { StreamsService } from '../streams/streams.service';
 import { isNatsNotFound } from '../common/nats/errors';
@@ -149,7 +156,7 @@ export class ConsumersService {
   ): Promise<{ consumers: ConsumerResponse[]; total: number }> {
     const { jsm } = this.connectionsService.getConnection(connectionId);
 
-    const consumers = await jsm.consumers.list(streamName).next();
+    const consumers = await this.listAllConsumers(jsm, streamName);
     const converted = consumers.map((ci) => this.convertConsumerInfo(ci));
 
     return { consumers: converted, total: converted.length };
@@ -324,7 +331,7 @@ export class ConsumersService {
     const lastSeq = streamInfo.state.last_seq;
 
     // List all consumers
-    const consumers = await jsm.consumers.list(streamName).next();
+    const consumers = await this.listAllConsumers(jsm, streamName);
 
     let totalPending = 0;
     let totalAckPending = 0;
@@ -337,7 +344,7 @@ export class ConsumersService {
       const numAckPending = ci.num_ack_pending ?? 0;
       const numWaiting = ci.num_waiting ?? 0;
 
-      const streamLag = lastSeq - deliveredStreamSeq;
+      const streamLag = Math.max(0, lastSeq - deliveredStreamSeq);
       const unackedSpan = deliveredStreamSeq - ackFloorStreamSeq;
 
       totalPending += numPending;
@@ -482,6 +489,18 @@ export class ConsumersService {
       num_waiting: ci.num_waiting ?? 0,
       num_ack_pending: ci.num_ack_pending ?? 0,
     };
+  }
+
+  private async listAllConsumers(
+    jsm: JetStreamManager,
+    streamName: string,
+  ): Promise<ConsumerInfo[]> {
+    const consumers: ConsumerInfo[] = [];
+    const lister = jsm.consumers.list(streamName);
+    for await (const ci of lister) {
+      consumers.push(ci);
+    }
+    return consumers;
   }
 
   private buildConsumerDiagnostic(

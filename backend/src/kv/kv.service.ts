@@ -4,8 +4,6 @@ import { ConnectionsService } from '../connections/connections.service';
 import { isNatsNotFound } from '../common/nats/errors';
 import { KvCreateDto } from './dto/kv.dto';
 
-const NANOS_PER_MILLI = 1_000_000;
-
 const STORAGE_MAP: Record<string, StorageType> = {
   file: StorageType.File,
   memory: StorageType.Memory,
@@ -81,7 +79,7 @@ export class KvService {
     if (dto.storage !== undefined) opts.storage = STORAGE_MAP[dto.storage];
     if (dto.history !== undefined) opts.history = dto.history;
     if (dto.max_bytes !== undefined) opts.max_bytes = dto.max_bytes;
-    if (dto.ttl !== undefined) opts.ttl = dto.ttl * NANOS_PER_MILLI;
+    if (dto.ttl !== undefined) opts.ttl = dto.ttl;
     if (dto.replicas !== undefined) opts.replicas = dto.replicas;
     if (dto.max_value_size !== undefined) opts.max_value_size = dto.max_value_size;
 
@@ -239,7 +237,7 @@ export class KvService {
       replicas: status.replicas,
       history: status.history,
       max_bytes: status.max_bytes,
-      ttl: status.ttl ? status.ttl / NANOS_PER_MILLI : 0,
+      ttl: status.ttl ?? 0,
       values: status.values,
       size: status.size,
     };

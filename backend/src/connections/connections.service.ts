@@ -28,6 +28,7 @@ export interface ConnectionListItem {
   connection_id: string;
   url: string;
   connected: boolean;
+  jetstream_enabled: boolean;
   created_at: string;
   last_accessed: string;
 }
@@ -211,10 +212,12 @@ export class ConnectionsService implements OnModuleDestroy {
     const items: ConnectionListItem[] = [];
 
     for (const [id, conn] of this.connections) {
+      const connected = !conn.nc.isClosed();
       items.push({
         connection_id: id,
         url: this.sanitizeUrl(conn.url),
-        connected: !conn.nc.isClosed(),
+        connected,
+        jetstream_enabled: connected,
         created_at: conn.createdAt.toISOString(),
         last_accessed: conn.lastAccessed.toISOString(),
       });
@@ -238,9 +241,11 @@ export class ConnectionsService implements OnModuleDestroy {
 
     conn.lastAccessed = new Date();
 
+    const connected = !conn.nc.isClosed();
+
     return {
-      connected: !conn.nc.isClosed(),
-      jetstream_enabled: true,
+      connected,
+      jetstream_enabled: connected,
       url: this.sanitizeUrl(conn.url),
       created_at: conn.createdAt.toISOString(),
       last_accessed: conn.lastAccessed.toISOString(),

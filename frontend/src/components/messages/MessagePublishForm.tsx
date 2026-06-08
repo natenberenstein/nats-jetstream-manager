@@ -4,12 +4,13 @@ import React, { FormEvent, useEffect, useState } from 'react';
 import { Plus, Save, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { MESSAGE_FIELD_HELP } from '@/lib/field-help';
 import { StreamInfo } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FieldLabel } from '@/components/ui/field-label';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -159,7 +160,9 @@ export function MessagePublishForm({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="block space-y-1">
-            <Label htmlFor="publish-stream">Stream</Label>
+            <FieldLabel htmlFor="publish-stream" help={MESSAGE_FIELD_HELP.stream}>
+              Stream
+            </FieldLabel>
             <div className="flex gap-2">
               <Select
                 value={selectedStream || ''}
@@ -216,7 +219,9 @@ export function MessagePublishForm({
           )}
 
           <div className="block space-y-1">
-            <Label htmlFor="publish-template">Publish Templates</Label>
+            <FieldLabel htmlFor="publish-template" help={MESSAGE_FIELD_HELP.templates}>
+              Publish Templates
+            </FieldLabel>
             <div className="flex gap-2">
               <Select onValueChange={applyTemplate} disabled={templates.length === 0}>
                 <SelectTrigger id="publish-template">
@@ -239,7 +244,9 @@ export function MessagePublishForm({
           </div>
 
           <div className="block space-y-1">
-            <Label htmlFor="publish-subject">Subject</Label>
+            <FieldLabel htmlFor="publish-subject" help={MESSAGE_FIELD_HELP.subject}>
+              Subject
+            </FieldLabel>
             <Input
               id="publish-subject"
               ref={subjectInputRef}
@@ -251,7 +258,9 @@ export function MessagePublishForm({
           </div>
 
           <div className="block space-y-1">
-            <Label htmlFor="publish-replay-subject">Replay Subject</Label>
+            <FieldLabel htmlFor="publish-replay-subject" help={MESSAGE_FIELD_HELP.replaySubject}>
+              Replay Subject
+            </FieldLabel>
             <Input
               id="publish-replay-subject"
               type="text"
@@ -267,14 +276,20 @@ export function MessagePublishForm({
               checked={batchMode}
               onCheckedChange={(checked) => setBatchMode(checked === true)}
             />
-            <Label htmlFor="batchMode" className="text-sm font-normal">
+            <FieldLabel
+              htmlFor="batchMode"
+              className="text-sm font-normal"
+              help={MESSAGE_FIELD_HELP.batchMode}
+            >
               Batch mode (one message per line)
-            </Label>
+            </FieldLabel>
           </div>
 
           {batchMode ? (
             <div className="block space-y-1">
-              <Label htmlFor="publish-batch-payload">Batch Payload</Label>
+              <FieldLabel htmlFor="publish-batch-payload" help={MESSAGE_FIELD_HELP.batchPayload}>
+                Batch Payload
+              </FieldLabel>
               <Textarea
                 id="publish-batch-payload"
                 value={batchPayload}
@@ -285,7 +300,9 @@ export function MessagePublishForm({
             </div>
           ) : (
             <div className="block space-y-1">
-              <Label htmlFor="publish-payload">Payload</Label>
+              <FieldLabel htmlFor="publish-payload" help={MESSAGE_FIELD_HELP.payload}>
+                Payload
+              </FieldLabel>
               <Textarea
                 id="publish-payload"
                 value={payload}
@@ -297,7 +314,9 @@ export function MessagePublishForm({
           )}
 
           <div className="block space-y-1">
-            <Label htmlFor="publish-headers">Headers (optional)</Label>
+            <FieldLabel htmlFor="publish-headers" help={MESSAGE_FIELD_HELP.headers}>
+              Headers (optional)
+            </FieldLabel>
             <Textarea
               id="publish-headers"
               value={headersInput}

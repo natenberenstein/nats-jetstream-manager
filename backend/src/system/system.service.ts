@@ -66,9 +66,9 @@ export class SystemService {
       memoryUsed = accountInfo.memory ?? 0;
       storageUsed = accountInfo.storage ?? 0;
 
-      // Total messages/bytes come from the account-level stats
+      // Account stats expose memory/file usage but not reliable total message counts.
       messages = accountInfo.messages ?? 0;
-      bytes = storageUsed;
+      bytes = memoryUsed + storageUsed;
 
       if (accountInfo.api) {
         jsApiTotal = accountInfo.api.total;
@@ -95,9 +95,13 @@ export class SystemService {
     const streamsByMessages: SystemMetricPoint[] = [];
 
     try {
-      const streamInfos = await jsm.streams.list().next();
+      let totalStreams = 0;
+      let totalStreamConsumers = 0;
+      let totalStreamMessages = 0;
+      let totalStreamBytes = 0;
+      const streamLister = jsm.streams.list();
 
-      for (const si of streamInfos) {
+      for await (const si of streamLister) {
         const config = (si as ExtendedStreamInfo).config;
         const state = (si as ExtendedStreamInfo).state;
         if (!config || !state) {
@@ -105,20 +109,23 @@ export class SystemService {
         }
 
         const name = config.name ?? 'unknown';
-        const streamBytes = state.bytes ?? 0;
-        const streamMessages = state.messages ?? 0;
+        const bytesForStream = state.bytes ?? 0;
+        const consumersForStream = state.consumer_count ?? 0;
+        const messagesForStream = state.messages ?? 0;
 
-        streamsByBytes.push({ name, value: streamBytes });
-        streamsByMessages.push({ name, value: streamMessages });
+        streamsByBytes.push({ name, value: bytesForStream });
+        streamsByMessages.push({ name, value: messagesForStream });
 
-        // If account-level messages wasn't available, accumulate from streams
-        if (messages === 0) {
-          messages += streamMessages;
-        }
-        if (bytes === 0) {
-          bytes += streamBytes;
-        }
+        totalStreams += 1;
+        totalStreamConsumers += consumersForStream;
+        totalStreamMessages += messagesForStream;
+        totalStreamBytes += bytesForStream;
       }
+
+      streams = totalStreams;
+      consumers = totalStreamConsumers;
+      messages = totalStreamMessages;
+      bytes = totalStreamBytes;
     } catch (error: unknown) {
       this.logger.warn(`Failed to list streams for observability: ${(error as Error).message}`);
     }

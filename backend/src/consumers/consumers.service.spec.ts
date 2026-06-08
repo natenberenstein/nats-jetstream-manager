@@ -3,9 +3,15 @@ import { ConsumerInfo, StreamInfo } from 'nats';
 import { ConsumersService } from './consumers.service';
 
 function createConsumerInfo(config: ConsumerInfo['config']): ConsumerInfo {
+  const name =
+    typeof config.name === 'string'
+      ? config.name
+      : typeof config.durable_name === 'string'
+        ? config.durable_name
+        : 'order-worker';
   return {
     stream_name: 'ORDERS',
-    name: 'order-worker',
+    name,
     created: '2026-01-01T00:00:00.000Z',
     config: {
       durable_name: 'order-worker',
@@ -27,6 +33,19 @@ function createConsumerLister(consumers: ConsumerInfo[]) {
     async *[Symbol.asyncIterator]() {
       for (const consumer of consumers) {
         yield consumer;
+      }
+    },
+  };
+}
+
+function createPagedConsumerLister(pages: ConsumerInfo[][]) {
+  return {
+    next: jest.fn().mockResolvedValue(pages[0] ?? []),
+    async *[Symbol.asyncIterator]() {
+      for (const page of pages) {
+        for (const consumer of page) {
+          yield consumer;
+        }
       }
     },
   };
@@ -61,6 +80,22 @@ describe('ConsumersService', () => {
     expect(result.consumers[0].config.filter_subject).toBeUndefined();
   });
 
+  it('lists consumers from every NATS list page', async () => {
+    const first = createConsumerInfo({ durable_name: 'first' } as ConsumerInfo['config']);
+    const second = createConsumerInfo({ durable_name: 'second' } as ConsumerInfo['config']);
+    const jsm = {
+      consumers: {
+        list: jest.fn().mockReturnValue(createPagedConsumerLister([[first], [second]])),
+      },
+    };
+    const service = createService(jsm);
+
+    const result = await service.listConsumers('connection-id', 'ORDERS');
+
+    expect(result.total).toBe(2);
+    expect(result.consumers.map((consumer) => consumer.name)).toEqual(['first', 'second']);
+  });
+
   it('preserves plural filter subjects in diagnostics responses', async () => {
     const consumerInfo = createConsumerInfo({
       filter_subjects: ['orders.created', 'orders.updated'],
@@ -83,6 +118,29 @@ describe('ConsumersService', () => {
 
     expect(result.consumers[0].filter_subjects).toEqual(['orders.created', 'orders.updated']);
     expect(result.consumers[0].filter_subject).toBeUndefined();
+  });
+
+  it('builds analytics from every NATS consumer list page', async () => {
+    const first = createConsumerInfo({ durable_name: 'first' } as ConsumerInfo['config']);
+    const second = createConsumerInfo({ durable_name: 'second' } as ConsumerInfo['config']);
+    const streamInfo = {
+      config: { name: 'ORDERS' },
+      state: { last_seq: 50 },
+    } as StreamInfo;
+    const jsm = {
+      streams: {
+        info: jest.fn().mockResolvedValue(streamInfo),
+      },
+      consumers: {
+        list: jest.fn().mockReturnValue(createPagedConsumerLister([[first], [second]])),
+      },
+    };
+    const service = createService(jsm);
+
+    const result = await service.getConsumerAnalytics('connection-id', 'ORDERS');
+
+    expect(result.total_consumers).toBe(2);
+    expect(result.consumers.map((consumer) => consumer.name)).toEqual(['first', 'second']);
   });
 
   it('creates consumers with plural filter subjects', async () => {
